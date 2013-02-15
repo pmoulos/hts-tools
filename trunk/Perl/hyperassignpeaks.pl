@@ -160,7 +160,7 @@ while (my $line = <SIG>)
 	{
 		for ($i=0; $i<@peakfile; $i++)
 		{
-			$hasPeak{$id}{basename($peakfile[$i])} = 0;
+			$hasPeak{$id}{basename($peakfile[$i])} = ();
 		}
 	}
 }
@@ -291,7 +291,8 @@ for ($i=0; $i<@peakfile; $i++)
 						push(@{$geneIndex{$currchr}{$geneids[$j]}},$j);
 						push(@sigallpeakids,$peakids[$k]);
 						push(@sigassgenes,$geneids[$j]);
-						$hasPeak{$geneids[$j]}{basename($peakfile[$i])}++;
+						#$hasPeak{$geneids[$j]}{basename($peakfile[$i])}++;
+						push(@{$hasPeak{$geneids[$j]}{basename($peakfile[$i])}},$peakids[$k]."_".$currdist);
 					}
 				}
 			}
@@ -448,7 +449,7 @@ for ($i=0; $i<@peakfile; $i++)
 						#my $pos = 0; # It was a tricky one bug...
 						if ($finalPeaks{$currpeak})
 						{
-							my ($q,$cq,$r) = split(/\t/,$finalPeaks{$currpeak});	
+							my ($q,$cq,$r) = split(/\t/,$finalPeaks{$currpeak});
 							my $s = ${$sigStart{$currchr}}[${$geneIndex{$currchr}{$currgene}}[$pos]];
 							my $e = ${$sigEnd{$currchr}}[${$geneIndex{$currchr}{$currgene}}[$pos]];
 							my $st = "+";
@@ -592,7 +593,9 @@ for ($i=0; $i<@peakfile; $i++)
 	}
 }
 
-&printMatrix(\%hasPeak) if (@out ~~ /matrix/);
+&printMatrix(\%hasPeak,"matrix-number") if (@out ~~ /matrix-number/);
+&printMatrix(\%hasPeak,"matrix-presence") if (@out ~~ /matrix-presence/);
+&printMatrix(\%hasPeak,"matrix-peaks") if (@out ~~ /matrix-peaks/);
 
 $date = &now;
 disp("$date - Finished!\n\n");
@@ -720,20 +723,61 @@ sub printGeneOrPeak
 sub printMatrix
 {
 	my $inhash = $_[0];
-	my ($row,$colhash);
-	my @v;
-	my $outfilename = &createOutputFile($peakfile[0],"matrix");
+	my $type = $_[1];
+	my ($row,$column,$colhash);
+	#my (@tmp,@v);
+	my $outfilename = &createOutputFile($peakfile[0],$type);
 	disp("Writing output in $outfilename...");
 	my @rows = keys(%$inhash);
 	open(OUTPUT,">$outfilename");
 	my $headhash = $inhash->{$rows[0]};
 	my @headers = keys(%$headhash);
 	print OUTPUT "GeneID\t",join("\t",@headers),"\n";
-	foreach $row (@rows)
+	if ($type =~ m/number/i)
 	{
-		$colhash = $inhash->{$row};
-		@v = values(%$colhash);
-		print OUTPUT "$row\t",join("\t",@v),"\n";
+		foreach $row (@rows)
+		{
+			$colhash = $inhash->{$row};
+			my @tmp = keys(%$colhash);
+			my @v;
+			foreach $column (@tmp)
+			{
+				(defined($colhash->{$column})) ?
+				(push(@v,scalar(@{$colhash->{$column}}))) :
+				(push(@v,0));
+			}
+			print OUTPUT "$row\t",join("\t",@v),"\n";
+		}
+	}
+	elsif ($type =~ m/presence/i)
+	{
+		foreach $row (@rows)
+		{
+			$colhash = $inhash->{$row};
+			my @tmp = keys(%$colhash);
+			my @v;
+			foreach $column (@tmp)
+			{
+				(defined($colhash->{$column})) ? (push(@v,"+")) : (push(@v,"-"));
+			}
+			print OUTPUT "$row\t",join("\t",@v),"\n";
+		}
+	}
+	elsif ($type =~ m/peaks/i)
+	{
+		foreach $row (@rows)
+		{
+			$colhash = $inhash->{$row};
+			my @tmp = keys(%$colhash);
+			my @v;
+			foreach $column (@tmp)
+			{
+				(defined($colhash->{$column})) ?
+				(push(@v,join("; ",@{$colhash->{$column}}))) :
+				(push(@v,"NP"));
+			}
+			print OUTPUT "$row\t",join("\t",@v),"\n";
+		}
 	}
 	close(OUTPUT);
 }
@@ -811,12 +855,12 @@ sub checkInputs
 			if ($c ne "stats" && $c ne "gff-peak" && $c ne "gff-gene" && $c ne "peak" &&  
 				$c ne "gene" && $c ne "all-peak" && $c ne "all-gene" && $c ne "pretty-peak" && 
 				$c ne "pretty-gene" && $c ne "gff-peak-db" && $c ne "gff-gene-db" && $c ne "peakdata"
-				&& $c ne "matrix")
+				&& $c ne "matrix-number" && $c ne "matrix-presence" && $c ne "matrix-peaks")
 			{
 				my $msg = "WARNING! --outformat options should be \"gff-peak\", \"gff-gene\", \"peak\",\n".
 						  "\"gene\", \"all-peak\", \"all-gene\", \"pretty-peak\", \"pretty-gene\", \"gff-peak-db\",\n".
-						  "\"gff-gene-db\", \"peakdata\", or \"stats\"\n".
-						  "Using default (\"gff-peak\")...";
+						  "\"gff-gene-db\", \"peakdata\", \"stats\", \"matrix-number\", \"matrix-presence\" or ".
+						  "\"matrix-peaks\" \nUsing default (\"gff-peak\")...";
 				disp($msg);
 				@out = ("gff-peak");
 			}
@@ -851,15 +895,15 @@ sub createOutputFile
 	my $in = shift @_;
 	my $type = shift @_;
 	my $ext;
-	my ($base,$dir) = fileparse($in,'\..*?');
+	my ($base,$dir) = fileparse($in,'\.[^.]*');
 	if ($type =~/gff/)
 	{
 		($type =~/db/) ? ($ext = ".txt") : ($ext = ".gff");
 	}
 	else { $ext = ".txt" }
-	if ($type eq "matrix")
+	if ($type =~ /matrix/)
 	{
-		return($dir."gene-peak-matrix.txt");
+		return($dir."gene-peak-$type.txt");
 	}
 	else
 	{
@@ -967,10 +1011,18 @@ $scriptname --input peakfile(s) --region regfile --background backfile [OPTIONS]
 				(please see output).
 				"peakdata" for retrieving only the assigned peaks from
 				the original peak file.
-				"matrix" to retrieve a spreadsheet-like file where rows
-				correspond to genes (or the --region file) and columns
+				"matrix-number" to retrieve a spreadsheet-like file where 
+				rows correspond to genes (or the --region file) and columns
 				correspond to peak files. The cell (i,j) contains the number
 				of peaks in peak file j assigned to gene i.
+				"matrix-presence" to retrieve a spreadsheet-like file where 
+				rows correspond to genes (or the --region file) and columns
+				correspond to peak files. The cell (i,j) contains "+" if peak
+				in peak file j assigned to gene i, "-" otherwise.
+				"matrix-peaks" to retrieve a spreadsheet-like file where 
+				rows correspond to genes (or the --region file) and columns
+				correspond to peak files. The cell (i,j) contains the peaks
+				in peak file j assigned to gene i, "NP" otherwise.
 			Example: --outformat stats gff-peak pretty-gene matrix
   --header|e		Use this option if you have a header line in
 			your input files.
