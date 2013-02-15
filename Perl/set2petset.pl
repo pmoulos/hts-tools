@@ -5,6 +5,7 @@
 
 use strict;
 use Getopt::Long;
+use File::Basename;
 use Pod::Usage;
 
 # Make sure output is unbuffered
@@ -43,21 +44,9 @@ else { $out = *STDOUT; }
 
 if ($insert)
 {
-	# Make a simple check to see if re-pairing part of set2petset has been run
-	my $reprun = 0;
-	my $checkcounter = 0;
-	while ((my $line = <INPUT>) && ($checkcounter < 50))
-	{
-		$checkcounter++;
-		#$line =~ s/\r|\n$//g;
-		my @cols = split(/\t/,$line);
-		$reprun = 1 if ($cols[3] =~ m/_(P|U)/i);
-	}
-	die "\nYou must run $scriptname on collapsed PETs first (directly from a BAM file with e.g. bamToBed)!\n\n" if (!$reprun);
-
-	seek(INPUT,0,0);
 	while (my $line = <INPUT>)
 	{
+		disp("Processed $. paired-end or unpaired single-end reads from ".basename($input)."...") if ($.%1000000 == 0);
 		$line =~ s/\r|\n$//g;
 		my @cols = split(/\t/,$line);
 		my ($chr,$start,$end) = ($cols[0],$cols[1],$cols[2]);
@@ -82,16 +71,23 @@ if ($insert)
 			print $out "$chr\t$istart\t$iend\t$iname\t$cols[4]\t$cols[5]\n"
 				unless ($iend < $istart || abs($iend - $istart) <= $dovetol); # Dovetail or too close!
 		}
-		else
+		elsif ($cols[3] =~ m/_U/i)
 		{
 			print join("\t",@cols),"\n";
+		}
+		else # Re-pairing part of set2petset has been run! Throw error!
+		{
+			disp("Unprocessed read by re-pairing found at line #$.");
+			die "\nYou must run $scriptname on collapsed PETs first (directly from a BAM file with e.g. bamToBed)!\n\n";
 		}
 	}
 }
 else # Just re-pair
 {
+	my ($sdseqname,$ddseqname);
 	while (my $line = <INPUT>)
 	{
+		disp("Processed $. single-end reads from ".basename($input)."...") if ($.%1000000 == 0);
 		$line =~ s/\r|\n$//g;
 		my @cols = split(/\t/,$line);
 		next if ($cols[4] < $score || $cols[0] =~ m/chrM|rand|chrU|hap/);
@@ -105,7 +101,6 @@ else # Just re-pair
 			$namehash{$seqname}{"end"} = $end;
 			$namehash{$seqname}{"strand"} = $strand;
 			$namehash{$seqname}{"score"} = $score;
-			$isPaired{$seqname} = 0;
 		}
 		else
 		{
@@ -124,41 +119,59 @@ else # Just re-pair
 						$namehash{$seqname}{"end"} = $end;
 					}
 					$namehash{$seqname}{"strand"} = "+";
-					$isPaired{$seqname} = 1;
+					print $out $namehash{$seqname}{"chr"}."\t".
+					$namehash{$seqname}{"start"}."\t".$namehash{$seqname}{"end"}."\t".
+					$seqname."_P\t".$namehash{$seqname}{"score"}."\t".$namehash{$seqname}{"strand"}."\n";
+					delete $namehash{$seqname};
 				}
 				else # Discordant pair, same chromosome
 				{
-					$namehash{"Discordant_SameChr_$sdiscordant"}{"chr"} = $chr;
-					$namehash{"Discordant_SameChr_$sdiscordant"}{"start"} = $start;
-					$namehash{"Discordant_SameChr_$sdiscordant"}{"end"} = $end;
-					$namehash{"Discordant_SameChr_$sdiscordant"}{"strand"} = $strand;
-					$namehash{"Discordant_SameChr_$sdiscordant"}{"score"} = $score;
-					$isPaired{"Discordant_SameChr_$sdiscordant"} = 0;
+					$sdseqname = "Discordant_SameChr_$sdiscordant";
+					$namehash{$sdseqname}{"chr"} = $chr;
+					$namehash{$sdseqname}{"start"} = $start;
+					$namehash{$sdseqname}{"end"} = $end;
+					$namehash{$sdseqname}{"strand"} = $strand;
+					$namehash{$sdseqname}{"score"} = $score;
 					$sdiscordant++;
+					print $out $namehash{$seqname}{"chr"}."\t".
+					$namehash{$seqname}{"start"}."\t".$namehash{$seqname}{"end"}."\t".
+					$seqname."_U\t".$namehash{$seqname}{"score"}."\t".$namehash{$seqname}{"strand"}."\n";
+					print $out $namehash{$sdseqname}{"chr"}."\t".
+					$namehash{$sdseqname}{"start"}."\t".$namehash{$sdseqname}{"end"}."\t".
+					$sdseqname."_U\t".$namehash{$sdseqname}{"score"}."\t".$namehash{$sdseqname}{"strand"}."\n";
+					delete $namehash{$seqname};
+					delete $namehash{$sdseqname};
 				}
 			}
-			else # Discordant pair, different chromosoe
+			else # Discordant pair, different chromosome
 			{
-				$namehash{"Discordant_DiffChr_$ddiscordant"}{"chr"} = $chr;
-				$namehash{"Discordant_DiffChr_$ddiscordant"}{"start"} = $start;
-				$namehash{"Discordant_DiffChr_$ddiscordant"}{"end"} = $end;
-				$namehash{"Discordant_DiffChr_$ddiscordant"}{"strand"} = $strand;
-				$namehash{"Discordant_DiffChr_$ddiscordant"}{"score"} = $score;
-				$isPaired{"Discordant_DiffChr_$ddiscordant"} = 0;
+				$ddseqname = "Discordant_DiffChr_$ddiscordant";
+				$namehash{$ddseqname}{"chr"} = $chr;
+				$namehash{$ddseqname}{"start"} = $start;
+				$namehash{$ddseqname}{"end"} = $end;
+				$namehash{$ddseqname}{"strand"} = $strand;
+				$namehash{$ddseqname}{"score"} = $score;
 				$ddiscordant++;
+				print $out $namehash{$seqname}{"chr"}."\t".
+				$namehash{$seqname}{"start"}."\t".$namehash{$seqname}{"end"}."\t".
+				$seqname."_U\t".$namehash{$seqname}{"score"}."\t".$namehash{$seqname}{"strand"}."\n";
+				print $out $namehash{$ddseqname}{"chr"}."\t".
+				$namehash{$ddseqname}{"start"}."\t".$namehash{$ddseqname}{"end"}."\t".
+				$ddseqname."_U\t".$namehash{$ddseqname}{"score"}."\t".$namehash{$ddseqname}{"strand"}."\n";
+				delete $namehash{$seqname};
+				delete $namehash{$ddseqname};
 			}
 		}
 	}
+
 	close(INPUT);
 
-	# Print the case of simple re-pairing
-	my $pflag;
+	# There are a number of unpaired reads to be printed in the hash...
 	foreach my $name (keys(%namehash))
 	{
-		($isPaired{$name}) ? ($pflag = "_P") : ($pflag = "_U");
-		print $out "$namehash{$name}{\"chr\"}\t".
-		"$namehash{$name}{\"start\"}\t$namehash{$name}{\"end\"}\t".
-		"$name$pflag\t$namehash{$name}{\"score\"}\t$namehash{$name}{\"strand\"}\n";
+		print $out $namehash{$name}{"chr"}."\t".
+		$namehash{$name}{"start"}."\t".$namehash{$name}{"end"}."\t".
+		$name."_U\t".$namehash{$name}{"score"}."\t".$namehash{$name}{"strand"}."\n";
 	}
 }
 
@@ -250,14 +263,6 @@ sub check_inputs
 	}
 }
 
-sub zeroFill
-{
-	my ($n,$len) = @_;
-	my $diff = $len - length($n);
-	return($n) if $diff <= 0;
-	return(('0'x$diff).$n);
-}
-
 sub disp
 {
 	print STDERR "\n@_" if (!$silent);
@@ -274,6 +279,18 @@ sub disp
 	#$namehash{$seqname}{"score"} = $score if ($score > $namehash{$seqname}{"score"});
 	#$namehash{$seqname}{"strand"} = "+";
 #}
+# Make a simple check to see if re-pairing part of set2petset has been run
+# Does not work as the STDIN is not seekable!
+#my $reprun = 0;
+#my $checkcounter = 0;
+#while ((my $line = <INPUT>) && ($checkcounter < 50))
+#{
+	#$checkcounter++;
+	##$line =~ s/\r|\n$//g;
+	#my @cols = split(/\t/,$line);
+	#$reprun = 1 if ($cols[3] =~ m/_(P|U)/i);
+#}
+#seek(INPUT,0,0);
 
 __END__
 
@@ -304,7 +321,7 @@ categorizing the reads to Paired (P), Unpaired (U) or Discordant (Discordant), a
 use to retrieve the insert reads between a pair of reads given some constraints (e.g. minimum insert
 size or maximum distance between pairs). Note that set2petset serves two functionalities, defined by
 the combination of parameters. If --insert is not chosen, the program will return a list of re-paired
-(very long reads) with their insert size. If executed with --insert and --tagsize, it will return a
+(very long) reads with their insert size. If executed with --insert and --tagsize, it will return a
 set of single-end reads characterized according to their position and also the insert sequence.
 
 =head1 ARGUMENTS
