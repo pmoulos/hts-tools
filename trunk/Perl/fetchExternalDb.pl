@@ -118,7 +118,7 @@ sub check_inputs
     	&program_usage;
     	exit;
     }
-    $stop .= "--- Please provide either a local data source of the word download ---" if (!$source);
+    $stop .= "--- Please provide either a local data source or the word download ---" if (!$source);
     $stop .= "--- Please provide database connection data ---\n" if (!@dbdata);
     $stop .= "--- --dbdata should be consisted of two strings! ---\n"
 		if (@dbdata && $#dbdata+1 != 2);

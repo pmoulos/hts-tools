@@ -54,6 +54,7 @@ our $exact = 0;		# Percentage intersections exactly as the UCSC Table Browser?
 our $npass = 3;		# Number of passes for dynamic binary search
 our $agap = 0;      # Acceptable gap to say that two peaks from two conditions are close
 our @out;		 	# Output files
+our $multi;	# Called from outside to multiply intersect?
 our $header = 0;	# Files contain header?
 our $waitbar = 0;  	# Do not use waitbar
 our $silent = 0;  	# Display verbose messages
@@ -748,7 +749,7 @@ $bB = fileparse($ofileB,'\..*?') if ($ovB || $oB);
 
 # Remove garbage
 (!$windows) ? (`rm /tmp/temp*.in$$ `) : (`del /f /q temp*.tmp `) if ($sort);
-disp("Finished!\n\n");
+disp("Finished!\n\n") if (!$multi);
 
 
 sub binSearchAny
@@ -1161,6 +1162,7 @@ sub checkInputs
     		   "pass|n=i" => \$npass,
     		   "gap|g=i" => \$agap,
     		   "output|o=s{,}" => \@out,
+    		   "multi|m" => \$multi,
     		   "header|d" => \$header,
     		   "waitbar|w" => \$waitbar,
     		   "silent|s" => \$silent,
@@ -1375,7 +1377,8 @@ sub createOutputFile
 	my $type = shift @_;
 	my ($baseA,$dirA,$extA) = fileparse($inA,'\..*?');
 	my $baseB = fileparse($inB,'\..*?');
-	return($dirA.$baseA."_".$baseB."_".$type.$extA);
+	($multi) ? (return($dirA.$baseA.$baseB)) :
+	(return($dirA.$baseA."_".$baseB."_".$type.$extA));
 }
 
 sub countLines
@@ -1541,3 +1544,24 @@ END
 
 # Correct autoextend (only -1 as chromosome is not separated this time)
 #$autoxtend-- if ($autoxtend);
+
+# Template for R venn diagrams
+#library(VennDiagrams)
+#overrideTriple=TRUE
+#draw.triple.venn(
+	#area1=100,
+	#area2=80,
+	#area3=60,
+	#n12=30,
+	#n23=25,
+	#n13=20,
+	#n123=10,
+	#category=c("One","Two","Three"),
+	#fill=c("red","green","blue"),
+	#lty="blank",
+	#cex=2,
+	#cat.cex=2,
+	#cat.col=c("red","green","blue"),
+	#cat.fontfamily=c("arial","arial","arial")
+#)
+

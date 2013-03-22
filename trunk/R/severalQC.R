@@ -1,4 +1,4 @@
-source("/media/HD4/Fleming/dev/diagplots.R")
+source("/media/HD4/Fleming/hts-tools/R/diagplots.R")
 
 color.unreads <- function(ur,st=TRUE,log.it="FALSE",output="x11",fil=NULL,...)
 {
@@ -320,6 +320,9 @@ cor.qc <- function(input,classes,cor.type=c("counts","pca","mds","hilbert"),plot
 	not.dead <- which(apply(window.counts,1,any))
 	window.counts <- window.counts[not.dead,]
 
+	if (save.rdata)
+		save(window.counts,file=paste(real.fil[1],paste(real.fil[2],".RData",sep=""),sep=.Platform$file.sep))
+
 	# Calculate correlations and make plots
 	if ("counts" %in% cor.type)
 	{
@@ -387,8 +390,8 @@ cor.qc <- function(input,classes,cor.type=c("counts","pca","mds","hilbert"),plot
 		closeGraphics(output)
 	}
 
-	if (save.rdata)
-		save(window.counts,file=paste(real.fil[1],paste(real.fil[2],".RData",sep=""),sep=.Platform$file.sep))
+	#if (save.rdata)
+	#	save(window.counts,file=paste(real.fil[1],paste(real.fil[2],".RData",sep=""),sep=.Platform$file.sep))
 }
 
 plot.sat.macs <- function(macs.file,output="x11",fil=NULL,...)

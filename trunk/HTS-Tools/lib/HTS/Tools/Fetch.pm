@@ -1,0 +1,827 @@
+=head1 NAME
+
+HTS::Tools::Fetch - The great new HTS::Tools::Fetch!
+
+=head1 VERSION
+
+Version 0.01
+
+=head1 SYNOPSIS
+
+Quick summary of what the module does.
+
+Perhaps a little code snippet.
+
+    use HTS::Tools::Fetch;
+
+    my $foo = HTS::Tools::Fetch->new();
+    ...
+
+=head1 EXPORT
+
+A list of functions that can be exported.  You can delete this section
+if you don't export anything, such as for a purely object-oriented module.
+
+=head1 SUBROUTINES/METHODS
+
+=cut
+
+package HTS::Tools::Fetch;
+
+our $MODNAME = "HTS::Tools::Fetch";
+our $VERSION = '0.01';
+our $AUTHOR = "Panagiotis Moulos";
+our $EMAIL = "moulos\@fleming.gr";
+our $DESC = "Annotation download module for module HTS::Tools.";
+
+#################### SPECIAL SECTION ####################
+sub cosort
+{
+	my @one = split("-",$a);
+	my @two = split("-",$b);
+	return 1 if ($one[0] > $two[0]);
+	return -1 if ($one[0] < $two[0]);
+	if ($one[0] == $two[0])
+	{
+		return 1 if ($one[1] > $two[1]);
+		return 0 if ($one[1] == $two[1]);
+		return -1 if ($one[1] < $two[1]);
+	}
+}
+################## END SPECIAL SECTION ##################
+
+use v5.10;
+use strict;
+use warnings FATAL => 'all';
+
+use Carp;
+use DBI;
+use File::Basename;
+use File::Path qw(make_path remove_tree);
+use File::Spec;
+use File::Temp;
+use HTTP::Request;
+use LWP::UserAgent;
+
+use lib '/media/HD4/Fleming/dev/HTS-Tools/lib';
+use HTS::Tools::Queries;
+use HTS::Tools::Utils;
+
+use vars qw($helper $qobj);
+
+use constant BIOMART_PATH => "http://www.biomart.org/biomart/martservice?";
+
+BEGIN {
+	$helper = HTS::Tools::Utils->new();
+	$qobj = HTS::Tools::Queries->new();
+	select(STDOUT);
+	$|=1;
+	$SIG{INT} = sub { $helper->catch_cleanup; }
+}
+
+# Make sure output is unbuffered
+select(STDOUT);
+$|=1;
+
+=head2 new
+
+Constructor of HTS::Tools::Fetch module
+
+	use HTS::Tools::Fetch;
+	my $fetcher = HTS::Tools::Fetch->new($params);
+
+=cut
+
+sub new
+{
+	my ($class,$params) = @_;
+	my $self = {};
+
+	# Pass global variables to the helper
+	(defined($params->{"silent"})) ? ($helper->set("silent",$params->{"silent"})) :
+		($helper->set("silent",0));
+	(defined($params->{"tmpdir"})) ? ($helper->set("tmpdir",$params->{"tmpdir"})) :
+		($helper->set("tmpdir",File::Temp->newdir()));
+	
+	bless($self,$class);
+	$self->init($params);
+	return($self);
+}
+
+=head2 init($params)
+
+HTS::Tools::Fetch object initialization method. NEVER use this directly, use new instead.
+
+=cut
+
+sub init
+{
+	my ($self,$params) = @_;
+
+	# Basic
+	foreach my $p (keys(%$params)) { $self->set($p,$params->{$p}); }
+
+	# Global
+	$self->set("silent",$helper->get("silent")) unless defined($self->{"silent"});
+	$self->set("tmpdir",$helper->get("tmpdir")) unless defined($self->{"tmpdir"});
+    
+    return($self);
+}
+
+=head2 fetch_ensembl_genes
+
+Fetch a BED6+1 headed file with the latest Ensembl genes annotation for one of the suported organisms.
+Mostly for internal use but it can easily be used for fetching annotation too.
+
+	$fetcher->fetch_ensembl_genes("human");
+
+=cut
+
+sub fetch_ensembl_genes
+{
+	my ($self,$org) = @_;
+	my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
+	my $sp = $self->format_species($org,"ensembl");
+	my $xml = $self->get_xml_genes_query($sp);
+	my $path = BIOMART_PATH;
+	my $request = HTTP::Request->new("POST",$path,HTTP::Headers->new(),'query='.$xml."\n");
+	my $ua = LWP::UserAgent->new;
+	my $tmpfh = File::Temp->new(DIR => $tmpdir,SUFFIX => ".ens");
+	my $regs = File::Spec->catfile($tmpdir,"regions.txt");
+	my $response;
+
+	# We need to put data in a temporary file because it's scrambled by asynchronicity
+	$helper->disp("Querying Biomart...");
+	$ua->request($request,sub {
+		my ($data,$response) = @_;
+		if ($response->is_success) {
+			print $tmpfh "$data";
+		}
+		else {
+			warn ("Problems with the web server: ".$response->status_line);
+		}
+	},1000);
+
+	seek($tmpfh,0,SEEK_SET);
+	my %strand = ( 1 => "+", -1 => "-" );
+	open(REGS,">$regs");
+	print REGS "chromosome\tstart\tend\tensembl_id\tgc_content\tstrand\tgene_name\n";
+	while (my $line = <$tmpfh>)
+	{
+		next if ($line !~ m/^[0-9XY]/);
+		$line =~ s/\r|\n$//g;
+		my @cols = split(/\t/,$line);
+		print REGS "chr$cols[0]\t$cols[1]\t$cols[2]\t$cols[3]\t$cols[4]\t$strand{$cols[5]}\t$cols[6]\n";
+	}
+	close(REGS);
+	close($tmpfh);
+
+	return($regs);
+}
+
+sub fetch_ensembl_exons
+{
+	my ($self,$org) = @_;
+	my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
+	my $sp = $self->format_species($org,"ensembl");
+	my $xml = $self->get_xml_exons_query($sp);
+	my $path = BIOMART_PATH;
+	my $request = HTTP::Request->new("POST",$path,HTTP::Headers->new(),'query='.$xml."\n");
+	my $ua = LWP::UserAgent->new;
+	my $tmpfh = File::Temp->new(DIR => $tmpdir,SUFFIX => ".ens");
+	my $regs = File::Spec->catfile($tmpdir,"regions.txt");
+	my $response;
+
+	# We need to put data in a temporary file because it's scrambled by asynchronicity
+	$helper->disp("Querying Biomart...");
+	$ua->request($request,sub {   
+		my ($data,$response) = @_;
+		if ($response->is_success) {
+			print $tmpfh "$data";
+		}
+		else {
+			warn ("Problems with the web server: ".$response->status_line);
+		}
+	},1000);
+
+	seek($tmpfh,0,SEEK_SET);
+	my %strand = ( 1 => "+", -1 => "-" );
+	open(REGS,">$regs");
+	print REGS "chromosome\tstart\tend\tensembl_exon_id\tensembl_gene_id\tstrand\tgene_name\n";
+	while (my $line = <$tmpfh>)
+	{
+		next if ($line !~ m/^[0-9XY]/);
+		$line =~ s/\r|\n$//g;
+		my @cols = split(/\t/,$line);
+		print REGS "chr$cols[0]\t$cols[1]\t$cols[2]\t$cols[3]\t$cols[4]\t$strand{$cols[5]}\t$cols[6]\n";
+	}
+	close(REGS);
+	close($tmpfh);
+
+	return($regs);
+}
+
+sub fetch_ensembl_utr
+{
+	my ($self,$org,$utr) = @_;
+	my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
+	my $sp = $self->format_species($org,"ensembl");
+	my $xml = $self->get_xml_utr_query($sp,$utr);
+	my $path = BIOMART_PATH;
+	my $request = HTTP::Request->new("POST",$path,HTTP::Headers->new(),'query='.$xml."\n");
+	my $ua = LWP::UserAgent->new;
+	my $tmpfh = File::Temp->new(DIR => $tmpdir,SUFFIX => ".ens");
+	my $regs = File::Spec->catfile($tmpdir,"regions.txt");
+	my $response;
+
+	# We need to put data in a temporary file because it's scrambled by asynchronicity
+	$helper->disp("Querying Biomart...");
+	$ua->request($request,sub {
+		my ($data,$response) = @_;
+		if ($response->is_success) {
+			print $tmpfh "$data";
+		}
+		else {
+			warn ("Problems with the web server: ".$response->status_line);
+		}
+	},1000);
+
+	seek($tmpfh,0,SEEK_SET);
+	my %strand = ( 1 => "+", -1 => "-" );
+	open(REGS,">$regs");
+	print REGS "chromosome\tstart\tend\tensembl_id\ttranscript_count\tstrand\tname\n";
+	while (my $line = <$tmpfh>)
+	{
+		next if ($line !~ m/^[0-9XY]/);
+		$line =~ s/\r|\n$//g;
+		my @cols = split(/\t/,$line);
+		next if (!$cols[1]);
+		print REGS "chr$cols[0]\t$cols[1]\t$cols[2]\t$cols[3]\t$cols[4]\t$strand{$cols[5]}\t$cols[6]\n";
+	}
+	close(REGS);
+	close($tmpfh);
+
+	return($regs);
+}
+
+sub fetch_ensembl_cds
+{
+	my ($self,$org) = @_;
+	my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
+	my $sp = $self->format_species($org,"ensembl");
+	my $xml = $self->get_xml_cds_query($sp);
+	my $path = BIOMART_PATH;
+	my $request = HTTP::Request->new("POST",$path,HTTP::Headers->new(),'query='.$xml."\n");
+	my $ua = LWP::UserAgent->new;
+	my $tmpfh = File::Temp->new(DIR => $tmpdir,SUFFIX => ".ens");
+	my $regs = File::Spec->catfile($tmpdir,"regions.txt");
+	my $response;
+
+	# We need to put data in a temporary file because it's scrambled by asynchronicity
+	$helper->disp("Querying Biomart...");
+	$ua->request($request,sub {   
+		my ($data,$response) = @_;
+		if ($response->is_success) {
+			print $tmpfh "$data";
+		}
+		else {
+			warn ("Problems with the web server: ".$response->status_line);
+		}
+	},1000);
+
+	seek($tmpfh,0,SEEK_SET);
+	my %strand = ( 1 => "+", -1 => "-" );
+	open(REGS,">$regs");
+	print REGS "chromosome\tstart\tend\tensembl_exon_id\tensembl_gene_id\tstrand\tgene_name\n";
+	while (my $line = <$tmpfh>)
+	{
+		next if ($line !~ m/^[0-9XY]/);
+		$line =~ s/\r|\n$//g;
+		my @cols = split(/\t/,$line);
+		next if (!$cols[1]);
+		print REGS "chr$cols[0]\t$cols[1]\t$cols[2]\t$cols[3]\t$cols[4]\t$strand{$cols[5]}\t$cols[6]\n";
+	}
+	close(REGS);
+	close($tmpfh);
+
+	return($regs);
+}
+
+sub fetch_ucsc_genes
+{
+	my ($self,$org,$type,$source) = @_;
+	my $sp = $self->format_species($org,$source);
+	my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
+	my $regs = File::Spec->catfile($tmpdir,"regions.txt");
+	my ($q,$data);
+
+	open(REGS,">$regs");
+	print REGS "chromosome\tstart\tend\tucsc_id\texon_count\tstrand\tgene_name\n";
+
+	if ($source eq "ucsc")
+	{
+		if ($type eq "canonical")
+		{
+			$helper->disp("Querying UCSC database for UCSC canonical genes...");
+			$q = $qobj->get_query("ucsc_canonical_genes");
+		}
+		elsif ($type eq "alternative")
+		{
+			$helper->disp("Querying UCSC database for UCSC alternative genes...");
+			$q = $qobj->get_query("ucsc_alternative_genes");
+		}
+	}
+	elsif ($source eq "refseq")
+	{
+		if ($type eq "canonical")
+		{
+			$helper->disp("Querying UCSC database for RefSeq canonical genes...");
+			$q = $qobj->get_query("refseq_canonical_genes");
+		}
+		elsif ($type eq "alternative")
+		{
+			$helper->disp("Querying UCSC database for RefSeq alternative genes...");
+			$q = $qobj->get_query("refseq_alternative_genes");
+		}
+	}
+	my $conn = $self->open_connection($sp);
+	my $sth = $conn->prepare($q);
+	$sth->execute();
+	while ($data = $sth->fetchrow_hashref())
+	{
+		print REGS $data->{"chrom"}."\t".$data->{"chromStart"}."\t".$data->{"chromEnd"}."\t".
+			$data->{"transcript"}."\t".$data->{"exonCount"}."\t".$data->{"strand"}."\t".$data->{"geneName"}."\n";
+	}
+	$self->close_connection($conn);
+	close(REGS);
+	return($regs);
+}
+
+sub fetch_ucsc_exons
+{
+	my ($self,$org,$type,$source) = @_;
+	my $sp = $self->format_species($org,$source);
+	my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
+	my $regs = File::Spec->catfile($tmpdir,"regions.txt");
+	my ($q,$data,$i);
+	my (@starts,@ends,@coords,@ses);
+
+	open(REGS,">$regs");
+	print REGS "chromosome\tstart\tend\texon_id\texon_count\tstrand\ttranscript_name\n";
+
+	if ($source eq "ucsc")
+	{
+		if ($type eq "canonical")
+		{
+			$helper->disp("Querying UCSC database for UCSC canonical exons...");
+			$q = $qobj->get_query("ucsc_canonical_exons");
+		}
+		elsif ($type eq "alternative")
+		{
+			$helper->disp("Querying UCSC database for UCSC alternative exnos...");
+			$q = $qobj->get_query("ucsc_alternative_exons");
+		}
+	}
+	elsif ($source eq "refseq")
+	{
+		if ($type eq "canonical")
+		{
+			$helper->disp("Querying UCSC database for RefSeq canonical exons...");
+			$q = $qobj->get_query("refseq_canonical_exons");
+		}
+		elsif ($type eq "alternative")
+		{
+			$helper->disp("Querying UCSC database for RefSeq alternative exons...");
+			$q = $qobj->get_query("refseq_alternative_exons");
+		}
+	}
+	my $conn = $self->open_connection($sp);
+	my $sth = $conn->prepare($q);
+	$sth->execute();
+	while ($data = $sth->fetchrow_hashref())
+	{
+
+		@starts = split(",",$data->{"exonStarts"});
+		@ends = split(",",$data->{"exonEnds"});
+		for ($i=0; $i<@starts; $i++)
+		{
+			push(@coords,$starts[$i]."-".$ends[$i]);
+		}
+		my %u = &unique(@coords);
+		@coords = sort cosort keys(%u);
+		foreach my $k (@coords)
+		{
+			@ses = split("-",$k);
+			print REGS $data->{"chrom"}."\t".$ses[0]."\t".$ses[1]."\t".$data->{"name"}."\t".
+			$data->{"exonCount"}."\t".$data->{"strand"}."\t".$data->{"transcript"}."\n";
+		}
+	}
+	$self->close_connection($conn);
+	close(REGS);
+	return($regs);
+}
+
+sub fetch_ucsc_utr
+{
+	my ($self,$org,$type,$source,$utr) = @_;
+	my $sp = $self->format_species($org,$source);
+	my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
+	my $regs = File::Spec->catfile($tmpdir,"regions.txt");
+	my ($q,$data);
+
+	open(REGS,">$regs");
+	print REGS "chromosome\tstart\tend\tucsc_id\texon_count\tstrand\tgene_name\n";
+
+	if ($source eq "ucsc")
+	{
+		if ($type eq "canonical")
+		{
+			if ($utr == 5)
+			{
+				$helper->disp("Querying UCSC database for UCSC canonical 5'UTRs...");
+				$q = $qobj->get_query("ucsc_canonical_5utr");
+			}
+			elsif ($utr == 3)
+			{
+				$helper->disp("Querying UCSC database for UCSC canonical 3'UTRs...");
+				$q = $qobj->get_query("ucsc_canonical_3utr");
+			}
+		}
+		elsif ($type == "alternative")
+		{
+			if ($utr == 5)
+			{
+				$helper->disp("Querying UCSC database for UCSC alternative 5'UTRs...");
+				$q = $qobj->get_query("ucsc_alternative_5utr");
+			}
+			elsif ($utr == 3)
+			{
+				$helper->disp("Querying UCSC database for UCSC alternative 3'UTRs...");
+				$q = $qobj->get_query("ucsc_alternative_3utr");
+			}
+		}
+	}
+	elsif ($source eq "refseq")
+	{
+		if ($type eq "canonical")
+		{
+			if ($utr == 5)
+			{
+				$helper->disp("Querying UCSC database for RefSeq canonical 5'UTRs...");
+				$q = $qobj->get_query("refseq_canonical_5utr");
+			}
+			elsif ($utr == 3)
+			{
+				$helper->disp("Querying UCSC database for RefSeq canonical 3'UTRs...");
+				$q = $qobj->get_query("refseq_canonical_3utr");
+			}
+		}
+		elsif ($type == "alternative")
+		{
+			if ($utr == 5)
+			{
+				$helper->disp("Querying UCSC database for RefSeq alternative 5'UTRs...");
+				$q = $qobj->get_query("refseq_alternative_5utr");
+			}
+			elsif ($utr == 3)
+			{
+				$helper->disp("Querying UCSC database for RefSeq alternative 3'UTRs...");
+				$q = $qobj->get_query("refseq_alternative_3utr");
+			}
+		}
+	}
+	
+	my $conn = $self->open_connection($sp);
+	my $sth = $conn->prepare($q);
+	$sth->execute();
+	while ($data = $sth->fetchrow_hashref())
+	{
+		print REGS $data->{"chrom"}."\t".$data->{"chromStart"}."\t".$data->{"chromEnd"}."\t".
+			$data->{"transcript"}."\t".$data->{"exonCount"}."\t".$data->{"strand"}."\t".$data->{"geneName"}."\n";
+	}
+	$self->close_connection($conn);
+	close(REGS);
+	return($regs);
+}
+
+sub fetch_ucsc_cds
+{
+	my ($self,$org,$type,$source) = @_;
+	my $sp = $self->format_species($org,$source);
+	my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
+	my $regs = File::Spec->catfile($tmpdir,"regions.txt");
+	my ($q,$data);
+
+	open(REGS,">$regs");
+	print REGS "chromosome\tstart\tend\tucsc_id\texon_count\tstrand\tgene_name\n";
+
+	if ($source eq "ucsc")
+	{
+		if ($type eq "canonical")
+		{
+			disp("Querying UCSC database for UCSC canonical CDS...");
+			$q = $qobj->get_query("ucsc_canonical_cds");
+		}
+		elsif ($type eq "alternative")
+		{
+			disp("Querying UCSC database for UCSC alternative CDS...");
+			$q = $qobj->get_query("ucsc_alternative_cds");
+		}
+	}
+	elsif ($source eq "refseq")
+	{
+		if ($type eq "canonical")
+		{
+			disp("Querying UCSC database for RefSeq canonical CDS...");
+			$q = $qobj->get_query("refseq_canonical_cds");
+		}
+		elsif ($type eq "alternative")
+		{
+			disp("Querying UCSC database for RefSeq alternative CDS...");
+			$q = $qobj->get_query("refseq_alternative_cds");
+		}
+	}
+	my $conn = $self->open_connection($sp);
+	my $sth = $conn->prepare($q);
+	$sth->execute();
+	while ($data = $sth->fetchrow_hashref())
+	{
+		print REGS $data->{"chrom"}."\t".$data->{"chromStart"}."\t".$data->{"chromEnd"}."\t".
+			$data->{"transcript"}."\t".$data->{"exonCount"}."\t".$data->{"strand"}."\t".$data->{"geneName"}."\n";
+	}
+	$self->close_connection($conn);
+	close(REGS);
+	return($regs);
+}
+
+sub get_xml_genes_query
+{
+	my ($self,$species) = @_;
+	my $xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n".
+			  "<!DOCTYPE Query>".
+			  "<Query virtualSchemaName = \"default\" formatter = \"TSV\" header = \"0\" uniqueRows = \"0\" count = \"\" datasetConfigVersion = \"0.6\" >\n".
+			  "<Dataset name = \"$species\" interface = \"default\" >\n".
+			  "<Attribute name = \"chromosome_name\" />".
+			  "<Attribute name = \"start_position\" />".
+			  "<Attribute name = \"end_position\" />".
+			  "<Attribute name = \"ensembl_gene_id\" />".
+			  "<Attribute name = \"percentage_gc_content\" />".
+			  "<Attribute name = \"strand\" />".
+			  "<Attribute name = \"external_gene_id\" />".
+			  "</Dataset>\n".
+			  "</Query>\n";
+	return($xml);
+}
+
+sub get_xml_exons_query
+{
+	my ($self,$species) = @_;
+	my $xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n".
+		  "<!DOCTYPE Query>".
+		  "<Query virtualSchemaName = \"default\" formatter = \"TSV\" header = \"0\" uniqueRows = \"0\" count = \"\" datasetConfigVersion = \"0.6\" >\n".
+		  "<Dataset name = \"$species\" interface = \"default\" >\n".
+		  "<Attribute name = \"chromosome_name\" />".
+		  "<Attribute name = \"exon_chrom_start\" />".
+		  "<Attribute name = \"exon_chrom_end\" />".
+		  "<Attribute name = \"ensembl_exon_id\" />".
+		  "<Attribute name = \"ensembl_gene_id\" />".
+		  "<Attribute name = \"strand\" />".
+		  "<Attribute name = \"external_gene_id\" />".
+		  "</Dataset>\n".
+		  "</Query>\n";
+	return($xml);
+}
+
+sub get_xml_utr_query
+{
+	my ($self,$species,$utr) = @_;
+	my $xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n".
+		"<!DOCTYPE Query>\n".
+		"<Query  virtualSchemaName = \"default\" formatter = \"TSV\" header = \"0\" uniqueRows = \"0\" count = \"\" datasetConfigVersion = \"0.6\" >\n".
+		"<Dataset name = \"$species\" interface = \"default\" >\n".
+		"<Attribute name = \"chromosome_name\" />\n".
+		"<Attribute name = \"".$utr."_utr_start\" />\n".
+		"<Attribute name = \"".$utr."_utr_end\" />\n".
+		"<Attribute name = \"ensembl_gene_id\" />\n".
+		"<Attribute name = \"transcript_count\" />\n".
+		"<Attribute name = \"strand\" />\n".
+		"<Attribute name = \"external_gene_id\" />\n".
+		"</Dataset>\n".
+		"</Query>\n";
+	return($xml);
+}
+
+sub get_xml_cds_query
+{
+	my ($self,$species) = @_;
+	my $xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n".
+		"<!DOCTYPE Query>\n".
+		"<Query  virtualSchemaName = \"default\" formatter = \"TSV\" header = \"0\" uniqueRows = \"0\" count = \"\" datasetConfigVersion = \"0.6\" >\n".
+		"<Dataset name = \"$species\" interface = \"default\" >\n".
+		"<Attribute name = \"chromosome_name\" />\n".
+		"<Attribute name = \"genomic_coding_start\" />\n".
+		"<Attribute name = \"genomic_coding_end\" />\n".
+		"<Attribute name = \"ensembl_exon_id\" />\n".
+		"<Attribute name = \"ensembl_gene_id\" />\n".
+		"<Attribute name = \"strand\" />\n".
+		"<Attribute name = \"external_gene_id\" />\n".
+		"</Dataset>\n".
+		"</Query>\n";
+	return($xml);
+}
+
+sub format_species
+{
+	use v5.14;
+	my ($self,$org,$source) = @_;
+	given($source)
+	{
+		when(/ucsc|refseq/)
+		{
+			given($org)
+			{
+				when(/human/) { return("hg19"); }
+				when(/mouse/) { return("mm9"); }
+				when(/rat/) { return("rn5"); }
+				when(/fly/) { return("dm3"); }
+				when(/zebrafish/) { return("danRer7"); }
+			}
+		}
+		when(/ensembl/)
+		{
+			given($org)
+			{
+				when(/human/) { return("hsapiens_gene_ensembl"); }
+				when(/mouse/) { return("mmusculus_gene_ensembl"); }
+				when(/rat/) { return("rnorvegicus_gene_ensembl"); }
+				when(/fly/) { return("dmelanogaster_gene_ensembl"); }
+				when(/zebrafish/) { return("drerio_gene_ensembl"); }
+			}
+		}
+	}
+}
+
+sub sort_ensembl_genes
+{
+	my ($self,$infile) = @_;
+	my $tmpdir = $self->get("tmpdir");
+	my $tmpfile;
+	
+	if ($^O !~ /MSWin/) # Case of linux, easy sorting
+	{
+		$helper->disp("Sorting bed file $infile...");
+		$tmpfile = File::Spec->catfile($tmpdir,"temp".".in$$");
+		`awk 'NR==1; NR > 1 {print \$0 | \" sort -k1,1 -k2g,2\"}' $infile > $tmpfile `;
+		$infile = $tmpfile;
+	}
+	else # We are in Windows... package required not able to sort file with header...
+	{
+		my $dmsg = "Module File::Sort can't sort a file with a header line without possible\n".
+				    "messing up data. Please sort files outside $MODNAME first (e.g. using\n".
+				    "Excel or something similar.";
+		die "\n$dmsg\n\n";
+	}
+
+	return($infile);
+}
+
+sub sort_ensembl_exons
+{
+	my ($self,$infile) = @_;
+	my $tmpdir = $self->get("tmpdir");
+	my $tmpfile;
+	
+	if ($^O !~ /MSWin/) # Case of linux, easy sorting
+	{
+		$helper->disp("Sorting bed file $infile...");
+		$tmpfile = File::Spec->catfile($tmpdir,"temp".".in$$");
+		`awk 'NR==1; NR > 1 {print \$0 | \" sort -k1,1 -k2g,2 -k3g,3 -u\"}' $infile > $tmpfile `;
+		$infile = $tmpfile;
+	}
+	else # We are in Windows... package required not able to sort file with header...
+	{
+		my $dmsg = "Module File::Sort can't sort a file with a header line without possible\n".
+				    "messing up data. Please sort files outside $MODNAME first (e.g. using\n".
+				    "Excel or something similar.";
+		die "\n$dmsg\n\n";
+	}
+
+	return($infile);
+}
+
+=head2 get
+
+HTS::Tools::Fetch object getter
+
+	my $param_value = $fetcher->get("param_name")
+	
+=cut
+
+sub get
+{
+	my ($self,$name) = @_;
+	return($self->{$name});
+}
+
+=head2 set
+
+HTS::Tools::Fetch object setter
+
+	$fetcher->set("param_name","param_value")
+	
+=cut
+
+sub set
+{
+	my ($self,$name,$value) = @_;
+	$self->{$name} = $value;
+	return($self);
+}
+
+=head1 AUTHOR
+
+Panagiotis Moulos, C<< <moulos at fleming.gr> >>
+
+=head1 BUGS
+
+Please report any bugs or feature requests to C<bug-hts-tools at rt.cpan.org>, or through
+the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=HTS-Tools>.  I will be notified, and then you'll
+automatically be notified of progress on your bug as I make changes.
+
+=head1 SUPPORT
+
+You can find documentation for this module with the perldoc command.
+
+    perldoc HTS::Tools::Fetch
+
+
+You can also look for information at:
+
+=over 4
+
+=item * RT: CPAN's request tracker (report bugs here)
+
+L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=HTS-Tools>
+
+=item * AnnoCPAN: Annotated CPAN documentation
+
+L<http://annocpan.org/dist/HTS-Tools>
+
+=item * CPAN Ratings
+
+L<http://cpanratings.perl.org/d/HTS-Tools>
+
+=item * Search CPAN
+
+L<http://search.cpan.org/dist/HTS-Tools/>
+
+=back
+
+
+=head1 ACKNOWLEDGEMENTS
+
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright 2013 Panagiotis Moulos.
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of the the Artistic License (2.0). You may obtain a
+copy of the full license at:
+
+L<http://www.perlfoundation.org/artistic_license_2_0>
+
+Any use, modification, and distribution of the Standard or Modified
+Versions is governed by this Artistic License. By using, modifying or
+distributing the Package, you accept this license. Do not use, modify,
+or distribute the Package, if you do not accept this license.
+
+If your Modified Version has been derived from a Modified Version made
+by someone other than you, you are nevertheless required to ensure that
+your Modified Version complies with the requirements of this license.
+
+This license does not grant you the right to use any trademark, service
+mark, tradename, or logo of the Copyright Holder.
+
+This license includes the non-exclusive, worldwide, free-of-charge
+patent license to make, have made, use, offer to sell, sell, import and
+otherwise transfer the Package with respect to any patent claims
+licensable by the Copyright Holder that are necessarily infringed by the
+Package. If you institute patent litigation (including a cross-claim or
+counterclaim) against any party alleging that the Package constitutes
+direct or contributory patent infringement, then this Artistic License
+to you shall terminate on the date that such litigation is filed.
+
+Disclaimer of Warranty: THE PACKAGE IS PROVIDED BY THE COPYRIGHT HOLDER
+AND CONTRIBUTORS "AS IS' AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES.
+THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, OR NON-INFRINGEMENT ARE DISCLAIMED TO THE EXTENT PERMITTED BY
+YOUR LOCAL LAW. UNLESS REQUIRED BY LAW, NO COPYRIGHT HOLDER OR
+CONTRIBUTOR WILL BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, OR
+CONSEQUENTIAL DAMAGES ARISING IN ANY WAY OUT OF THE USE OF THE PACKAGE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+=cut
+
+1; # End of HTS::Tools::Fetch
