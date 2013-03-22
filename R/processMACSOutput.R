@@ -16,10 +16,12 @@
 # bin.rr=list(ratio=c(25,75),rpw=c(25,75))
 # bin.rr=list(ratio=c(5,50),rpw=c(5,25))
 
+# TODO: When normalization != none but has not control, the control norm reads still try to export
+
 processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,1,0.05),fc.cut=1,org="hg18",avg.win=100,win.size=10000,
 							   normalize=c("none","linear","balance","rpkm","peakseq.original","peakseq.rlm"),chrom.info.file=NULL,ver=c(14,2),
 							   eff.size=if (is.element(org,c("hg18","hg19","mm8","mm9","mm10","dm2","dm3","ce"))) org else NULL,sat=c(0.05,0.2),
-							   write.output=TRUE,bin.rr=NULL,plot.rvr=FALSE,plot.svr=FALSE,image.format="x11",export.negative=FALSE)
+							   pileup=5,write.output=TRUE,bin.rr=NULL,plot.rvr=FALSE,plot.svr=FALSE,image.format="x11",export.negative=FALSE)
 {
 	# If user does not provide files
 	if (missing(input) && is.na(mapfile))
@@ -63,6 +65,8 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
 		stop("The FDR cutoff must be numeric.")
 	if (!is.numeric(fc.cut))
 		stop("The fold change cutoff must be numeric.")
+	if (!is.numeric(pileup))
+		stop("The pileup cutoff must be numeric.")
 	if (is.na(output))
 		output="auto"
 	if (!is.na(output) && length(input)!=length(output))
@@ -151,7 +155,10 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
 			names(all.peaks[[basename(input[i])]]) <- 
 				c("chromosome","start","end","length","summit","pileup","significance","MACS_fe","fdr")
 			# FDR filtering
-			fdr.fail[[basename(input[i])]] <- which(10^-all.peaks[[basename(input[i])]]$fdr>=fdr.cut)
+			if (pileup != 0 && !is.na(pileup) && !is.null(pileup))
+				fdr.fail[[basename(input[i])]] <- which(10^-all.peaks[[basename(input[i])]]$fdr>=fdr.cut | all.peaks[[basename(input[i])]]$pileup<pileup)
+			else
+				fdr.fail[[basename(input[i])]] <- which(10^-all.peaks[[basename(input[i])]]$fdr>=fdr.cut)
 		}
 	}
 
@@ -268,7 +275,7 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
 				diffs <- all.peaks[[nam]]$end - all.peaks[[nam]]$start + 1
 				avg.counts.matrix[[nam]] <- count.matrix[[nam]]/(diffs/avg.win)
 				# Saturation index
-				saturation[[nam]]$control <- control.counts[[nam]]/(all.peaks[[nam]]$length - ovObj.taglen[[nam]]$treatment + 1)
+				saturation[[nam]]$control <- control.counts[[nam]]/(all.peaks[[nam]]$length - ovObj.taglen[[nam]]$control + 1)
 				# Normalization
 				if (normalize=="linear")
 				{
@@ -349,20 +356,20 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
 				}
 				else fc.fail[[nam]] <- NULL
 
-				# Saturation filter
-				if (!is.null(sat))
-				{
-					sat.fail[[nam]] <-
-						which(saturation[[nam]]$treatment<sat[2] & saturation[[nam]]$control>sat[1])
-						#which((saturation[[nam]]$treatment/saturation[[nam]]$max)<sat[2] & (saturation[[nam]]$control/saturation[[nam]]$max>sat[1]))
-				}
-				else sat.fail[[nam]] <- NULL
+				## Saturation filter
+				#if (!is.null(sat))
+				#{
+				#	sat.fail[[nam]] <-
+				#		which(saturation[[nam]]$treatment<sat[2] | saturation[[nam]]$control>sat[1])
+				#		#which((saturation[[nam]]$treatment/saturation[[nam]]$max)<sat[2] & (saturation[[nam]]$control/saturation[[nam]]$max>sat[1]))
+				#}
+				#else sat.fail[[nam]] <- NULL
 			}
 			else # Ratio cannot be calculated and categorization cannot be done
 			{
 				count.matrix[[nam]] <- as.matrix(treat.counts[[nam]])
 				diffs <- all.peaks[[nam]]$end - all.peaks[[nam]]$start + 1
-				avg.counts.matrix[[nam]] <- count.matrix[[nam]][,1]/(diffs/avg.win)
+				avg.counts.matrix[[nam]] <- as.matrix(count.matrix[[nam]][,1]/(diffs/avg.win))
 				saturation[[nam]]$treatment <- count.matrix[[nam]][,1]/(all.peaks[[nam]]$length - ovObj.taglen[[nam]]$treatment + 1)
 				ratios[[nam]] <- NULL
 				fc.fail[[nam]] <- NULL
@@ -394,30 +401,37 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
 					count.matrix.norm[[nam]] <- NULL
 					avg.counts.matrix.norm[[nam]] <- NULL
 					ratios.norm[[nam]] <- NULL
-				}
-
-				# Saturation filter
-				p.index <- 1:nrow(all.peaks[[nam]])
-				if (!is.null(sat))
-				{
-					good <- which(saturation[[nam]]$treatment>sat[2] & saturation[[nam]]$control<sat[1])
-					#good <- which((saturation[[nam]]$treatment/saturation[[nam]]$max)>sat[2] & (saturation[[nam]]$control/saturation[[nam]]$max)<sat[1])
-					if (length(good)!=0)
-						sat.fail[[nam]] <- p.index[-good]
-					else sat.fail[[nam]] <- NULL
-				}
-				else sat.fail[[nam]] <- NULL
+				}				
 			}
 		}
+
+		# Saturation filter
+		p.index <- 1:nrow(all.peaks[[nam]])
+		if (!is.null(sat))
+		{
+			if (hasControl)
+			{
+				good <- which(saturation[[nam]]$treatment>sat[2] & saturation[[nam]]$control<sat[1])
+				#good <- which((saturation[[nam]]$treatment/saturation[[nam]]$max)>sat[2] & (saturation[[nam]]$control/saturation[[nam]]$max)<sat[1])
+			}
+			else
+			{
+				good <- which(saturation[[nam]]$treatment>sat[2])
+			}
+			if (length(good)!=0)
+				sat.fail[[nam]] <- p.index[-good]
+			else sat.fail[[nam]] <- NULL
+		}
+		else sat.fail[[nam]] <- NULL
 
 		# Unify all the filters
 		for (nam in basename(input))
 			filter.fail[[nam]] <- base:::union(base:::union(fdr.fail[[nam]],fc.fail[[nam]]),sat.fail[[nam]]) # Masked by IRanges... Argh!
 		
 		# Categorize final distributions according to ratios and ranksums
+		rat.flags <- rank.flags <- iqc.flags <- rat.qnt <- rank.qnt <- list()
 		if (!is.null(bin.rr) && hasControl)
 		{
-			rat.flags <- rank.flags <- iqc.flags <- rat.qnt <- rank.qnt <- list()
 			for (nam in basename(input))
 			{
 				if (length(filter.fail[[nam]]) != 0)
@@ -494,15 +508,15 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
 					all.peaks[[nam]]$length[-filter.fail[[nam]]],
 					all.peaks[[nam]]$summit[-filter.fail[[nam]]],
 					count.matrix[[nam]][-filter.fail[[nam]],],
-					if (!is.null(count.matrix.norm[[nam]])) count.matrix.norm[[nam]][-filter.fail[[nam]],] else matrix(NA,length(all.peaks[[nam]]$chromosome[-filter.fail[[nam]]]),2),
+					if (!is.null(count.matrix.norm[[nam]])) count.matrix.norm[[nam]][-filter.fail[[nam]],] else matrix(NA,length(all.peaks[[nam]]$chromosome[-filter.fail[[nam]]]),ifelse(hasControl,2,1)),
 					avg.counts.matrix[[nam]][-filter.fail[[nam]],],
-					if (!is.null(avg.counts.matrix.norm[[nam]])) avg.counts.matrix.norm[[nam]][-filter.fail[[nam]],] else matrix(NA,length(all.peaks[[nam]]$chromosome[-filter.fail[[nam]]]),2),
+					if (!is.null(avg.counts.matrix.norm[[nam]])) avg.counts.matrix.norm[[nam]][-filter.fail[[nam]],] else matrix(NA,length(all.peaks[[nam]]$chromosome[-filter.fail[[nam]]]),ifelse(hasControl,2,1)),
 					if (!is.null(ratios[[nam]])) ratios[[nam]][-filter.fail[[nam]]] else rep(NA,length(all.peaks[[nam]]$chromosome[-filter.fail[[nam]]])),
 					if (!is.null(ratios.norm[[nam]])) ratios.norm[[nam]][-filter.fail[[nam]]] else rep(NA,length(all.peaks[[nam]]$chromosome[-filter.fail[[nam]]])),
 					all.peaks[[nam]]$significance[-filter.fail[[nam]]],
 					all.peaks[[nam]]$fdr[-filter.fail[[nam]]],
 					#add.matrix[[nam]][-filter.fail[[nam]],], # Avg counts, Ratios, RS
-					iqc.flags[[nam]], # Flags
+					if (hasControl && !is.null(iqc.flags[[nam]])) iqc.flags[[nam]] else rep(NA,length(all.peaks[[nam]]$chromosome[-filter.fail[[nam]]])), # Flags
 					if (ver == 2) all.peaks[[nam]]$pileup[-filter.fail[[nam]]] else rep(NA,length(all.peaks[[nam]]$chromosome[-filter.fail[[nam]]])),
 					#rank.sums[[nam]][-filter.fail[[nam]]],
 					#saturation[[nam]]$max[-filter.fail[[nam]]],
@@ -555,20 +569,19 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
 					all.peaks[[nam]]$length,
 					all.peaks[[nam]]$summit,
 					count.matrix[[nam]],
-					if (!is.null(count.matrix.norm[[nam]])) count.matrix.norm[[nam]] else matrix(NA,length(all.peaks[[nam]]$chromosome),2),
+					if (!is.null(count.matrix.norm[[nam]])) count.matrix.norm[[nam]] else matrix(NA,length(all.peaks[[nam]]$chromosome),ifelse(hasControl,2,1)),
 					avg.counts.matrix[[nam]],
-					if (!is.null(avg.counts.matrix.norm[[nam]])) avg.counts.matrix.norm[[nam]] else matrix(NA,length(all.peaks[[nam]]$chromosome),2),
+					if (!is.null(avg.counts.matrix.norm[[nam]])) avg.counts.matrix.norm[[nam]] else matrix(NA,length(all.peaks[[nam]]$chromosome),ifelse(hasControl,2,1)),
 					if (!is.null(ratios[[nam]])) ratios[[nam]] else rep(NA,length(all.peaks[[nam]]$chromosome)),
 					if (!is.null(ratios.norm[[nam]])) ratios.norm[[nam]] else rep(NA,length(all.peaks[[nam]]$chromosome)),
 					all.peaks[[nam]]$significance,
 					all.peaks[[nam]]$fdr,
 					#add.matrix[[nam]][-filter.fail[[nam]],], # Avg counts, Ratios, RS
-					iqc.flags[[nam]], # Flags
+					if (hasControl) iqc.flags[[nam]] else rep(NA,length(all.peaks[[nam]]$chromosome)), # Flags
 					if (ver == 2) all.peaks[[nam]]$pileup else rep(NA,length(all.peaks[[nam]]$chromosome)),
-					#rank.sums[[nam]],
 					#saturation[[nam]]$max,
 					saturation[[nam]]$treatment,
-					if (hasControl) saturation[[nam]]$control else rep(NA,length(all.peaks[[nam]]$chromosome)),
+					if (hasControl && !is.null(iqc.flags[[nam]])) saturation[[nam]]$control else rep(NA,length(all.peaks[[nam]]$chromosome)),
 					all.peaks[[nam]]$MACS_fe,
 					stringsAsFactors=FALSE
 				)
@@ -582,32 +595,29 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
 				  "length",
 				  "summit",
 				  "reads_treatment",
-				  if (is.na(control)) "na.1" else "reads_control",
-				  if (normalize=="none") "na.2" else "reads_treatment_norm",
-				  if (normalize=="none" || is.na(control)) "na.3" else "reads_control_norm",
-				  "avg_counts_treatment",
-				  if (is.na(control)) "na.4" else "avg_counts_control",
-				  if (normalize=="none") "na.5" else "avg_counts_treatment_norm",
-				  if (normalize=="none" || is.na(control)) "na.6" else "avg_counts_control_norm",
-				  if (is.na(control)) "na.7" else "fold_enrichment",
-				  if (normalize=="none" || is.na(control)) "na.8" else "fold_enrichment_norm",
+				  if (!hasControl) NULL else "reads_control",
+				  if (normalize=="none") "na.1" else "reads_treatment_norm",
+				  if (normalize=="none" & !hasControl) NULL else if (normalize=="none" & hasControl) "na.2" else "reads_control_norm",
+				  "avg_reads_treatment",
+				  if (!hasControl) NULL else "avg_reads_control",
+				  if (normalize=="none") "na.3" else "avg_reads_treatment_norm",
+				  if (normalize=="none" & !hasControl) NULL else if (normalize=="none" & hasControl) "na.4" else "avg_reads_control_norm",
+				  if (!hasControl) "na.5" else "fold_enrichment",
+				  if (normalize=="none" || !hasControl) "na.6" else "fold_enrichment_norm",
 				  "significance",
 				  "fdr",
-				  if ((!is.na(control) && is.null(bin.rr)) || is.na(control)) "na.9" else "qc_flag",
-				  if (ver == 14) "na.9" else "pileup",
-				  #"rank_sum",
+				  if ((!hasControl && is.null(bin.rr)) || !hasControl) "na.7" else "qc_flag",
+				  if (ver == 14) "na.8" else "pileup",
 				  #"saturation_max",
 				  "saturation_treatment",
-				  if (hasControl) "saturation_control" else "na.10",
+				  if (hasControl) "saturation_control" else "na.9",
 				  "MACS_fe")
 			names(finalObj[[nam]]) <- the.names
 			if (any(grep("na",names(finalObj[[nam]]))))
 				finalObj[[nam]] <- finalObj[[nam]][,-grep("na",names(finalObj[[nam]]))]
-
 			if (export.negative)
 				if (any(grep("qc_flag",names(finalObj[[nam]]))))
 					names(negObj[[nam]]) <- names(finalObj[[nam]])[-grep("qc_flag",names(finalObj[[nam]]))]
-			
 		}
 	}
 	else # Just filter for FDR, no bed files for counting..

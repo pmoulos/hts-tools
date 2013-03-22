@@ -37,8 +37,10 @@
 #
 # Author      : Panagiotis Moulos (pmoulos@eie.gr)
 # Created     : 26 - 05 - 2008 (dd - mm - yyyy)
-# Last Update : 10 - 10 - 2012 (dd - mm - yyyy)
-# Version     : 2.0
+# Last Update : 28 - 02 - 2013 (dd - mm - yyyy)
+# Version     : 2.1
+#
+# CHANGELOG
 #
 # Version 1.1 implements a binary search algorithm to look for the proper regions in the
 # regions hash instead of greedily searching through all of them. Additionally, it checks
@@ -49,11 +51,32 @@
 # Version 1.21 introduces a bug fix in the binary search
 # Version 2.0 is an almost complete rewrite of the original program, more efficient, more
 # modularized and OO ready. It also works in paraller with multiple input files and the
-# output is only one matrix-like file.
+# output is only one matrix-like file. The current implementation is slightly more memory
+# consuming than the previous one, but faster, parallelizable and can easily return a table
+# of counts and several stats with minimum effort.
+# Version 2.1 allows for automatic download of region files in the case of Ensembl genes
+# or exons for human, mouse, rat, fruitlfy and zebrafish
 
+# TODO: Check how we can use gtf2tree.pl from the ngsplot package (https://code.google.com/p/ngsplot/)
 # TODO: Make a note that when we are multi-coring, a large regions file (e.g. an organism
 #		genes) takes longer because the hash is initialized for every file (so if we have
 #		a lot of files like the tcga case it takes some time).
+
+#################### SPECIAL SECTION ####################
+sub cosort
+{
+	my @one = split("-",$a);
+	my @two = split("-",$b);
+	return 1 if ($one[0] > $two[0]);
+	return -1 if ($one[0] < $two[0]);
+	if ($one[0] == $two[0])
+	{
+		return 1 if ($one[1] > $two[1]);
+		return 0 if ($one[1] == $two[1]);
+		return -1 if ($one[1] < $two[1]);
+	}
+}
+################## END SPECIAL SECTION ##################
 
 use strict;
 use Getopt::Long;
@@ -63,9 +86,10 @@ use File::Spec;
 use File::Path qw(make_path remove_tree);
 use Parallel::Loops;
 use LWP::UserAgent;
-use Data::Dumper;
 
 use constant MAXCORES => 12;
+use constant REMOTE_HOST => "genome-mysql.cse.ucsc.edu";
+use constant REMOTE_USER => "genome";
 
 # Make sure output is unbuffered
 select(STDOUT);
@@ -88,6 +112,7 @@ our $splitper = 0; # Split genomic regions in sub-regions of xbps and count indi
 our $ncore = 1; # Number of cores for parallel calculations
 our $stats = 0; # Return some statistics about tag distributions per area
 our $output = ""; # The output file, can be auto
+our $source; # Source in case of downloading data
 our $waitbar = 0;	# Do not use waitbar
 our $silent = 0; # Display verbose messages
 our $help = 0; # Help?
@@ -105,22 +130,33 @@ our $help = 0; # Help?
 our $tmpdir = File::Temp->newdir();
 
 my @originfile = @infile; # Keep original filenames (verbose purposes)
-($regionfile,@infile) = &sort_inputs($regionfile,@infile) if ($sort);
 
 # Read regions file in memory and initialize the hash that will host read counts per gene
-# per file. They operate on bed files. The current implementation is slightly more memory
-# consuming than the previous one, but faster, parallelizable and can easily return a table
-# of counts and several stats with minimum effort. Finally, write the output.
-if ($regionfile=~ m/human-gene|mouse-gene|rat-gene|fly-gene/i)
+# per file. They operate on bed files. Finally, write the output.
+#FIXME Until given ... when statement becomes standard since Switch does not work properly anymore!
+if ($regionfile =~ m/human-gene|mouse-gene|rat-gene|fly-gene|zebrafish-gene/i)
 {
 	$regionfile = &fetch_ensembl_genes($regionfile);
 	$regionfile = &sort_ensembl_genes($regionfile);
 }
-elsif ($regionfile=~ m/human-exon|mouse-exon|rat-exon|fly-exon/i)
+elsif ($regionfile =~ m/human-exon|mouse-exon|rat-exon|fly-exon|zebrafish-exon/i)
 {
 	$regionfile = &fetch_ensembl_exons($regionfile);
 	$regionfile = &sort_ensembl_exons($regionfile);
 }
+elsif ($regionfile =~ m/human-(5|3)utr|mouse-(5|3)utr|rat-(5|3)utr|fly-(5|3)utr|zebrafish-(5|3)utr/i)
+{
+	($regionfile =~ m/5utr/i) ? ($regionfile = &fetch_ensembl_utr($regionfile,5)) :
+		($regionfile = &fetch_ensembl_utr($regionfile,3));
+	$regionfile = &sort_ensembl_exons($regionfile);
+}
+elsif ($regionfile =~ m/human-cds|mouse-cds|rat-cds|fly-cds|zebrafish-cds/i)
+{
+	$regionfile = &fetch_ensembl_cds($regionfile);
+	$regionfile = &sort_ensembl_exons($regionfile);
+}
+else { ($regionfile,@infile) = &sort_inputs($regionfile,@infile) if ($sort); }
+
 my ($chromosome,$gencounts,$splitcounts,$theHeader) = &read_region_file($regionfile,\@originfile);
 ($gencounts,$splitcounts) = &count_all_reads($chromosome,$gencounts,$splitcounts,\@infile,\@originfile);
 &write_reads($chromosome,$gencounts,$splitcounts,\@originfile,$theHeader);
@@ -149,6 +185,7 @@ sub check_inputs
                "stats|z" => \$stats,
                "output|o=s" => \$output,
                "ncore|n=i" => \$ncore,
+               "source|u=s" => \$source,
     		   "waitbar|w" => \$waitbar,
     		   "silent|s" => \$silent,
     		   "help|h" => \$help);
@@ -160,17 +197,14 @@ sub check_inputs
     }
     $stop .= "--- Please specify input file(s) ---\n" if (!@infile);
     $stop .= "--- Please specify region file ---\n" if (!$regionfile);
+    $stop .= "--- The supported genomes are organism-type, where organism is human, mouse, rat, fly or zebrafish and type is gene, exon, 5utr, 3utr or cds! ---\n"
+		if ( !-f $regionfile && $regionfile !~ m/human-(gene|exon|(5|3)utr|cds)|mouse-(gene|exon|(5|3)utr|cds)|rat-(gene|exon|(5|3)utr|cds)|fly-(gene|exon|(5|3)utr|cds)|zebrafish-(gene|exon|(5|3)utr|cds)/i);
     if ($stop)
     {
             print STDERR "\n$stop\n";
             print STDERR "Type perl $scriptname --help for help in usage.\n\n";
             exit;
     }
-    if ( !-f $regionfile && $regionfile !~ m/human-(gene|exon)|mouse-(gene|exon)|rat-(gene|exon)|fly-(gene|exon)/i)
-    {
-		disp("The supported genomes so far are only human-type, mouse-type, rat-type or fly-type, where type is gene or exon! Exiting...\n");
-		exit;
-	}
     if ($lscore && $escore) # If both given, use exponential scoring
     {
     	disp("You chose both linear and exponential scoring. Only exponential will be used...");
@@ -202,6 +236,23 @@ sub check_inputs
 	{
 		my ($base,$dir,$ext) = fileparse($infile[0],'\.[^.]*');
 		$output = File::Spec->catfile($dir,$base."_REGIONCOUNTSTATS".$ext);
+	}
+	if ($regionfile =~ m/human-(gene|exon|(5|3)utr|cds)|mouse-(gene|exon|(5|3)utr|cds)|rat-(gene|exon|(5|3)utr|cds)|fly-(gene|exon|(5|3)utr|cds)|zebrafish-(gene|exon|(5|3)utr|cds)/i)
+	{
+		my %sources = ("ucsc" => "UCSC","refseq" => "RefSeq","ensembl" => "Ensembl");
+		if ($source)
+		{
+			$source = lc($source);
+			if ($source ~~ keys(%sources))
+			{
+				disp("Selected template regions source: ",$sources{$source});
+			}
+			else
+			{
+				disp("Source for template region files not given or is not well-defined! Using default (ucsc)...");
+				$source = "ucsc";
+			}
+		}
 	}
 }
 
@@ -270,7 +321,7 @@ sub read_region_file
 	my @originfile = @{shift @_};
 	@originfile = @infile unless(@originfile);
 	
-	my ($theHeader,$chr,$start,$end,$uid,$rest);
+	my ($theHeader,$chr,$start,$end,$uid,$score,$strand,$rest);
 	my @arest;
 
 	my (%chromosome,%gencounts,%splitcounts);
@@ -298,6 +349,7 @@ sub read_region_file
 	{
 		$rprog->update($.) if ($waitbar);
 		$regline =~ s/\r|\n$//g; # Make sure to remove carriage returns
+		
 		($chr,$start,$end,$uid,@arest) = split(/\t/,$regline);
 		$rest = join("\t",@arest);
 		($rest eq "") ? ($chromosome{$chr}{$uid} = $start."\t".$end) :
@@ -626,7 +678,7 @@ sub count_reads_multi
 		$bprog = &waitbar_init($numberlines,"Counting...","yes");
 	}
 	
-	#$filename = basename($originfile);
+	$filename = basename($originfile);
 	open(BEDFILE,$infile);
 	my $nextchr = "";
 
@@ -822,8 +874,16 @@ sub write_reads
 	}
 	else { $out = *STDOUT; }
 
-	($stats) ? (disp("Writing reads and calculating statistics per genomic regions in $output...")) :
-		disp("Writing reads per genomic regions for file in $output...");
+	if ($output)
+	{
+		($stats) ? (disp("Writing reads and calculating statistics per genomic regions in $output...")) :
+			disp("Writing reads per genomic regions for file in $output...");
+	}
+	else
+	{
+		($stats) ? (disp("Writing reads and calculating statistics per genomic regions to standard output...")) :
+			disp("Writing reads per genomic regions for file to standard output...");
+	}
 
 	my ($regionlines,$fprog);
 	if ($waitbar)
@@ -842,6 +902,7 @@ sub write_reads
 			$outhead .= "\t".$base[0];
 			$outhead .= "\tSub-area Counts/$splitper bp" if ($splitper); # Return also sub-area distributions
 			$outhead .= "\tMean Counts/$splitper bp\tMedian Counts/$splitper bp\tStDev Counts\tMAD Counts" if ($stats);
+			print $out "$outhead\n";
 		}
 		else
 		{
@@ -857,9 +918,9 @@ sub write_reads
 			$outsubhead .= "\tMean Counts/$splitper bp\tMedian Counts/$splitper bp\tStDev Counts\tMAD Counts" if ($stats);
 			$outsubhead = "$outsubhead"x(scalar @base);
 			$outsubhead = ("\t"x(scalar split(/\t/,$theHeader))).$outsubhead;
+			print $out "$outhead\n";
+			print $out "$outsubhead\n" if ($splitper);
 		}
-		print $out "$outhead\n";
-		print $out "$outsubhead\n" if ($splitper);
 	}
 
 	if ($ncore == 1)
@@ -1060,6 +1121,37 @@ sub sort_inputs
 	return($regionfile,@infile);
 }
 
+sub sort_one
+{
+	my $file = shift @_;
+	my $tmpfile;
+	
+	if ($^O !~ /MSWin/) # Case of linux, easy sorting
+	{
+		disp("Sorting file $file...");
+		$tmpfile = File::Spec->catfile($tmpdir,"temptss.in$$");
+		`sort -k1,1 -k2g,2 $file > $tmpfile `;
+		$file = $tmpfile;
+	}
+	else # We are in Windows... package required
+	{
+		&tryModule("File::Sort","sort_file");
+		eval "use File::Sort qw(sort_file)"; # Like this or interpreter complains
+		disp("Sorting file $file...");
+		$tmpfile = File::Spec->catfile($tmpdir,"temptss.tmp");
+		sort_file(
+		{
+			I => $file,
+			o => $tmpfile,
+			k => ['1,1','2n,2'],
+			t => "\t"
+		});
+		$file = $tmpfile;
+	}
+
+	return($file);
+}
+
 sub sort_ensembl_genes
 {
 	my $infile = shift @_;
@@ -1104,7 +1196,7 @@ sub sort_ensembl_exons
 	{
 		disp("Sorting bed file $infile...");
 		$tmpfile = File::Spec->catfile($tmpdir,"temp".".in$$");
-		`awk 'NR==1; NR > 1 {print \$0 | \" sort -k1,1 -k2g,2 -u\"}' $infile > $tmpfile `;
+		`awk 'NR==1; NR > 1 {print \$0 | \" sort -k1,1 -k2g,2 -k3g,3 -u\"}' $infile > $tmpfile `;
 		$infile = $tmpfile;
 	}
 	else # We are in Windows... package required not able to sort file with header...
@@ -1146,10 +1238,14 @@ sub try_module
 					 "system administrator.";
 		die "\n$killer\n\n";
 	}
-	if (@fun)
+	else
 	{
-		my $funs = join(" ",@fun);
-		eval "use $module qw($funs)";
+		if (@fun)
+		{
+			my $funs = join(" ",@fun);
+			eval "use $module qw($funs)";
+		}
+		else { eval "use $module"; }
 	}
 }
 
@@ -1194,7 +1290,7 @@ sub fetch_ensembl_genes
 	seek($tmpfh,0,SEEK_SET);
 	my %strand = ( 1 => "+", -1 => "-" );
 	open(REGS,">$regs");
-	print REGS "Chromosome\tStart\tEnd\tEnsemblID\tGCcontent\tStrand\tName\n";
+	print REGS "chromosome\tstart\tend\tensembl_id\tgc_content\tstrand\tgene_name\n";
 	while (my $line = <$tmpfh>)
 	{
 		next if ($line !~ m/^[0-9XY]/);
@@ -1205,7 +1301,7 @@ sub fetch_ensembl_genes
 	close(REGS);
 	close($tmpfh);
 
-	return($regs);	
+	return($regs);
 }
 
 sub fetch_ensembl_exons
@@ -1234,7 +1330,7 @@ sub fetch_ensembl_exons
 	seek($tmpfh,0,SEEK_SET);
 	my %strand = ( 1 => "+", -1 => "-" );
 	open(REGS,">$regs");
-	print REGS "Chromosome\tStart\tEnd\tEnsemblExonID\tStrand\tEnsemblGeneID\tName\n";
+	print REGS "chromosome\tstart\tend\tensembl_exon_id\tensembl_gene_id\tstrand\tgene_name\n";
 	while (my $line = <$tmpfh>)
 	{
 		next if ($line !~ m/^[0-9XY]/);
@@ -1245,7 +1341,90 @@ sub fetch_ensembl_exons
 	close(REGS);
 	close($tmpfh);
 
-	return($regs);	
+	return($regs);
+}
+
+sub fetch_ensembl_utr
+{
+	my $sp = &format_species($_[0]);
+	my $utr = $_[1];
+	my $xml = &get_xml_utr_query($sp,$utr);
+	my $path="http://www.biomart.org/biomart/martservice?";
+	my $request = HTTP::Request->new("POST",$path,HTTP::Headers->new(),'query='.$xml."\n");
+	my $ua = LWP::UserAgent->new;
+	my $tmpfh = File::Temp->new(DIR => $tmpdir,SUFFIX => ".ens");
+	my $regs = File::Spec->catfile($tmpdir,"regions.txt");
+	my $response;
+
+	# We need to put data in a temporary file because it's scrambled by asynchronicity
+	disp("Querying Biomart...");
+	$ua->request($request,sub {
+		my ($data,$response) = @_;
+		if ($response->is_success) {
+			print $tmpfh "$data";
+		}
+		else {
+			warn ("Problems with the web server: ".$response->status_line);
+		}
+	},1000);
+
+	seek($tmpfh,0,SEEK_SET);
+	my %strand = ( 1 => "+", -1 => "-" );
+	open(REGS,">$regs");
+	print REGS "chromosome\tstart\tend\tensembl_id\ttranscript_count\tstrand\tname\n";
+	while (my $line = <$tmpfh>)
+	{
+		next if ($line !~ m/^[0-9XY]/);
+		$line =~ s/\r|\n$//g;
+		my @cols = split(/\t/,$line);
+		next if (!$cols[1]);
+		print REGS "chr$cols[0]\t$cols[1]\t$cols[2]\t$cols[3]\t$cols[4]\t$strand{$cols[5]}\t$cols[6]\n";
+	}
+	close(REGS);
+	close($tmpfh);
+
+	return($regs);
+}
+
+sub fetch_ensembl_cds
+{
+	my $sp = &format_species($_[0]);
+	my $xml = &get_xml_cds_query($sp);
+	my $path="http://www.biomart.org/biomart/martservice?";
+	my $request = HTTP::Request->new("POST",$path,HTTP::Headers->new(),'query='.$xml."\n");
+	my $ua = LWP::UserAgent->new;
+	my $tmpfh = File::Temp->new(DIR => $tmpdir,SUFFIX => ".ens");
+	my $regs = File::Spec->catfile($tmpdir,"regions.txt");
+	my $response;
+
+	# We need to put data in a temporary file because it's scrambled by asynchronicity
+	disp("Querying Biomart...");
+	$ua->request($request,sub {   
+		my ($data,$response) = @_;
+		if ($response->is_success) {
+			print $tmpfh "$data";
+		}
+		else {
+			warn ("Problems with the web server: ".$response->status_line);
+		}
+	},1000);
+
+	seek($tmpfh,0,SEEK_SET);
+	my %strand = ( 1 => "+", -1 => "-" );
+	open(REGS,">$regs");
+	print REGS "chromosome\tstart\tend\tensembl_exon_id\tensembl_gene_id\tstrand\tgene_name\n";
+	while (my $line = <$tmpfh>)
+	{
+		next if ($line !~ m/^[0-9XY]/);
+		$line =~ s/\r|\n$//g;
+		my @cols = split(/\t/,$line);
+		next if (!$cols[1]);
+		print REGS "chr$cols[0]\t$cols[1]\t$cols[2]\t$cols[3]\t$cols[4]\t$strand{$cols[5]}\t$cols[6]\n";
+	}
+	close(REGS);
+	close($tmpfh);
+
+	return($regs);
 }
 
 sub get_xml_genes_query
@@ -1271,27 +1450,94 @@ sub get_xml_exons_query
 {
 	my $species = $_[0];
 	my $xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n".
-			  "<!DOCTYPE Query>".
-			  "<Query virtualSchemaName = \"default\" formatter = \"TSV\" header = \"0\" uniqueRows = \"0\" count = \"\" datasetConfigVersion = \"0.6\" >\n".
-			  "<Dataset name = \"$species\" interface = \"default\" >\n".
-			  "<Attribute name = \"chromosome_name\" />".
-			  "<Attribute name = \"exon_chrom_start\" />".
-			  "<Attribute name = \"exon_chrom_end\" />".
-			  "<Attribute name = \"ensembl_exon_id\" />".
-			  "<Attribute name = \"strand\" />".
-			  "<Attribute name = \"ensembl_gene_id\" />".
-			  "<Attribute name = \"external_gene_id\" />".
-			  "</Dataset>\n".
-			  "</Query>\n";
+		  "<!DOCTYPE Query>".
+		  "<Query virtualSchemaName = \"default\" formatter = \"TSV\" header = \"0\" uniqueRows = \"0\" count = \"\" datasetConfigVersion = \"0.6\" >\n".
+		  "<Dataset name = \"$species\" interface = \"default\" >\n".
+		  "<Attribute name = \"chromosome_name\" />".
+		  "<Attribute name = \"exon_chrom_start\" />".
+		  "<Attribute name = \"exon_chrom_end\" />".
+		  "<Attribute name = \"ensembl_exon_id\" />".
+		  "<Attribute name = \"ensembl_gene_id\" />".
+		  "<Attribute name = \"strand\" />".
+		  "<Attribute name = \"external_gene_id\" />".
+		  "</Dataset>\n".
+		  "</Query>\n";
+	return($xml);
+}
+
+sub get_xml_utr_query
+{
+	my ($species,$utr) = @_;
+	my $xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n".
+		"<!DOCTYPE Query>\n".
+		"<Query  virtualSchemaName = \"default\" formatter = \"TSV\" header = \"0\" uniqueRows = \"0\" count = \"\" datasetConfigVersion = \"0.6\" >\n".
+		"<Dataset name = \"$species\" interface = \"default\" >\n".
+		"<Attribute name = \"chromosome_name\" />\n".
+		"<Attribute name = \"".$utr."_utr_start\" />\n".
+		"<Attribute name = \"".$utr."_utr_end\" />\n".
+		"<Attribute name = \"ensembl_gene_id\" />\n".
+		"<Attribute name = \"transcript_count\" />\n".
+		"<Attribute name = \"strand\" />\n".
+		"<Attribute name = \"external_gene_id\" />\n".
+		"</Dataset>\n".
+		"</Query>\n";
+	return($xml);
+}
+
+sub get_xml_cds_query
+{
+	my $species = $_[0];
+	my $xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n".
+		"<!DOCTYPE Query>\n".
+		"<Query  virtualSchemaName = \"default\" formatter = \"TSV\" header = \"0\" uniqueRows = \"0\" count = \"\" datasetConfigVersion = \"0.6\" >\n".
+		"<Dataset name = \"$species\" interface = \"default\" >\n".
+		"<Attribute name = \"chromosome_name\" />\n".
+		"<Attribute name = \"genomic_coding_start\" />\n".
+		"<Attribute name = \"genomic_coding_end\" />\n".
+		"<Attribute name = \"ensembl_exon_id\" />\n".
+		"<Attribute name = \"ensembl_gene_id\" />\n".
+		"<Attribute name = \"strand\" />\n".
+		"<Attribute name = \"external_gene_id\" />\n".
+		"</Dataset>\n".
+		"</Query>\n";
 	return($xml);
 }
 
 sub format_species
 {
-	if ($_[0] =~ m/human/) { return("hsapiens_gene_ensembl"); }
-	elsif ($_[0] =~ m/mouse/) { return("mmusculus_gene_ensembl"); }
-	elsif ($_[0] =~ m/rat/) { return("rnorvegicus_gene_ensembl"); }
-	elsif ($_[0] =~ m/fly/) { return("dmelanogaster_gene_ensembl"); }
+	# Impossible otherwise!
+	use v5.14;
+	my ($org,$source) = @_;
+	given($source)
+	{
+		when(/ucsc|refseq/)
+		{
+			given($org)
+			{
+				when(/human/) { return("hg19"); }
+				when(/mouse/) { return("mm9"); }
+				when(/rat/) { return("rn5"); }
+				when(/fly/) { return("dm3"); }
+				when(/zebrafish/) { return("danRer7"); }
+			}
+		}
+		when(/ensembl/)
+		{
+			given($org)
+			{
+				when(/human/) { return("hsapiens_gene_ensembl"); }
+				when(/mouse/) { return("mmusculus_gene_ensembl"); }
+				when(/rat/) { return("rnorvegicus_gene_ensembl"); }
+				when(/fly/) { return("dmelanogaster_gene_ensembl"); }
+				when(/zebrafish/) { return("drerio_gene_ensembl"); }
+			}
+		}
+	}
+	#if ($_[0] =~ m/human/) { return("hsapiens_gene_ensembl"); }
+	#elsif ($_[0] =~ m/mouse/) { return("mmusculus_gene_ensembl"); }
+	#elsif ($_[0] =~ m/rat/) { return("rnorvegicus_gene_ensembl"); }
+	#elsif ($_[0] =~ m/fly/) { return("dmelanogaster_gene_ensembl"); }
+	#elsif ($_[0] =~ m/zebrafish/) { return("drerio_gene_ensembl"); }
 }
 
 sub waitbar_init
@@ -1314,6 +1560,11 @@ sub count_lines
 	return $totlines;
 }
 
+sub swap
+{
+	return($_[1],$_[0]);
+}
+
 sub disp
 {
 	print STDERR "\n@_" if (!$silent);
@@ -1331,13 +1582,24 @@ sub cleanup
 	remove_tree($tmpdir);
 }
 
+sub unique
+{
+	my @list = @_;
+	my (%seen,$item);
+	foreach $item (@list) 
+	{
+		$seen{$item}++;
+	}
+	return(%seen);
+}
+
 sub advertise
 {
 	#use Term::ANSIColor;
 	#print color 'bold yellow on_blue';
 	disp($scriptname);
 	#print color 'bold green';
-	disp("Tag counting in genomic regions... Copyright: Panagiotis Moulos (moulos\@fleming.gr)\n");
+	disp("Short sequence read counting in genomic regions... Copyright: Panagiotis Moulos (moulos\@fleming.gr)\n");
 	#print color 'reset';
 }
 
@@ -1356,6 +1618,7 @@ genomic regions by 3 possible ways: an overlaping coefficient, a
 linear probabilitistic score and an exponential probabilistic score.
 Please see program description in the header of the script for further
 details and file format descriptions.
+
 Author : Panagiotis Moulos (pmoulos\@eie.gr)
 
 Main usage
@@ -1368,7 +1631,19 @@ $scriptname --input file1 [file2, file3, ..., filen] --region file [OPTIONS]
   			be of the same structure as in bed files. The 4th column
   			should contain a UNIQUE identifier for each region (e.g.
   			Ensembl IDs). The rest columns can contain additional data
-  			about the regions.
+  			about the regions. Instead of a local file, it can be one
+  			of the following, which will automatically download and use
+  			genomic annotations from the latest version of Ensembl:
+  			"human-gene" for Ensembl homo sapiens gene co-ordinates
+  			"human-exon" for Ensembl homo sapiens exon co-ordinates
+  			"mouse-gene" for Ensembl mus musculus gene co-ordinates
+  			"mouse-exon" for Ensembl mus musculus exon co-ordinates
+  			"rat-gene" for Ensembl rattus norvegicus gene co-ordinates
+  			"rat-exon" for Ensembl rattus norvegicus exon co-ordinates
+  			"fly-gene" for Ensembl drosophila melanogaster gene co-ordinates
+  			"fly-exon" for Ensembl drosophila melanogaster exon co-ordinates
+  			"zebrafish-gene" for Ensembl danio rerio gene co-ordinates
+  			"zebrafish-exon" for Ensembl danio rerio exon co-ordinates
 --- Optional ---
   --sort|a		Use this option if you wish to sort the input files
   			first. It is obligatory if the files are not already
@@ -1411,7 +1686,7 @@ $scriptname --input file1 [file2, file3, ..., filen] --region file [OPTIONS]
   --split|t		Use this option if you wish to further split your genomic
   			regions in smaller areas. In this case, tags will be counted
   			per area and the distribution of counts per area will be
-  			returned as a column in the output file. After the option,
+  			returned as a column in the output file. After --split,
   			you can provide the length of sub-areas. The default is
   			1000 and splits the regions per 1kb, unless the regions are
   			smaller. In this case, the area will consist of only one
@@ -1428,16 +1703,20 @@ $scriptname --input file1 [file2, file3, ..., filen] --region file [OPTIONS]
   --output|o		A file to write the output to. If "auto", then it
 			generates an automatic filename in the folder where the
 			input files are. If not provided, output is written to STDOUT.
-  --waitbar|w		Use this option if you wish to display a simple
-			progress bar while selecting and printing the final files.
-			For small files (which are rather unlike to occur) it is
-			probably useless as the program finishes very quickly.
+  --waitbar|w		Use this option if you wish to display a progress
+			bar using Term::ProgressBar module. Caution, as for large
+			files it explodes the processing time.
   --silent|s		Use this option if you want to turn informative
   			messages off.
   --help|h		Display this help text.
 
 The program returns bed file(s) that contain the provided genomic regions
 with any other information together with read counts per region.
+
+Package dependecies:
+	Tie::IxHash::Easy (mandatory)
+	Term::ProgressBar (optional)
+	File::Sort (optional)
 
 END
 	print $usagetext;
@@ -1453,4 +1732,33 @@ END
 		#($base[$i],$dir[$i],$ext[$i]) = fileparse($in[$i],'\.[^.]*');
 	#}
 	#return(\@base,\@dir,\@ext);
+#}
+
+#given($regionfile)
+#{
+	#when(/human-gene|mouse-gene|rat-gene|fly-gene|zebrafish-gene/i)
+	#{
+		#$regionfile = &fetch_ensembl_genes($regionfile);
+		#$regionfile = &sort_ensembl_genes($regionfile);
+	#}
+	#when (/human-exon|mouse-exon|rat-exon|fly-exon|zebrafish-exon/i)
+	#{
+		#$regionfile = &fetch_ensembl_exons($regionfile);
+		#$regionfile = &sort_ensembl_exons($regionfile);
+	#}
+	#when(/human-(5|3)utr|mouse-(5|3)utr|rat-(5|3)utr|fly-(5|3)utr|zebrafish-(5|3)utr/i)
+	#{
+		#($regionfile =~ m/5utr/i) ? ($regionfile = &fetch_ensembl_utr($regionfile,5)) :
+			#($regionfile = &fetch_ensembl_utr($regionfile,3));
+		#$regionfile = &sort_ensembl_exons($regionfile);
+	#}
+	#when(/human-cds|mouse-cds|rat-cds|fly-cds|zebrafish-cds/i)
+	#{
+		#$regionfile = &fetch_ensembl_cds($regionfile);
+		#$regionfile = &sort_ensembl_exons($regionfile);
+	#}
+	#default
+	#{
+		#($regionfile,@infile) = &sort_inputs($regionfile,@infile) if ($sort);
+	#}
 #}
