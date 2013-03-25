@@ -49,6 +49,7 @@ use Carp;
 use File::Spec;
 use File::Path qw(make_path remove_tree);
 use DBI;
+use POSIX qw(floor ceil);
 
 use constant REMOTE_HOST => "genome-mysql.cse.ucsc.edu";
 use constant REMOTE_USER => "genome";
@@ -372,6 +373,27 @@ sub advertise
 	print color 'reset';
 }
 
+=head2 count_hoh(%hash_of_hashes)
+
+Counts internal hash elements in a hash of hashes
+
+	$helper->count_hoh(%complex_hash);
+	
+=cut
+
+sub count_hoh
+{
+	my ($self,$inhash) = @_;
+	my ($c,$h,$i,$count);
+	foreach $c (keys(%$inhash))
+	{
+		$h = $inhash->{$c};
+		$count+= keys(%$h); 
+	}
+	$count = 0 if (!$count);
+	return($count);
+}
+
 =head2 catch_cleanup
 
 Ctrl-C signal catcher that ensures removing of temporary directories. Never use this directly as it
@@ -400,6 +422,54 @@ sub cleanup
 {
 	my $self = shift @_;
 	remove_tree($self->get("tmpdir"));
+}
+
+=head2 waitbar_init
+
+Very simple waitbar inititation
+
+	$helper->waitbar_init;
+
+=cut
+
+sub waitbar_init
+{
+	my ($self,$initlen) = @_;
+	$initlen = 50 if ($initlen eq "");
+	my $printlen = ' 'x$initlen;
+	print "\nProgress\n";
+	print "|$printlen|\n";
+	print("|");
+}
+
+=head2 waitbar_update
+
+Very simple waitbar progress
+
+	$helper->waitbar_update($curr_iter,$total_length)
+
+=cut
+
+sub waitbar_update
+{
+	my ($self,$curr,$tot,$waitbarlen) = $_[2];
+	$waitbarlen = 50 if ($waitbarlen eq "");
+	my $step;
+	if ($tot > $waitbarlen)
+	{
+		$step = ceil($tot/$waitbarlen);
+		print "#" if ($curr%$step == 0);
+	}
+	else
+	{
+		$step = floor($waitbarlen/$tot);
+		print "#" x $step;
+	}
+	if ($curr == $tot)
+	{
+		my $rem = $waitbarlen - floor($tot/$step);
+		($rem != 0) ? (print "#" x $rem."|\n") : print "|\n";
+	}
 }
 
 =head2 get

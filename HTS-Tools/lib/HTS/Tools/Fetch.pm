@@ -8,19 +8,28 @@ Version 0.01
 
 =head1 SYNOPSIS
 
-Quick summary of what the module does.
+HTS::Tools::Fetch is the module which serves the automatic downloading and formating of the genomic
+region templates mentioned in the SYNOPSIS of HTS::Tools::Count module. See that part for an explanation
+of the module possibilities. This module can be used independently to fetch these regions for additional
+applications. It also serves the module HTS::Tools::Profile.
 
 Perhaps a little code snippet.
 
     use HTS::Tools::Fetch;
+    my $fetcher = HTS::Tools::Fetch->new();
+    my $fetcher = HTS::Tools::Fetch->new({'tmpdir' => 'my_output_dir'});
+    $fetcher->fetch_ensembl_genes('human');
+    $fetcher->fetch_ucsc_exons('mouse','canonical','ucsc');
+    $fetcher->fetch_ucsc_utr('rat','alternative','refseq',5);
 
-    my $foo = HTS::Tools::Fetch->new();
-    ...
+Note that the 'tmpdir' parameter must be set if this module is called independently so as to store the
+region templates that will be fetched, otherwise, they are written in a temporary directory which is
+destroyed after the module has finished. The 'silent' option is also available. See the SYNOPSIS of
+HTS::Tools::Count.
 
 =head1 EXPORT
 
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
+Functions that can be exported:
 
 =head1 SUBROUTINES/METHODS
 
@@ -90,6 +99,8 @@ Constructor of HTS::Tools::Fetch module
 	use HTS::Tools::Fetch;
 	my $fetcher = HTS::Tools::Fetch->new($params);
 
+See the SYNOPSIS for possible parameters.
+
 =cut
 
 sub new
@@ -102,7 +113,15 @@ sub new
 		($helper->set("silent",0));
 	(defined($params->{"tmpdir"})) ? ($helper->set("tmpdir",$params->{"tmpdir"})) :
 		($helper->set("tmpdir",File::Temp->newdir()));
+	$helper->advertise($MODNAME,$VERSION,$AUTHOR,$EMAIL,$DESC);
 	
+	# Validate the input parameters
+	my $checker = HTS::Tools::Paramcheck->new();
+	$checker->set("tool","fetch");
+	$checker->set("params",$params);
+	$params = $checker->validate;
+	
+	# After validating, bless and initialize
 	bless($self,$class);
 	$self->init($params);
 	return($self);
@@ -133,7 +152,9 @@ sub init
 Fetch a BED6+1 headed file with the latest Ensembl genes annotation for one of the suported organisms.
 Mostly for internal use but it can easily be used for fetching annotation too.
 
-	$fetcher->fetch_ensembl_genes("human");
+	$fetcher->fetch_ensembl_genes($organism);
+	
+For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count.
 
 =cut
 
@@ -179,6 +200,17 @@ sub fetch_ensembl_genes
 	return($regs);
 }
 
+=head2 fetch_ensembl_exons
+
+Fetch a BED6+1 headed file with the latest Ensembl exons annotation for one of the suported organisms.
+Mostly for internal use but it can easily be used for fetching annotation too.
+
+	$fetcher->fetch_ensembl_exons($organism);
+	
+For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count.
+
+=cut
+
 sub fetch_ensembl_exons
 {
 	my ($self,$org) = @_;
@@ -220,6 +252,17 @@ sub fetch_ensembl_exons
 
 	return($regs);
 }
+
+=head2 fetch_ensembl_utr
+
+Fetch a BED6+1 headed file with the latest Ensembl UTR annotation for one of the suported organisms.
+Mostly for internal use but it can easily be used for fetching annotation too.
+
+	$fetcher->fetch_ensembl_utr($organism,$utr);
+	
+For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count. $utr can be 5 or 3.
+
+=cut
 
 sub fetch_ensembl_utr
 {
@@ -264,6 +307,17 @@ sub fetch_ensembl_utr
 	return($regs);
 }
 
+=head2 fetch_ensembl_cds
+
+Fetch a BED6+1 headed file with the latest Ensembl CDS annotation for one of the suported organisms.
+Mostly for internal use but it can easily be used for fetching annotation too.
+
+	$fetcher->fetch_ensembl_cds($organism);
+	
+For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count.
+
+=cut
+
 sub fetch_ensembl_cds
 {
 	my ($self,$org) = @_;
@@ -306,6 +360,19 @@ sub fetch_ensembl_cds
 
 	return($regs);
 }
+
+=head2 fetch_ucsc_genes
+
+Fetch a BED6+1 headed file with the UCSC genes annotation for one of the suported organisms, by connecting
+either to UCSC or a local version of the UCSC Genome Browser database. Mostly for internal use but it 
+can easily be used for fetching annotation too.
+
+	$fetcher->fetch_ucsc_genes($organism,$splicing_type,$db_source);
+	
+For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count. $splicing_type can be 'canonical'
+or 'alternative', $db_source can be 'ucsc' or 'refseq'.
+
+=cut
 
 sub fetch_ucsc_genes
 {
@@ -356,6 +423,19 @@ sub fetch_ucsc_genes
 	close(REGS);
 	return($regs);
 }
+
+=head2 fetch_ucsc_exons
+
+Fetch a BED6+1 headed file with the UCSC exons annotation for one of the suported organisms, by connecting
+either to UCSC or a local version of the UCSC Genome Browser database. Mostly for internal use but it 
+can easily be used for fetching annotation too.
+
+	$fetcher->fetch_ucsc_exons($organism,$splicing_type,$db_source);
+	
+For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count. $splicing_type can be 'canonical'
+or 'alternative', $db_source can be 'ucsc' or 'refseq'.
+
+=cut
 
 sub fetch_ucsc_exons
 {
@@ -420,6 +500,19 @@ sub fetch_ucsc_exons
 	close(REGS);
 	return($regs);
 }
+
+=head2 fetch_ucsc_utr
+
+Fetch a BED6+1 headed file with the UCSC UTR annotation for one of the suported organisms, by connecting
+either to UCSC or a local version of the UCSC Genome Browser database. Mostly for internal use but it 
+can easily be used for fetching annotation too.
+
+	$fetcher->fetch_ucsc_utr($organism,$splicing_type,$db_source,$utr);
+	
+For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count. $splicing_type can be 'canonical'
+or 'alternative', $db_source can be 'ucsc' or 'refseq'. $utr can be 5 or 3.
+
+=cut
 
 sub fetch_ucsc_utr
 {
@@ -504,6 +597,19 @@ sub fetch_ucsc_utr
 	return($regs);
 }
 
+=head2 fetch_ucsc_cds
+
+Fetch a BED6+1 headed file with the UCSC CDS annotation for one of the suported organisms, by connecting
+either to UCSC or a local version of the UCSC Genome Browser database. Mostly for internal use but it 
+can easily be used for fetching annotation too.
+
+	$fetcher->fetch_ucsc_genes($organism,$splicing_type,$db_source);
+	
+For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count. $splicing_type can be 'canonical'
+or 'alternative', $db_source can be 'ucsc' or 'refseq'.
+
+=cut
+
 sub fetch_ucsc_cds
 {
 	my ($self,$org,$type,$source) = @_;
@@ -554,6 +660,18 @@ sub fetch_ucsc_cds
 	return($regs);
 }
 
+=head2 get_xml_genes_query
+
+Construct an XML string used for the genes query in Ensembl with Biomart. Mostly for internal use but
+may be used to display the query.
+
+	$fetcher->get_xml_exons_query($organism);
+	
+For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count. $organism must be properly 
+formatted through the format_species function.
+
+=cut
+
 sub get_xml_genes_query
 {
 	my ($self,$species) = @_;
@@ -572,6 +690,18 @@ sub get_xml_genes_query
 			  "</Query>\n";
 	return($xml);
 }
+
+=head2 get_xml_exons_query
+
+Construct an XML string used for the exons query in Ensembl with Biomart. Mostly for internal use but
+may be used to display the query.
+
+	$fetcher->get_xml_exons_query($organism);
+	
+For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count. $organism must be properly 
+formatted through the format_species function.
+
+=cut
 
 sub get_xml_exons_query
 {
@@ -592,6 +722,18 @@ sub get_xml_exons_query
 	return($xml);
 }
 
+=head2 get_xml_utr_query
+
+Construct an XML string used for the UTR query in Ensembl with Biomart. Mostly for internal use but
+may be used to display the query.
+
+	$fetcher->get_xml_utr_query($organism,$utr);
+	
+For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count. $organism must be properly 
+formatted through the format_species function. $utr can be 5 or 3.
+
+=cut
+
 sub get_xml_utr_query
 {
 	my ($self,$species,$utr) = @_;
@@ -611,6 +753,18 @@ sub get_xml_utr_query
 	return($xml);
 }
 
+=head2 get_xml_cds_query
+
+Construct an XML string used for the CDS query in Ensembl with Biomart. Mostly for internal use but
+may be used to display the query.
+
+	$fetcher->get_xml_cds_query($organism);
+	
+For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count. $organism must be properly 
+formatted through the format_species function.
+
+=cut
+
 sub get_xml_cds_query
 {
 	my ($self,$species) = @_;
@@ -629,6 +783,18 @@ sub get_xml_cds_query
 		"</Query>\n";
 	return($xml);
 }
+
+=head2 format_species
+
+Construct a string representing with the correct nomenclature, species for each external annotaton
+source database. Mostly for internal use.
+
+	$fetcher->format_species($organism,$source);
+	
+For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count. $source can be one of 'ucsc',
+'refseq' or 'ensembl'.
+
+=cut
 
 sub format_species
 {
@@ -661,6 +827,14 @@ sub format_species
 	}
 }
 
+=head2 sort_ensembl_genes
+
+Sort the genes file fetched from Ensembl through Biomart. Internal use.
+
+	$fetcher->sort_ensembl_genes($file);
+
+=cut
+
 sub sort_ensembl_genes
 {
 	my ($self,$infile) = @_;
@@ -684,6 +858,14 @@ sub sort_ensembl_genes
 
 	return($infile);
 }
+
+=head2 sort_ensembl_exons
+
+Sort the exons file fetched from Ensembl through Biomart. Internal use.
+
+	$fetcher->sort_ensembl_exons($file);
+
+=cut
 
 sub sort_ensembl_exons
 {
