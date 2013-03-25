@@ -1645,6 +1645,10 @@ $scriptname --input file1 [file2, file3, ..., filen] --region file [OPTIONS]
   			"zebrafish-gene" for Ensembl danio rerio gene co-ordinates
   			"zebrafish-exon" for Ensembl danio rerio exon co-ordinates
 --- Optional ---
+  --source|u		Use this option to set the online data source in
+			the case of selecting one of the prefefined region templates
+			with --region. Can be one of "ucsc", "refseq" or "ensembl".
+			Default to "ensembl".
   --sort|a		Use this option if you wish to sort the input files
   			first. It is obligatory if the files are not already
   			sorted. If you do not use it and the files are not sorted,

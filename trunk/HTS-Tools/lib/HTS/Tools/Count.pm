@@ -8,52 +8,183 @@ Version 0.01
 
 =head1 SYNOPSIS
 
-Program to join reads in bed file(s) with their genomic regions in a genome and count
-presences of reads (uniquely) in each gene. Simplifies the operation on genomic intervals
-of Galaxy and solw by performing all operations locally and unified. Additionally, it
-addresses the problem of partial overlaping between a read and a genomic regions by 3
-possible ways:
-a. By providing an overlaping coefficient between 0 and 1, the program adds a read into
-a genomic region if the part of the read within the boundaries (start or end) of the
-genomic region is >= coefficient*read length. For example, if a read has length 200
-and the overlaping coefficient is 0.9, then 0.9*200 = 180 bases should be within the
-region boundaries to be included in that region. This should provide more accuracy
-when having large reads. It can be used in the case of small reads too, but lucks
-automation.
-b. By using a linear probabilistic score. In this case, if a read is located half inside
-a region, it is added up to that region, else a score is calculated for the read based
-on the formula: score = #bps inside region/(length of read/2). This score lies between
-0 and 1 and it is compared to a uniform random number p between 0 and 1. If p<score
-then this tag is added up to the genomic region else discarded. This scoring scheme
-should be used with reads of small length and should be avoided in the case of large
-reads because of causing possible under-representation in promoter regions, in case
-one wishes to summarize reads in gene regions. However it could perform well when
-studying promoter or binding regions.
-c. By using an exponential probabilistic score. This case, works as case (b) but the
-scoring function is score = exp(-c^2/#bps inside region) where c is constant. The
-constant c determines determines the steepness of the score. The lower the value is,
-the higher is the probability to include in the region tags whose larger part lies
-outside the region. This scoring scheme should be used with reads of small length and
-for reasons similar to those of (b) but would maybe perform better when used in
-promoter or binding regions.
-Apart from the bed files, the program requires also a bed file (3 first columns should
-be chromosome, start, end and the 4th a UNIQUE region identification, e.g. Ensembl ID, 
-could also contain further information in extra columns) which contains the genomic 
-regions of interest, in which number of reads should be summarized. The program returns 
-bed file(s) that contain the provided genomic regions with any other information together 
-with read counts per region.
-The region file can be automatically downloaded among a variety of predefined regions...
-More documentation to come...
+Program to count reads in bed file(s) over specific genomic regions in a genome and count. It also 
+addresses the problem of partial overlaping between a read and a genomic regions by 3 possible ways:
+
+=over 4
+
+=item *
+
+a. By providing an overlaping coefficient between 0 and 1, the program adds a read into a genomic region 
+if the part of the read within the boundaries (start or end) of the genomic region is >= coefficient*read length. 
+For example, if a read has length 200 and the overlaping coefficient is 0.9, then 0.9*200 = 180 bases 
+should be within the region boundaries to be included in that region. This should provide more accuracy 
+when having large reads. It can be used in the case of small reads too, but lucks automation. It can
+also split each genomic region in bins of constant length and count reads in individual bins and calculate
+several statistics for each genomic region based on the bin stats.
+
+=item *
+
+b. By using a linear probabilistic score. In this case, if a read is located half inside a region, it
+is added up to that region, else a score is calculated for the read based on the formula: score = #bps 
+inside region/(length of read/2). This score lies between 0 and 1 and it is compared to a uniform random 
+number p between 0 and 1. If p<score then this tag is added up to the genomic region else discarded. 
+This scoring scheme should be used with reads of small length and should be avoided in the case of 
+large reads because of causing possible under-representation in promoter regions, in case one wishes 
+to summarize reads in gene regions. However it could perform well when studying promoter or binding regions.
+
+=item *
+
+c. By using an exponential probabilistic score. This case, works as case (b) but the scoring function 
+is score = exp(-c^2/#bps inside region) where c is constant. The constant c determines the steepness 
+of the score. The lower the value is, the higher is the probability to include in the region tags whose
+larger part lies outside the region. This scoring scheme should be used with reads of small length and
+for reasons similar to those of (b) but would maybe perform better when used in promoter or binding regions.
+
+=back
+
+Apart from the bed files, the program requires also a bed file (3 first columns should be chromosome, 
+start, end and the 4th a UNIQUE region identification, e.g. Ensembl ID, could also contain further 
+information in extra columns) which contains the genomic regions of interest, in which number of reads 
+should be summarized. The program returns bed file(s) that contain the provided genomic regions with 
+any other information together with read counts per region. The region file can be automatically downloaded
+among a variety of predefined regions from Ensembl, UCSC or RefSeq. More documentation to come...
 
     use HTS::Tools::Count;
+	my %params = (
+		'input' => ['normal_pol2.bed','disease_pol2.bed'],
+		'region' => 'human-gene',
+		'source' => 'ucsc',
+		'split' => 1000
+	)
+    my $counter = HTS::Tools::Count->new(\%params);
+    $counter->run;
+    
+The acceptable parameters are as follows:
 
-    my $count = HTS::Tools::Count->new(\%params);
-    $count->run;
+=over 4
 
-=head1 EXPORT
+=item I<input> B<(required)>
 
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
+Input file(s). The input bed files can be 3, 6 or n column bedfiles, only the first 3 are used. More
+formats will be added soon.
+
+=item I<region> B<(required)>
+
+Genomic regions file. The first 3 columns should be of the same structure as in bed files. The 4th 
+column should contain a UNIQUE identifier for each region (e.g. Ensembl IDs). The rest columns can 
+contain additional data about the regionsn (e.g. annotation elements, descriptions etc.). Instead of 
+a local file, it can be one of the following, which will automatically download and use genomic regions 
+from the source defined by the I<source> parameter:
+
+"human-gene" for homo sapiens gene co-ordinates
+"human-exon" for homo sapiens exon co-ordinates
+"human-5utr" for homo sapiens 5'UTR co-ordinates
+"human-3utr" for homo sapiens 3'UTR co-ordinates
+"human-cds" for homo sapiens CDS co-ordinates
+"mouse-gene" for mus musculus gene co-ordinates
+"mouse-exon" for mus musculus exon co-ordinates
+"mouse-5utr" for mus musculus 5'UTR co-ordinates
+"mouse-3utr" for mus musculus 3'UTR co-ordinates
+"mouse-cds" for mus musculus CDS co-ordinates
+"rat-gene" for rattus norvegicus gene co-ordinates
+"rat-exon" for rattus norvegicus exon co-ordinates
+"rat-5utr" for rattus norvegicus 5'UTR co-ordinates
+"rat-3utr" for rattus norvegicus 3'UTR co-ordinates
+"rat-cds" for rattus norvegicus CDS co-ordinates
+"fly-gene" for drosophila melanogaster gene co-ordinates
+"fly-exon" for drosophila melanogaster exon co-ordinates
+"fly-5utr" for drosophila melanogaster 5'UTR co-ordinates
+"fly-3utr" for drosophila melanogaster 3'UTR co-ordinates
+"fly-cds" for drosophila melanogaster CDS co-ordinates
+"zebrafish-gene" for danio rerio gene co-ordinates
+"zebrafish-exon" for danio rerio exon co-ordinates
+"zebrafish-5utr" for danio rerio 5'UTR co-ordinates
+"zebrafish-3utr" for danio rerio 3'UTR co-ordinates
+"zebrafish-cds" for danio rerio CDS co-ordinates
+
+=item I<source> B<(optional)>
+
+Use this option to set the online data source in the case of selecting one of the prefefined region 
+templates with I<region>. It can be one of "ucsc", "refseq" or "ensembl" and Default to "ensembl".
+
+=item I<sort> B<(optional)>
+
+Use this option if you wish to sort the input files first. It is obligatory if the files are not already
+sorted. If you do not use it and the files are not sorted, results will be incorrect if the program will 
+not crash. If you wish to sort the files manually, be sure to sort firstly by chromosome (1st column) 
+and then by region start. In Linux systems, the command should look like this: 
+
+	sort -k1,1 -k2g,2 inputfile > outputfile 
+
+In Windows systems, it would be better to use a spreadsheet program like Excel to perform sorting by 
+columns. Both the input bed files and the region file should be sorted. If the structure of the region 
+file is as described (1st column: chromosome, 2nd column: start 3rd column: end, 4th column: unique ID 
+etc.) the sorting command is exactly the same as in common bed files (3 or 6 columns).
+
+=item I<percent> B<(optional)>
+
+Use this option to provide the overlaping coefficient according to which tags that partially fall outside 
+provided genomic regions will be assigned to genomic regions. Defaults to 0.95 and is the default algorithm 
+for assigning tags that fall partially inside provided genomic regions.
+
+=item I<lscore> B<(optional)>
+
+Use this option to use the linear probabilistic scoring scheme to address the problem of partial tag
+overlap with the provided genomic regions. Please see header of the script file for description. Defaults 
+to 0 (not use).
+
+=item I<escore> B<(optional)>
+
+Use this option to use the exponential probabilistic scoring scheme to address the problem of partial tag
+overlap with the provided genomic regions. Please see the SYNOPSIS section for a description. Defaults to 0
+(not use).
+
+=item I<constant> B<(optional)>
+
+Use this option to provide the constant for the exponential scoring scheme (see description of I<escore>
+option). Defaults to 3.
+
+=item I<small> B<(optional)>
+
+Use this option if you wish to take into consideration genomic regions in your genomic regions file which 
+are smaller than the tag length (rare but may occur, especially with customized genomic regions). Defaults 
+to 0 (not use).
+
+=item I<split> B<(optional)>
+
+Use this option if you wish to further split your genomic regions in smaller areas. In this case, tags 
+will be counted per area and the distribution of counts per area will be returned as a column in the 
+output file. The argument is the length of sub-areas. The default is 1000 and splits the regions per 
+1kb, unless the regions are smaller. In this case, the area will consist of only one sub-area of length 
+equal to that of the area. Note also that when using this option, tags that are found inside sub-areas 
+are not assigned to those sub-areas based on scoring schemes (options I<percent>, I<lscore> and I<escore>)
+but tags are assigned based on the location of their center.
+
+=item I<stats> B<(optional)>
+
+Use this option to also return basic statistics of counts in the windows used returned by using I<split>.
+It should be set to 1 (defaults to 0).
+
+=item I<ncore> B<(optional)>
+
+If the machine has multicore processor(s) and the package Parallel::ForkManager is installed, you can use
+parallel processing. Default is 1 and can go up to 12.
+
+=item I<output> B<(optional)>
+
+A file to write the output to. If "auto", then it generates an automatic filename in the folder where the
+input files are. If not provided, output is written to STDOUT.
+
+=item I<silent> B<(optional)>
+
+Set this to 1 if you want to turn informative messages off.
+
+=back
+
+=head1 OUTPUT
+
+A table-like test file containing the reads inside each genomic region for each input reads file.
 
 =head1 SUBROUTINES/METHODS
 
@@ -94,6 +225,11 @@ BEGIN {
 }
 
 =head2 new
+
+The HTS::Tools::Count object constructor. It accepts a set of parameters that are required to run the
+counter and get the output.
+
+	my $counter = HTS::Tools::Count->new({'input' => 'myfile.bed','region' => 'ensembl_genes.txt'});
 
 =cut
 
@@ -140,6 +276,14 @@ sub init
     
     return($self);
 }
+
+=head2 run
+
+The HTS::Tools::Count run subroutine. It runs the counter with the given parameters in the constructor.
+
+	$counter->run;
+	
+=cut
 
 sub run
 {
@@ -191,6 +335,14 @@ sub run
 	$helper->disp("Finished!\n\n");
 }
 
+=head2 split_area
+
+Creates the bins in the region file genomic regions. Internal use.
+
+	$counter->split_area($area_start,$area_end,$bin_size);
+	
+=cut
+
 sub split_area
 {
 	my ($self,$start,$end,$splitlen) = @_;
@@ -214,6 +366,14 @@ sub split_area
 	
 	return @subareas;
 }
+
+=head2 bin_search_loc
+
+Binary search for genomic regions. Internal use.
+
+	$counter->bin_search_loc($start,$end,@array_of_coordinates);
+	
+=cut
 
 sub bin_search_loc
 {
@@ -246,6 +406,15 @@ sub bin_search_loc
 	}
 	return (0,-1);
 }
+
+=head2 read_region_file
+
+Region file parser and constructor of the internal hash representation. Requires Tie::IxHash::Easy.
+Internal use.
+
+	$counter->read_region_file($regionfile,[@input_files]);
+	
+=cut
 
 sub read_region_file
 {
@@ -305,6 +474,14 @@ sub read_region_file
 
 	return(\%chromosome,\%gencounts,\%splitcounts,$theHeader);
 }
+
+=head2 count_all_reads
+
+Wrapper for the main counting subroutine. Internal use.
+
+	$counter->count_all_reads($region_structure,$region_counts,$split_counts,@input_files,[@input_files]);
+	
+=cut
 
 sub count_all_reads
 {	
@@ -378,6 +555,14 @@ sub count_all_reads
 	
 	return($gencounts,$splitcounts);
 }
+
+=head2 count_reads
+
+Single core main read counter. Internal use.
+
+	$counter->count_reads($region_structure,$region_counts,$split_counts,$input_file,[$input_file]);
+	
+=cut
 
 sub count_reads
 {
@@ -556,6 +741,14 @@ sub count_reads
 	return($gencounts,$splitcounts);
 }
 
+=head2 count_reads_multi
+
+Multiple core main read counter. Internal use.
+
+	$counter->count_reads_multi($region_structure,$region_counts,$split_counts,$input_file,[$input_file]);
+	
+=cut
+
 sub count_reads_multi
 {
 	my ($self,$chromosome,$gencounts,$splitcounts,$infile,$originfile) = @_;
@@ -732,6 +925,14 @@ sub count_reads_multi
 	return($gencounts,$splitcounts);
 }
 
+=head2 write_reads
+
+Main output writer. Internal use.
+
+	$counter->write_reads($region_structure,$region_counts,$split_counts,$input_file,[$input_file],$header);
+	
+=cut
+
 sub write_reads
 {
 	my $self = shift @_;
@@ -894,6 +1095,14 @@ sub write_reads
 	close(OUTPUT) if ($self->get("output"));
 }
 
+=head2 sort_inputs
+
+Helper sorting function for input files and region. Internal use.
+
+	$counter->sort_inputs($region_file,@input_files);
+	
+=cut
+
 sub sort_inputs
 {
 	my ($self,$regionfile,@infile) = @_;
@@ -946,6 +1155,14 @@ sub sort_inputs
 	return($regionfile,@infile);
 }
 
+=head2 sort_one
+
+Helper sorting function. Internal use.
+
+	$counter->sort_one($input_file);
+	
+=cut
+
 sub sort_one
 {
 	my ($self,$file) = @_;
@@ -978,6 +1195,14 @@ sub sort_one
 	return($file);
 }
 
+=head2 decide_header
+
+Parse the first line of region file and decide if it has a header line or data start right away. Internal use.
+
+	$counter->decide_header($first_line);
+	
+=cut
+
 sub decide_header
 {
 	my ($self,$line )= @_;
@@ -993,11 +1218,37 @@ sub decide_header
 	}
 }
 
+=head2 change_params
+
+Massively change the parameters of an HTS::Tools::Count object.
+
+	$counter->change_params({'input' => 'another_file','region' => 'mouse-exon'})
+	
+=cut
+
+sub change_params
+{
+	my ($self,$params) = @_;
+	
+	# Validate the new parameters 
+	my $checker = HTS::Tools::Paramcheck->new();
+	$checker->set("tool","count");
+	$checker->set("params",$params);
+	$params = $checker->validate;
+	
+	# If validator does not complain, change the parameters
+	while (my ($name,$value) = each(%$params))
+	{
+		$self->set($name,$value);
+	}
+	return($self);
+}
+
 =head2 get
 
 HTS::Tools::Count object getter
 
-	my $param_value = $count->get("param_name")
+	my $param_value = $counter->get("param_name")
 =cut
 
 sub get
@@ -1010,7 +1261,7 @@ sub get
 
 HTS::Tools::Count object setter
 
-	$count->set("param_name","param_value")
+	$counter->set("param_name","param_value")
 	
 =cut
 
@@ -1021,6 +1272,11 @@ sub set
 	return($self);
 }
 
+=head1 DEPENDENCIES
+
+Tie::IxHash::Easy (mandatory)
+File::Sort (optional)
+
 =head1 AUTHOR
 
 Panagiotis Moulos, C<< <moulos at fleming.gr> >>
@@ -1030,9 +1286,6 @@ Panagiotis Moulos, C<< <moulos at fleming.gr> >>
 Please report any bugs or feature requests to C<bug-hts-tools at rt.cpan.org>, or through
 the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=HTS-Tools>.  I will be notified, and then you'll
 automatically be notified of progress on your bug as I make changes.
-
-
-
 
 =head1 SUPPORT
 
@@ -1106,7 +1359,6 @@ YOUR LOCAL LAW. UNLESS REQUIRED BY LAW, NO COPYRIGHT HOLDER OR
 CONTRIBUTOR WILL BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, OR
 CONSEQUENTIAL DAMAGES ARISING IN ANY WAY OUT OF THE USE OF THE PACKAGE,
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 
 =cut
 

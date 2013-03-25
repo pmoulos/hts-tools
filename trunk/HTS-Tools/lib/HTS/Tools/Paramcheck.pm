@@ -56,7 +56,9 @@ BEGIN {
 
 use constant MAXCORES => 12;
 
-=head2 new($tool,%params)
+=head2 new($tool,$args)
+
+The HTS::Tools::Paramcheck object constructor. See the SYNOPSIS for usage examples.
 
 =cut
 
@@ -107,6 +109,10 @@ sub validate
 		when(/assign/i)
 		{
 			$self->validate_assign;
+		}
+		when(/constants/i)
+		{
+			$self->validate_constants;
 		}
 		when(/convert/i)
 		{
@@ -176,6 +182,15 @@ sub validate_convert
 {
 	my $self = shift @_;
 	my $modname = "HTS::Tools::Convert";
+	
+	my @accept = ();
+	
+	# Check and warn for unrecognized parameters
+    foreach my $p (keys(%{$self->{"params"}}))
+    {
+		$helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+	}
+	
 	return($self->{"params"});
 }
 
@@ -186,7 +201,6 @@ function instead
 
 =cut
 
-# TODO: Check for unrecognized parameters
 sub validate_count
 {
 	my $self = shift @_;
@@ -297,6 +311,18 @@ sub validate_fetch
 {
 	my $self = shift @_;
 	my $modname = "HTS::Tools::Fetch";
+	
+	# Check required packages
+	$helper->try_module("Tie::IxHash::Easy");
+
+	my @accept = ("silent","tmpdir");
+	
+	# Check and warn for unrecognized parameters
+    foreach my $p (keys(%{$self->{"params"}}))
+    {
+		$helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+	}
+
 	return($self->{"params"});
 }
 
@@ -311,6 +337,86 @@ sub validate_intersect
 {
 	my $self = shift @_;
 	my $modname = "HTS::Tools::Intersect";
+	
+	my @accept = ("inputA","inputB","sort","percent","any","extend","mode","autoextend","both","exact",
+			"pass","gap","output","multi","header","waitbar","silent","tmpdir");
+	
+	# Check and warn for unrecognized parameters
+    foreach my $p (keys(%{$self->{"params"}}))
+    {
+		$helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+	}
+	
+	# Check fatal
+	my $stop;
+    $stop .= "--- Please specify input file(s) ---\n" if (!$self->{"params"}->{"inputA"} || !$self->{"params"}->{"inputB"});
+    if ($self->{${$percent}[0]} =~ /\d\:\d+/) 
+    {
+    	my ($s,$e) = split(":",$self->${$percent}[0]);
+    	@{$self->{$percent}} = ($s..$e);
+	}
+	foreach my $cpp (@{$self->{$percent}})
+	{
+		if ($cpp < 0 || $cpp > 100)
+		{
+			$stop .= "--- Overlap percentage should be a value between 0 and 100 ---\n";
+			last;
+		}
+	}
+    if ($stop)
+    {
+		$helper->disp("$stop\n");
+		croak "Type perldoc $modname for help in usage.\n\n";
+		exit;
+    }
+	
+	if ($self->{"params"}->{"pass"} < 0)
+	{
+		disp("The number of passes for dynamic binary search should be >0! Using default (3)...");
+		$self->{"params"}->{"pass"} = 3;
+	}
+    # Check gap
+    disp("The gap parameter should be >=0! Using default (10000)...") if ($self->{"params"}->{"gap"} < 0);
+    # Check what is given on extend
+    if (@{$self->{"params"}->{"extend"}})
+    {
+    	if (!${$self->{"params"}->{"extend"}}[1])
+    	{
+    		disp("The extend parameter has one argument... Assuming same extension in both sides.");
+    		${$self->{"params"}->{"extend"}}[1] = ${$self->{"params"}->{"extend"}}[0];
+    	}
+    }
+    if (@{$self->{"params"}->{"extend"}} && $self->{"params"}->{"autoextend"})
+    {
+    	disp("extend and autoextend options cannot be given together! Ignoring autoextend...");
+    	$self->{"params"}->{"autoextend"} = 0;
+	}
+    $self->{"params"}->{"mode"} -= 2 if ($self->{"params"}->{"mode"});
+    # Check proper output format
+    if (@{$self->{"params"}->{"out"}})
+    {
+		foreach my $c (@{$self->{"params"}->{"out"}})
+		{
+			if ($c ne "overlapA" && $c ne "overlapB" && $c ne "onlyA" && $c ne "onlyB" && $c ne "overpairs" &&
+			    $c ne "nonpairs")
+			{
+				my $msg = "WARNING! Output options should be one or more of \"overlapA\", \"overlapB\",".
+				          " \"onlyA\", \"onlyB\", \"overpairs\" or \"nonpairs\",\n".
+						  "Using default (\"overlapA\")...";
+				disp($msg);
+				@{$self->{"params"}->{"extend"}} = ("overlapA");
+			}
+		}
+	}
+	else
+	{
+		if (!${$self->{"params"}->{"percent"}}[1])
+		{
+			$helper->disp("Output file type not given! Using default (overlapA)...") ;
+			@{$self->{"params"}->{"out"}} = ("overlapA");
+		}
+	}
+	
 	return($self->{"params"});
 }
 
@@ -325,6 +431,15 @@ sub validate_motifscan
 {
 	my $self = shift @_;
 	my $modname = "HTS::Tools::Motifscan";
+	
+	my @accept = ();
+	
+	# Check and warn for unrecognized parameters
+    foreach my $p (keys(%{$self->{"params"}}))
+    {
+		$helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+	}
+	
 	return($self->{"params"});
 }
 
@@ -339,6 +454,15 @@ sub validate_multisect
 {
 	my $self = shift @_;
 	my $modname = "HTS::Tools::Multisect";
+	
+	my @accept = ();
+	
+	# Check and warn for unrecognized parameters
+    foreach my $p (keys(%{$self->{"params"}}))
+    {
+		$helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+	}
+	
 	return($self->{"params"});
 }
 
@@ -353,6 +477,15 @@ sub validate_normalize
 {
 	my $self = shift @_;
 	my $modname = "HTS::Tools::Normalize";
+	
+	my @accept = ();
+	
+	# Check and warn for unrecognized parameters
+    foreach my $p (keys(%{$self->{"params"}}))
+    {
+		$helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+	}
+	
 	return($self->{"params"});
 }
 
@@ -367,6 +500,15 @@ sub validate_profile
 {
 	my $self = shift @_;
 	my $modname = "HTS::Tools::Profile";
+	
+	my @accept = ();
+	
+	# Check and warn for unrecognized parameters
+    foreach my $p (keys(%{$self->{"params"}}))
+    {
+		$helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+	}
+	
 	return($self->{"params"});
 }
 
@@ -381,6 +523,15 @@ sub validate_qc
 {
 	my $self = shift @_;
 	my $modname = "HTS::Tools::QC";
+	
+	my @accept = ();
+	
+	# Check and warn for unrecognized parameters
+    foreach my $p (keys(%{$self->{"params"}}))
+    {
+		$helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+	}
+	
 	return($self->{"params"});
 }
 
@@ -423,6 +574,34 @@ sub validate_queries
 	if (!($query ~~ @accept))
 	{
 		$helper->disp("Unkown query for $modname: $query\n");
+		croak "Type perldoc $modname for help in usage.\n\n";
+	}
+}
+
+=head2 validate_constants
+
+The parameter validator function of the HTS::Constants module. Do not use this directly, use the validate
+function instead
+
+=cut
+
+sub validate_constants
+{
+	my ($self,$params) = @_;
+	my $modname = "HTS::Tools::Constants";
+	my $wrongs = 0;
+
+	my @accept = ();
+
+	foreach my $c (keys(%{$self->{"params"}}))
+    {
+		$helper->disp("Unrecognized constant : $c   --- Ignoring...") if (!($c ~~ @accept));
+		$wrongs++;
+	}
+	
+	if ($wrongs == scalar keys(%{$self->{"params"}}))
+	{
+		$helper->disp("No valid constant was given for $modname\n");
 		croak "Type perldoc $modname for help in usage.\n\n";
 	}
 }
@@ -541,4 +720,4 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =cut
 
-1; # End of HTS::Tools::Fetch
+1; # End of HTS::Tools::Paramcheck

@@ -2,6 +2,7 @@ Build.PL
 Changes
 lib/HTS/Tools.pm
 lib/HTS/Tools/Assign.pm
+lib/HTS/Tools/Constants.pm
 lib/HTS/Tools/Convert.pm
 lib/HTS/Tools/Count.pm
 lib/HTS/Tools/Fetch.pm
@@ -9,8 +10,10 @@ lib/HTS/Tools/Intersect.pm
 lib/HTS/Tools/Motifscan.pm
 lib/HTS/Tools/Multisect.pm
 lib/HTS/Tools/Normalize.pm
+lib/HTS/Tools/Paramcheck.pm
 lib/HTS/Tools/Profile.pm
 lib/HTS/Tools/QC.pm
+lib/HTS/Tools/Queries.pm
 lib/HTS/Tools/Utils.pm
 MANIFEST			This list of files
 README
