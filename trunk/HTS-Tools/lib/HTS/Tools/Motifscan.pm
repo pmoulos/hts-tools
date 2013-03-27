@@ -1,21 +1,10 @@
-package HTS::Tools::Motifscan;
-
-use v5.10;
-use strict;
-use warnings FATAL => 'all';
-
 =head1 NAME
 
-HTS::Tools::Motifscan - The great new HTS::Tools::Motifscan!
+HTS::Tools::Motifscan - A massive motif scanner (not finder!) for short genomic regions
 
 =head1 VERSION
 
 Version 0.01
-
-=cut
-
-our $VERSION = '0.01';
-
 
 =head1 SYNOPSIS
 
@@ -25,8 +14,7 @@ Perhaps a little code snippet.
 
     use HTS::Tools::Motifscan;
 
-    my $foo = HTS::Tools::Motifscan->new();
-    ...
+    my $motifscanner = HTS::Tools::Motifscan->new();
 
 =head1 EXPORT
 
@@ -35,18 +23,54 @@ if you don't export anything, such as for a purely object-oriented module.
 
 =head1 SUBROUTINES/METHODS
 
-=head2 function1
-
 =cut
 
-sub function1 {
+package HTS::Tools::Motifscan;
+
+use v5.10;
+use strict;
+use warnings FATAL => 'all';
+
+use Carp;
+use File::Basename;
+use File::Temp;
+use File::Spec;
+
+use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
+use HTS::Tools::Paramcheck;
+use HTS::Tools::Utils;
+
+use vars qw($helper);
+
+our $MODNAME = "HTS::Tools::Count";
+our $VERSION = '0.01';
+our $AUTHOR = "Panagiotis Moulos";
+our $EMAIL = "moulos\@fleming.gr";
+our $DESC = "Short sequence read counting in genomic regions.";
+
+BEGIN {
+	$helper = HTS::Tools::Utils->new();
+	select(STDOUT);
+	$|=1;
+	$SIG{INT} = sub { $helper->catch_cleanup; }
 }
 
-=head2 function2
+=head2 new
 
 =cut
 
-sub function2 {
+sub new
+{
+}
+
+=head2 init
+
+HTS::Tools::Motifscan object initialization method. NEVER use this directly, use new instead.
+
+=cut
+
+sub init
+{
 }
 
 =head1 AUTHOR
@@ -59,15 +83,11 @@ Please report any bugs or feature requests to C<bug-hts-tools at rt.cpan.org>, o
 the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=HTS-Tools>.  I will be notified, and then you'll
 automatically be notified of progress on your bug as I make changes.
 
-
-
-
 =head1 SUPPORT
 
 You can find documentation for this module with the perldoc command.
 
     perldoc HTS::Tools::Motifscan
-
 
 You can also look for information at:
 

@@ -42,7 +42,7 @@ use Carp;
 use File::Spec;
 use File::Basename;
 
-use lib '/media/HD4/Fleming/dev/HTS-Tools/lib';
+use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools::Utils;
 
 use vars qw($helper);
@@ -208,9 +208,10 @@ sub validate_count
 
 	# Check required packages
 	$helper->try_module("Tie::IxHash::Easy");
+	$helper->try_module("IntervalTree");
 
 	my @accept = ("input","region","sort","percent","lscore","escore","constant","small","split","stats",
-		"output","ncore","source","silent","tmpdir");
+		"pass","output","ncore","source","silent","tmpdir");
 
 	# Check fatal
 	my $stop;
@@ -296,6 +297,12 @@ sub validate_count
 			$self->{"params"}->{"source"} = "ensembl";
 		}
 	}
+	if ($self->{"params"}->{"pass"})
+    {
+		$helper->disp("Number of binary search passes must be a positive integer! Using default (3)...")
+			if ($self->{"params"}->{"pass"} < 0 || $self->{"params"}->{"pass"} !~ m/\d+/);
+    	$self->{"params"}->{"pass"} = 3;
+    }
 
 	return($self->{"params"});
 }
@@ -350,12 +357,12 @@ sub validate_intersect
 	# Check fatal
 	my $stop;
     $stop .= "--- Please specify input file(s) ---\n" if (!$self->{"params"}->{"inputA"} || !$self->{"params"}->{"inputB"});
-    if ($self->{${$percent}[0]} =~ /\d\:\d+/) 
+    if (${$self->{"params"}->{"percent"}}[0] =~ /\d\:\d+/) 
     {
-    	my ($s,$e) = split(":",$self->${$percent}[0]);
-    	@{$self->{$percent}} = ($s..$e);
+    	my ($s,$e) = split(":",${$self->{"params"}->{"percent"}}[0]);
+    	@{$self->{"params"}->{"percent"}} = ($s..$e);
 	}
-	foreach my $cpp (@{$self->{$percent}})
+	foreach my $cpp (@{$self->{"params"}->{"percent"}})
 	{
 		if ($cpp < 0 || $cpp > 100)
 		{

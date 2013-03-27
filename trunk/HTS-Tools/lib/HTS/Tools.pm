@@ -38,7 +38,7 @@ use warnings FATAL => 'all';
 
 use File::Temp;
 
-use lib '/media/HD4/Fleming/dev/HTS-Tools/lib';
+use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools::Assign;
 use HTS::Tools::Convert;
 use HTS::Tools::Count;

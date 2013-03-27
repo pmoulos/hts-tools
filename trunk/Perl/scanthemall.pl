@@ -924,6 +924,7 @@ sub createOutputFile
 	}
 }
 
+# Passed to HTS::Tools::Convert
 sub fasta2tab
 {
 	my $infile = shift @_;
@@ -953,6 +954,7 @@ sub fasta2tab
 	return($outfile);
 }
 
+# Passed to HTS::Tools::Convert
 sub tab2fasta
 {
 	my $infile = shift @_;
@@ -977,6 +979,7 @@ sub tab2fasta
 	close(OUTPUT);
 }
 
+# Passed to HTS::Tools::Utils
 sub countLines
 {
 	open(IN,$_[0]) or die "\nThe file $_[0] does not exist!\n\n";
@@ -986,6 +989,7 @@ sub countLines
 	return $totlines;
 }
 
+# Passed to HTS::Tools::Utils
 sub countFASTA
 {
 	open(IN,$_[0]) or die "\nThe file $_[0] does not exist!\n\n";
@@ -995,6 +999,7 @@ sub countFASTA
 	return $totfa;
 }
 
+# Passed to HTS::Tools::Utils
 sub countUniLines
 {
 	open(IN,$_[0]) or die "\nThe file $_[0] does not exist!\n\n";
@@ -1037,6 +1042,7 @@ sub rangeVector
 	return(@rout);
 }
 
+# Passed to HTS::Tools::Utils
 sub dirtyChkFASTA
 {
 	my $in = shift @_;
@@ -1047,6 +1053,7 @@ sub dirtyChkFASTA
 	return($chk);
 }
 
+# Passed to HTS::Tools::Utils
 sub dirtyChkTab
 {
 	my $in = shift @_;
@@ -1059,6 +1066,7 @@ sub dirtyChkTab
 	return($chk);
 }
 
+# Passed to HTS::Tools::Utils
 sub waitbarInit
 {
 	my $initlen = shift @_;
@@ -1069,6 +1077,7 @@ sub waitbarInit
 	print("|");
 }
 
+# Passed to HTS::Tools::Utils
 sub waitbarUpdate
 {
 	my $curr = $_[0];
@@ -1095,6 +1104,7 @@ sub waitbarUpdate
 	}
 }
 
+# Passed to HTS::Tools::Utils
 sub now
 {
 	my $type = shift @_;
@@ -1116,17 +1126,20 @@ sub now
 	}
 }
 
+# Passed to HTS::Tools::Utils
 sub minmax
 {
 	my @s = sort { $a <=> $b } @_;
 	return($s[0],$s[$#s]);
 }
 
+# Passed to HTS::Tools::Utils
 sub getSysSep
 {
 	($^O !~ /MSWin/) ? (return("/")) : (return("\\"))
 }
 
+# Passed to HTS::Tools::Utils
 sub disp
 {
 	my @in = @_;

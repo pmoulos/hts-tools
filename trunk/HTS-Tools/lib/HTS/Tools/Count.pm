@@ -208,7 +208,7 @@ use File::Temp;
 use File::Spec;
 use File::Path qw(make_path remove_tree);
 
-use lib '/media/HD4/Fleming/dev/HTS-Tools/lib';
+use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools::Fetch;
 use HTS::Tools::Paramcheck;
 use HTS::Tools::Utils;
@@ -436,7 +436,7 @@ sub read_region_file
 	$helper->disp("Reading genomic regions file...");
 	$helper->disp("...also splitting genomic regions in areas of ".$self->get("split")." base pairs...") if ($self->get("split"));
 	
-	open(REGIONS,$regionfile) or die "\nThe file $regionfile does not exist!\n";
+	open(REGIONS,$regionfile) or croak "\nThe file $regionfile does not exist!\n";
 	$regline = <REGIONS>;
 	$theHeader = $self->decide_header($regline);
 	seek(REGIONS,0,0) if (!$theHeader);
@@ -917,7 +917,6 @@ sub count_reads_multi
 				$u = $i - 1 if ($bedend <= $currstart);
 				$l = $i + 1 if ($bedstart >= $currend);
 			}
-
 		}
 	}
 	close(BEDFILE);
@@ -970,8 +969,8 @@ sub write_reads
 	}
 	else
 	{
-		($self->get("stats")) ? ($helper->disp("Writing reads and calculating statistics per genomic regions to standard output...")) :
-			$helper->disp("Writing reads per genomic regions for file to standard output...");
+		($self->get("stats")) ? ($helper->disp("Writing reads and calculating statistics per genomic regions to standard output...\n")) :
+			$helper->disp("Writing reads per genomic regions for file to standard output...\n");
 	}
 
 	$outcount = 1;

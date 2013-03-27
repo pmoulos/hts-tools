@@ -198,7 +198,7 @@ use File::Basename;
 use File::Temp;
 use File::Spec;
 
-use lib '/media/HD4/Fleming/dev/HTS-Tools/lib';
+use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools::Paramcheck;
 use HTS::Tools::Utils;
 
@@ -276,32 +276,42 @@ constructor.
 sub run
 {
 	my $self = shift @_;
-	my $ofileA = $fileA;
-	my $ofileB = $fileB; # Keep original filenames (verbose purposes)
-
-	if ($self->get($sort))
-	{
-		($fileA,$fileB) = $self->sort_input($self->get("inputA"),$self->get("inputB"));
-	}
 	
 	# Copy some memory-less variables to avoid rewriting the whole thing...
+	my $fileA = $self->get("inputA");
+	my $fileB = $self->get("inputB");
 	my $any = $self->get("any");
 	my $mode = $self->get("mode");
 	my $agap = $self->get("agap");
+	my $npass = $self->get("pass");
+	my $autoxtend = $self->get("autoextend");
+	my $exact = $self->get("exact");
+	my $both = $self->get("both");
+	my $header = $self->get("header");
+	my $multi = $self->get("multi");
 	my @percent = @{$self->get("percent")};
 	my @extend = @{$self->get("extend")};
 	my @out = @{$self->get("output")};
+	my $waitbar = $self->get("waitbar");
+	my $silent = $self->get("silent");
+	my $ofileA = $fileA;
+	my $ofileB = $fileB; # Keep original filenames (verbose purposes)
+
+	if ($self->get("sort"))
+	{
+		($fileA,$fileB) = $self->sort_input($fileA,$fileB);
+	}
 	
 	# Bavard a little... I like information...
-	$helper->$helper->disp("Type of overlap: any overlap, percentage overlap ignored...") if ($any && @percent);
-	$helper->$helper->disp("Type of overlap: any overlap") if ($any && !@percent);
-	$helper->$helper->disp("Type of overlap: $percent[0]% overlap") if ($percent[0] && !$percent[1] && !$any);
-	$helper->$helper->disp("Extending region modes upstream $extend[0] and downstream $extend[1] bps") if (@extend && !$autoxtend);
-	$helper->$helper->disp("Region modes extension on each side will be auto-calculated...") if ($autoxtend);
+	$helper->disp("Type of overlap: any overlap, percentage overlap ignored...") if ($any && @percent);
+	$helper->disp("Type of overlap: any overlap") if ($any && !@percent);
+	$helper->disp("Type of overlap: $percent[0]% overlap") if ($percent[0] && !$percent[1] && !$any);
+	$helper->disp("Extending region modes upstream $extend[0] and downstream $extend[1] bps") if (@extend && !$autoxtend);
+	$helper->disp("Region modes extension on each side will be auto-calculated...") if ($autoxtend);
 	if ($percent[1])
 	{
-		$helper->$helper->disp("Multiple overlap percentages... Running in batch mode to determine overlapping distributions...");
-		$helper->$helper->disp("No overlapping output files will be produced..."); 
+		$helper->disp("Multiple overlap percentages... Running in batch mode to determine overlapping distributions...");
+		$helper->disp("No overlapping output files will be produced..."); 
 	}
 
 	# Save some more memory...
@@ -326,7 +336,7 @@ sub run
 	$helper->$helper->disp(" ");
 
 	# Get number of lines for fileA (mostly for waitbar, I know, inefficient but I like waitbars ;-)
-	my $linesA = $helper->count_lines($fileA) if ($self->get("waitbar"));
+	my $linesA = $helper->count_lines($fileA) if ($waitbar);
 
 	# Suck in fileB
 	my $chr;
@@ -334,7 +344,7 @@ sub run
 	my (%hashB,%onlyB);
 	open(INB,$fileB) or croak "\nThe file $fileB does not exist!\n";
 	$helper->$helper->disp("Reading file $ofileB...");
-	my $headerB = <INB> if ($self->get("header"));
+	my $headerB = <INB> if ($header);
 	while (my $line = <INB>)
 	{
 		next if ($line =~/^chrM/);
@@ -364,12 +374,12 @@ sub run
 			{
 				open (INA,$fileA) or croak "\nThe file $fileA does not exist!\n";;
 				$helper->$helper->disp("Reading file $ofileA and processing overlaps...");
-				my $headerA = <INA> if ($self->get("header"));
+				my $headerA = <INA> if ($header);
 				my (@lines,@medmodes);
-				$helper->waitbar_init if ($self->get("waitbar"));
+				$helper->waitbar_init if ($waitbar);
 				while (my $line = <INA>)
 				{
-					$helper->waitbar_update($.,$linesA) if ($self->get("waitbar"));
+					$helper->waitbar_update($.,$linesA) if ($waitbar);
 					next if ($line =~/^chrM/);
 					next if ($line =~/rand|hap|chrU/);
 					$line =~ s/\r|\n$//g;
@@ -395,11 +405,11 @@ sub run
 						}
 					}
 					my $countopic = 0;
-					$helper->waitbar_init if ($self->get("waitbar"));
+					$helper->waitbar_init if ($waitbar);
 					foreach my $l (@lines)
 					{
 						$countopic++;
-						$helper->waitbar_update($countopic,$linesA-1) if ($self->get("waitbar"));
+						$helper->waitbar_update($countopic,$linesA-1) if ($waitbar);
 						($cchr,@crest) = split(/\t/,$l);
 						@currvals = @{$hashB{$cchr}} if ($hashB{$cchr}); 
 						$n = 0;
@@ -459,11 +469,11 @@ sub run
 					}		
 					open (INA,$fileA) or croak "\nThe file $fileA does not exist!\n";;
 					$helper->$helper->disp("Reading file $ofileA and processing overlaps...");
-					$helper->waitbar_init if ($self->get("waitbar"));
-					my $headerA = <INA> if ($self->get("header"));
+					$helper->waitbar_init if ($waitbar);
+					my $headerA = <INA> if ($header);
 					while (my $line = <INA>)
 					{
-						$helper->waitbar_update($.,$linesA) if ($self->get("waitbar"));	
+						$helper->waitbar_update($.,$linesA) if ($waitbar);	
 						next if ($line =~/^chrM/);
 						next if ($line =~/rand|hap|chrU/);
 						$line =~ s/\r|\n$//g;
@@ -531,11 +541,11 @@ sub run
 				
 				open (INA,$fileA) or croak "\nThe file $fileA does not exist!\n";;
 				$helper->$helper->disp("Reading file $ofileA and processing overlaps...");
-				$helper->waitbar_init if ($self->get("waitbar"));
-				my $headerA = <INA> if ($self->get("header"));
+				$helper->waitbar_init if ($waitbar);
+				my $headerA = <INA> if ($header);
 				while (my $line = <INA>)
 				{
-					$helper->waitbar_update($.,$linesA) if ($self->get("waitbar"));	
+					$helper->waitbar_update($.,$linesA) if ($waitbar);	
 					next if ($line =~/^chrM/);
 					next if ($line =~/rand|hap|chrU/);
 					$line =~ s/\r|\n$//g;
@@ -624,8 +634,8 @@ sub run
 		
 	open (INA,$fileA) or croak "\nThe file $fileA does not exist!\n";;
 	$helper->$helper->disp("Reading file $ofileA and processing overlaps...");
-	my $headerA = <INA> if ($self->get("header"));
-	$helper->waitbar_init if ($self->get("waitbar"));
+	my $headerA = <INA> if ($header);
+	$helper->waitbar_init if ($waitbar);
 	if (@extend || $autoxtend)
 	{
 		if ($autoxtend) # We have to suck in the whole peak file once...
@@ -633,7 +643,7 @@ sub run
 			my (@lines,@medmodes);
 			while (my $line = <INA>)
 			{
-				$helper->waitbar_update($.,$linesA) if ($self->get("waitbar"));
+				$helper->waitbar_update($.,$linesA) if ($waitbar);
 				next if ($line =~/^chrM/);
 				next if ($line =~/rand|hap|chrU/);
 				$line =~ s/\r|\n$//g;
@@ -645,11 +655,11 @@ sub run
 			@extend = (int($med/2),int($med/2));
 			$helper->disp("Median region length is $med bps. Extending each region mode $extend[1] bps on each side...\n");
 			my $countopic = 0;
-			$helper->waitbar_init if ($self->get("waitbar"));
+			$helper->waitbar_init if ($waitbar);
 			foreach my $l (@lines)
 			{
 				$countopic++;
-				$helper->waitbar_update($countopic,$linesA-1) if ($self->get("waitbar"));
+				$helper->waitbar_update($countopic,$linesA-1) if ($waitbar);
 				($cchr,@crest) = split(/\t/,$l);
 				
 				# Perform binary search according to user choices...
@@ -702,7 +712,7 @@ sub run
 		{
 			while (my $line = <INA>)
 			{
-				$helper->waitbar_update($.,$linesA) if ($self->get("waitbar"));	
+				$helper->waitbar_update($.,$linesA) if ($waitbar);	
 				next if ($line =~/^chrM/);
 				next if ($line =~/rand|hap|chrU/);
 				$line =~ s/\r|\n$//g;
@@ -759,7 +769,7 @@ sub run
 	{
 		while (my $line = <INA>)
 		{
-			$helper->waitbar_update($.,$linesA) if ($self->get("waitbar"));	
+			$helper->waitbar_update($.,$linesA) if ($waitbar);	
 			next if ($line =~/^chrM/);
 			next if ($line =~/rand|hap|chrU/);
 			$line =~ s/\r|\n$//g;
@@ -1378,7 +1388,8 @@ sub create_output_file
 	my ($self,$inA,$inB,$type) = @_;
 	my ($baseA,$dirA,$extA) = fileparse($inA,'\..*?');
 	my $baseB = fileparse($inB,'\..*?');
-	($multi) ? (return(File::Spec->catfile($dirA,$baseA.$baseB))) :
+
+	($self->get("multi")) ? (return(File::Spec->catfile($dirA,$baseA.$baseB))) :
 	(return(File::Spec->catfile($dirA,$baseA."_".$baseB."_".$type.$extA)));
 }
 
@@ -1398,7 +1409,7 @@ sub sort_inputs
 	# Simulate try and catch
 	if ($^O !~ /MSWin/) # Case of linux, easy sorting
 	{
-		if ($header)
+		if ($self->get("header"))
 		{
 			$helper->disp("Sorting file $fileA...");
             my $sortcmdA = "awk 'NR==1; NR > 1 {print \$0 | \" sort -k1,1 -k2g,2\"}' $fileA > $tmpfileA";
@@ -1424,10 +1435,10 @@ sub sort_inputs
 		my $status = $helper->try_module("File::Sort");
 		
 		# Will die if module does not exist
-		if ($header) # Cannot find a solution for direct sorting in Windows... sorry :-(
+		if ($self->get("header")) # Cannot find a solution for direct sorting in Windows... sorry :-(
 		{
 			my $dmsg = "Module File::Sort can't sort a file with a header line without possible\n".
-					   "messing up data. Please sort files outside $scriptname first (e.g. using\n".
+					   "messing up data. Please sort files outside $MODNAME first (e.g. using\n".
 					   "Excel or something similar.";
 			croak "\n$dmsg\n\n";
 		}
