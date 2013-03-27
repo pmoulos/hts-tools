@@ -72,7 +72,7 @@ use File::Temp;
 use HTTP::Request;
 use LWP::UserAgent;
 
-use lib '/media/HD4/Fleming/dev/HTS-Tools/lib';
+use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools::Queries;
 use HTS::Tools::Utils;
 

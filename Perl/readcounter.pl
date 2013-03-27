@@ -696,67 +696,68 @@ sub count_reads_multi
 			$nextchr = $bedchr;
 		}
 
-		# Start binary search
-		my $i;
-		my ($l,$u) = (0,$#k);
-		while ($l <= $u)
-		{
-			$i = int(($l + $u)/2);
-			my $gene = $k[$i];
-			my $coords = $v[$i];
-			($currstart,$currend,$currrest) = split(/\t/,$coords);
+		#use Data::Dumper;
+		#print Dumper(\@v);
 
-			# Conditions that satisfy our search
-			# Security, too small region, tag does not fit?
-			# Mark that there is something there if user wishes and proceed
-			if ($currstart >= $bedstart && $currend <= $bedend)
+		# Start binary search
+		#my %found;
+		#my $found;
+		my $n = 0;
+		#while ($n < 3)
+		#{
+			my $i;
+			#$found = 0;
+			my ($l,$u) = (0,$#k);
+			while ($l <= $u)
 			{
-				$gencounts->{$bedchr}->{$gene}++ if ($countsmall);
-				if ($splitper && $countsmall) # If splitting of regions
+				$i = int(($l + $u)/2);
+				my $gene = $k[$i];
+				my $coords = $v[$i];
+				($currstart,$currend,$currrest) = split(/\t/,$coords);
+
+				# Conditions that satisfy our search
+				# Security, too small region, tag does not fit?
+				# Mark that there is something there if user wishes and proceed
+				if ($currstart >= $bedstart && $currend <= $bedend)
 				{
-					@regarr = &split_area($currstart,$currend,$splitper);
-					@bsr = &bin_search_loc($bedstart,$bedend,@regarr);
-					$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
-				}
-				last;
-			}
-			# Ideal case... whole tag inside gene... no problem
-			elsif ($currstart <= $bedstart && $currend >= $bedend)
-			{
-				$gencounts->{$bedchr}->{$gene}++;
-				#print "\t$filename $gencounts->{$bedchr}->{$gene}";
-				if ($splitper) # If splitting of regions
-				{
-					@regarr = &split_area($currstart,$currend,$splitper);
-					@bsr = &bin_search_loc($bedstart,$bedend,@regarr);
-					$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
-				}
-				last;
-			}
-			# Part of tag outside after region
-			elsif ($currstart < $bedstart && $currend < $bedend && $bedstart < $currend)
-			{
-				$diff = $currend - $bedstart;
-				if ($lscore || $escore) # Linear or exponential scoring
-				{
-					if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside no need for further check
+					#next if $found{$i};
+					$gencounts->{$bedchr}->{$gene}++ if ($countsmall);
+					if ($splitper && $countsmall) # If splitting of regions
 					{
-						$gencounts->{$bedchr}->{$gene}++;
-						if ($splitper) # If splitting of regions
-						{
-							@regarr = &split_area($currstart,$currend,$splitper);
-							@bsr = &bin_search_loc($bedstart,$bedend,@regarr);
-							$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
-						}
+						@regarr = &split_area($currstart,$currend,$splitper);
+						@bsr = &bin_search_loc($bedstart,$bedend,@regarr);
+						$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
 					}
-					else # Use probabilistic scoring scheme
+					#$found{$i}++; # Find a way not to splice the array of coordinates, check if the found value is the same...
+					#$found = $i;
+					last;
+				}
+				# Ideal case... whole tag inside gene... no problem
+				elsif ($currstart <= $bedstart && $currend >= $bedend)
+				{
+					#next if $found{$i};
+					$gencounts->{$bedchr}->{$gene}++;
+					#print "\t$filename $gencounts->{$bedchr}->{$gene}";
+					if ($splitper) # If splitting of regions
 					{
-						$score = ($currend - $bedstart)/(($bedend - $bedstart)/2) if ($lscore); # Linear
-						$score = exp(-$c**2/($currend - $bedstart)) if ($escore); # Exponential
-						$p = rand();
-						if ($p < $score)
+						@regarr = &split_area($currstart,$currend,$splitper);
+						@bsr = &bin_search_loc($bedstart,$bedend,@regarr);
+						$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+					}
+					#$found{$i}++;
+					#$found = $i;
+					last;
+				}
+				# Part of tag outside after region
+				elsif ($currstart < $bedstart && $currend < $bedend && $bedstart < $currend)
+				{
+					#next if $found{$i};
+					$diff = $currend - $bedstart;
+					if ($lscore || $escore) # Linear or exponential scoring
+					{
+						if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside no need for further check
 						{
-							$gencounts->{$bedchr}->{$gene}++; 
+							$gencounts->{$bedchr}->{$gene}++;
 							if ($splitper) # If splitting of regions
 							{
 								@regarr = &split_area($currstart,$currend,$splitper);
@@ -764,45 +765,26 @@ sub count_reads_multi
 								$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
 							}
 						}
-					}
-				}
-				else # Simple overlap
-				{
-					if ($diff >= $percentage*($bedend - $bedstart))
-					{
-						$gencounts->{$bedchr}->{$gene}++;
-						if ($splitper) # If splitting of regions
+						else # Use probabilistic scoring scheme
 						{
-							@regarr = &split_area($currstart,$currend,$splitper);
-							@bsr = &bin_search_loc($bedstart,$bedend,@regarr);
-							$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+							$score = ($currend - $bedstart)/(($bedend - $bedstart)/2) if ($lscore); # Linear
+							$score = exp(-$c**2/($currend - $bedstart)) if ($escore); # Exponential
+							$p = rand();
+							if ($p < $score)
+							{
+								$gencounts->{$bedchr}->{$gene}++; 
+								if ($splitper) # If splitting of regions
+								{
+									@regarr = &split_area($currstart,$currend,$splitper);
+									@bsr = &bin_search_loc($bedstart,$bedend,@regarr);
+									$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+								}
+							}
 						}
 					}
-				}
-				last;
-			}
-			# Part of tag outside before region
-			elsif ($currstart > $bedstart && $currend > $bedend && $bedend > $currstart)
-			{
-				$diff = $bedend - $currstart;
-				if ($lscore || $escore) # Linear or exponential scoring
-				{
-					if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside
+					else # Simple overlap
 					{
-						$gencounts->{$bedchr}->{$gene}++;
-						if ($splitper) # If splitting of regions
-						{
-							@regarr = &split_area($currstart,$currend,$splitper);
-							@bsr = &bin_search_loc($bedstart,$bedend,@regarr);
-							$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
-						}
-					}
-					else # Use probabilistic scoring scheme
-					{
-						$score = ($bedend - $currstart)/(($bedend - $bedstart)/2) if ($lscore); # Linear
-						$score = exp(-$c**2/($bedend - $currstart)) if ($escore); # Exponential
-						$p = rand();
-						if ($p < $score)
+						if ($diff >= $percentage*($bedend - $bedstart))
 						{
 							$gencounts->{$bedchr}->{$gene}++;
 							if ($splitper) # If splitting of regions
@@ -813,30 +795,77 @@ sub count_reads_multi
 							}
 						}
 					}
+					#$found{$i}++;
+					#$found = $i;
+					last;
 				}
-				else # Simple overlap
+				# Part of tag outside before region
+				elsif ($currstart > $bedstart && $currend > $bedend && $bedend > $currstart)
 				{
-					if ($diff >= $percentage*($bedend - $bedstart))
+					#next if $found{$i};
+					$diff = $bedend - $currstart;
+					if ($lscore || $escore) # Linear or exponential scoring
 					{
-						$gencounts->{$bedchr}->{$gene}++;
-						if ($splitper) # If splitting of regions
+						if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside
 						{
-							@regarr = &split_area($currstart,$currend,$splitper);
-							@bsr = &bin_search_loc($bedstart,$bedend,@regarr);
-							$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+							$gencounts->{$bedchr}->{$gene}++;
+							if ($splitper) # If splitting of regions
+							{
+								@regarr = &split_area($currstart,$currend,$splitper);
+								@bsr = &bin_search_loc($bedstart,$bedend,@regarr);
+								$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+							}
+						}
+						else # Use probabilistic scoring scheme
+						{
+							$score = ($bedend - $currstart)/(($bedend - $bedstart)/2) if ($lscore); # Linear
+							$score = exp(-$c**2/($bedend - $currstart)) if ($escore); # Exponential
+							$p = rand();
+							if ($p < $score)
+							{
+								$gencounts->{$bedchr}->{$gene}++;
+								if ($splitper) # If splitting of regions
+								{
+									@regarr = &split_area($currstart,$currend,$splitper);
+									@bsr = &bin_search_loc($bedstart,$bedend,@regarr);
+									$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+								}
+							}
 						}
 					}
+					else # Simple overlap
+					{
+						if ($diff >= $percentage*($bedend - $bedstart))
+						{
+							$gencounts->{$bedchr}->{$gene}++;
+							if ($splitper) # If splitting of regions
+							{
+								@regarr = &split_area($currstart,$currend,$splitper);
+								@bsr = &bin_search_loc($bedstart,$bedend,@regarr);
+								$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+							}
+						}
+					}
+					#$found{$i}++;
+					#$found = $i;
+					last;
 				}
-				last;
+				else # If none of them met, reduce the searching subset
+				{
+					$u = $i - 1 if ($bedend <= $currstart);
+					$l = $i + 1 if ($bedstart >= $currend);
+				}
 			}
-			else # If none of them met, reduce the searching subset
-			{
-				$u = $i - 1 if ($bedend <= $currstart);
-				$l = $i + 1 if ($bedstart >= $currend);
-			}
-
+			#if ($found)
+			#{
+				##print STDERR "\nfound is $found!";
+				#splice(@k,$found,1); # Remove it from areas else it will be found again
+				#splice(@v,$found,1);
+				#$n++;
+				##print STDERR "\nI found it in $n!";
+			#} else { last; }
 		}
-	}
+	#}
 	close(BEDFILE);
 
 	#print Dumper($gencounts);
@@ -881,8 +910,8 @@ sub write_reads
 	}
 	else
 	{
-		($stats) ? (disp("Writing reads and calculating statistics per genomic regions to standard output...")) :
-			disp("Writing reads per genomic regions for file to standard output...");
+		($stats) ? (disp("Writing reads and calculating statistics per genomic regions to standard output...\n")) :
+			disp("Writing reads per genomic regions for file to standard output...\n");
 	}
 
 	my ($regionlines,$fprog);

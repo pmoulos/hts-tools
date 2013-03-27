@@ -183,6 +183,85 @@ sub count_lines
 	return $totlines;
 }
 
+=head2 count_unique_lines($file)
+
+Counts the unique lines of a (non-binary) file
+
+	my $uniqe_number_of_lines = $helper->count_unique_lines($file);
+
+=cut
+
+sub count_unique_lines
+{
+	my ($self,$in) = @_;
+	open(IN,$in) or croak "\nThe file $in does not exist!\n\n";
+	my ($l,@li,%lh);
+	while ($l = <IN>)
+	{
+		@li = split(/\t/,$l);
+		$lh{$li[0]}++;
+	}
+	close(IN);
+	my $totlines = keys(%lh);
+	return $totlines;
+}
+
+=head2 count_fasta($fasta_file)
+
+Counts the number of sequences in a FASTA file
+
+	my $number_of_seqs = $helper->count_fasta($fasta_file);
+
+=cut
+
+sub count_fasta
+{
+	my ($self,$in) = @_;
+	open(IN,$in) or croak "\nThe file $in does not exist!\n\n";
+	my $totfa=0;
+	$totfa += tr/\>/\>/ while sysread(IN,$_,2**16);
+	close(IN);
+	return $totfa;
+}
+
+=head2 check_fasta($file)
+
+Quick (and dirty) check if the input file is a FASTA file
+
+	my $is_fasta = $helper->check_fasta($file);
+
+=cut
+
+sub check_fasta
+{
+	my ($self,$in) = @_;
+	open(FCHK,$in) or croak "\nThe file $in does not exist!\n";
+	my $chk = 0;
+	$chk = 1 if (<FCHK> !~ /^>/);
+	close(FCHK);
+	return($chk);
+}
+
+=head2 check_tabseq($file)
+
+Quick (and dirty) check if the input file is a tabular sequence file
+
+	my $is_tab = $helper->check_tabseq($file);
+
+=cut
+
+sub check_tabseq
+{
+	my ($self,$in) = @_;
+	open(TCHK,$in) or die "\nThe file $in does not exist!\n";
+	my $chk = 0;
+	my @test = split(/\t/,<TCHK>);
+	my $len = @test;
+	$chk = 1 if ($len < 2);
+	close(TCHK);
+	return($chk);
+}
+
 =head2 round($number)
 
 Scientifically rounds a number to the closest integer
@@ -275,6 +354,35 @@ sub mad
 		push(@absdiff,($_ - $med));
 	}
 	return abs(median(@absdiff));
+}
+
+=head2 minmax(@array)
+
+Returns the minimum and the maximum value of an arithmetic arraty
+
+	my $minmax = $helper->minmax(@array);
+	
+=cut
+
+sub minmax
+{
+	my $self = shift @_;
+	my @s = sort { $a <=> $b } @_;
+	return($s[0],$s[$#s]);
+}
+
+=head2 get_sys_sep
+
+Returns the OS system path separator
+
+	my $sysep = $helper->get_sys_sep;
+	
+=cut
+
+sub get_sys_sep
+{
+	my $self = shift @_;
+	($^O !~ /MSWin/) ? (return("/")) : (return("\\"))
 }
 
 =head2 try_module($module)

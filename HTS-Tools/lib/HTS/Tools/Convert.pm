@@ -1,21 +1,11 @@
-package HTS::Tools::Convert;
-
-use v5.10;
-use strict;
-use warnings FATAL => 'all';
 
 =head1 NAME
 
-HTS::Tools::Convert - The great new HTS::Tools::Convert!
+HTS::Tools::Convert - A set of format conversion utilities for HTS::Tools
 
 =head1 VERSION
 
 Version 0.01
-
-=cut
-
-our $VERSION = '0.01';
-
 
 =head1 SYNOPSIS
 
@@ -26,7 +16,6 @@ Perhaps a little code snippet.
     use HTS::Tools::Convert;
 
     my $foo = HTS::Tools::Convert->new();
-    ...
 
 =head1 EXPORT
 
@@ -35,18 +24,122 @@ if you don't export anything, such as for a purely object-oriented module.
 
 =head1 SUBROUTINES/METHODS
 
-=head2 function1
-
 =cut
 
-sub function1 {
+package HTS::Tools::Convert;
+
+use v5.10;
+use strict;
+use warnings FATAL => 'all';
+
+our $MODNAME = "HTS::Tools::Convert";
+our $VERSION = '0.01';
+our $AUTHOR = "Panagiotis Moulos";
+our $EMAIL = "moulos\@fleming.gr";
+our $DESC = "Set of format conversion utilities.";
+
+use Carp;
+use File::Basename;
+use File::Spec;
+
+use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
+use HTS::Tools::Paramcheck;
+use HTS::Tools::Utils;
+
+use vars qw($helper);
+
+BEGIN {
+	$helper = HTS::Tools::Utils->new();
+	select(STDOUT);
+	$|=1;
+	$SIG{INT} = sub { $helper->catch_cleanup; }
 }
 
-=head2 function2
+=head2 new
 
 =cut
 
-sub function2 {
+sub new
+{
+}
+
+=head2 init($params)
+
+HTS::Tools::Convert object initialization method. NEVER use this directly, use new instead.
+
+=cut
+
+sub init
+{
+}
+
+=head2 fasta2tab($fasta_file)
+
+Convert a FASTA file to sequences in tabular format
+
+	my $tab_converted = $converter->fasta2tab($fasta_file);
+
+=cut
+
+sub fasta2tab
+{
+	my ($self,$infile) = @_;
+	my $currid;
+	open(INPUT,$infile) or croak "\nThe file $infile does not exist!\n";
+	my ($base,$dir) = fileparse($infile,'\.[^.]*');
+	my $outfile = File::Spec->catfile($dir,$base.".tab");
+	open(OUTPUT,">$outfile");
+	while (my $line = <INPUT>)
+	{
+		$line =~ s/\r|\n$//g;
+		if ($line =~ /^>/)
+		{
+			print OUTPUT "\n" if ($currid);
+			$currid = $line;
+			$currid =~ s/^>//g;
+			print OUTPUT "$currid\t";
+		}
+		elsif ($currid)
+		{
+			print OUTPUT "$line";
+		}
+	}
+	print OUTPUT "\n";
+	close(INPUT);
+	close(OUTPUT);
+	return($outfile);
+}
+
+=head2 tab2fasta($tab_file)
+
+Convert a tabular sequences file to FASTA format
+
+	my $fasta_converted = $converter->tab2fasta($tab_file);
+
+=cut
+
+sub tab2fasta
+{
+	my ($self,$infile) = @_;
+	my @conts;
+	open(INPUT,$infile) or croak "\nThe file $infile does not exist!\n";
+	my ($base,$dir) = fileparse($infile,'\.[^.]*');
+	my $outfile = File::Spec->catfile($dir,$base.".fa");
+	open(OUTPUT,">$outfile");
+	while (my $line = <INPUT>)
+	{
+		$line =~ s/\r|\n$//g;
+		@conts = split(/\t/,$line);
+		print OUTPUT ">$conts[0]\n";
+		my $seq = $conts[1];
+		while ($seq)
+		{
+			my $olin = substr($seq,0,100,"");
+			print OUTPUT "$olin\n";
+		}
+	}
+	close(INPUT);
+	close(OUTPUT);
 }
 
 =head1 AUTHOR
