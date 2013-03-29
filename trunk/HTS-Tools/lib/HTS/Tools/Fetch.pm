@@ -79,6 +79,8 @@ use HTS::Tools::Utils;
 use vars qw($helper $qobj);
 
 use constant BIOMART_PATH => "http://www.biomart.org/biomart/martservice?";
+use constant REMOTE_HOST => "genome-mysql.cse.ucsc.edu";
+use constant REMOTE_USER => "genome";
 
 BEGIN {
 	$helper = HTS::Tools::Utils->new();
@@ -116,9 +118,7 @@ sub new
 	$helper->advertise($MODNAME,$VERSION,$AUTHOR,$EMAIL,$DESC);
 	
 	# Validate the input parameters
-	my $checker = HTS::Tools::Paramcheck->new();
-	$checker->set("tool","fetch");
-	$checker->set("params",$params);
+	my $checker = HTS::Tools::Paramcheck->new({"tool" => "fetch","params" => $params});
 	$params = $checker->validate;
 	
 	# After validating, bless and initialize
@@ -480,14 +480,13 @@ sub fetch_ucsc_exons
 	$sth->execute();
 	while ($data = $sth->fetchrow_hashref())
 	{
-
 		@starts = split(",",$data->{"exonStarts"});
 		@ends = split(",",$data->{"exonEnds"});
 		for ($i=0; $i<@starts; $i++)
 		{
 			push(@coords,$starts[$i]."-".$ends[$i]);
 		}
-		my %u = &unique(@coords);
+		my %u = $helper->unique(@coords);
 		@coords = sort cosort keys(%u);
 		foreach my $k (@coords)
 		{
@@ -589,8 +588,8 @@ sub fetch_ucsc_utr
 	$sth->execute();
 	while ($data = $sth->fetchrow_hashref())
 	{
-		print REGS $data->{"chrom"}."\t".$data->{"chromStart"}."\t".$data->{"chromEnd"}."\t".
-			$data->{"transcript"}."\t".$data->{"exonCount"}."\t".$data->{"strand"}."\t".$data->{"geneName"}."\n";
+		print REGS $data->{"chrom"}."\t".$data->{"start"}."\t".$data->{"end"}."\t".
+			$data->{"name"}."\t".$data->{"exonCount"}."\t".$data->{"strand"}."\t".$data->{"geneName"}."\n";
 	}
 	$self->close_connection($conn);
 	close(REGS);
@@ -889,6 +888,75 @@ sub sort_ensembl_exons
 	}
 
 	return($infile);
+}
+
+=head2 open_connection($db,@dbdata)
+
+Open a connection to a local ore remote database given a host and database connection credits. Do not
+directly use this function, it serves only internal purposes of retrieving data from UCSC database
+in order to annotate, read count and plot.
+
+	my $conn = $helper->open_connection("hg19","gbuser","gbpass");
+
+=cut
+
+sub open_connection
+{   
+	my ($self,$database,@dbdata) = @_;
+
+	# Generally, dbdata should be read from HTS::Tools::Constants
+	@dbdata = ("user","password");
+	
+	my ($hostname,$conn);
+	if (@dbdata && $self->check_db_existence($database,@dbdata))
+	{
+		$hostname = "localhost";
+		$conn = DBI->connect("dbi:mysql:database=$database;host=$hostname;port=3306",$dbdata[0],$dbdata[1]);
+	}
+	else # Connect to the public MySQL host at UCSC
+	{
+		$hostname = REMOTE_HOST;
+		$conn = DBI->connect("dbi:mysql:database=$database;host=$hostname;port=3306",REMOTE_USER);
+	}
+    return $conn;
+}
+
+=head2 close_connection($db,@dbdata)
+
+Close the connection to a local ore remote database. Do not directly use this function, it serves only
+internal purposes of retrieving data from UCSC database in order to annotate, read count and plot.
+
+	$helper->close_connection($conn);
+
+=cut
+
+sub close_connection
+{ 
+    my ($self,$conn) = @_;
+    $conn->disconnect();
+}
+
+=head2 check_existence($db,@dbdata)
+
+Check if a local or remote database exists. Do not directly use this function, it serves only internal
+purposes of retrieving data from UCSC database in order to annotate, read count and plot.
+
+	$helper->check_db_existence("arbDB","user","pass");
+
+=cut
+
+sub check_db_existence
+{
+	my ($self,$dbcheck,@dbdata) = @_;
+	my $out = 1;
+	my $conn = DBI->connect("dbi:mysql:database=information_schema;host=localhost;port=3306",$dbdata[0],$dbdata[1]);
+	my $query = "SELECT `SCHEMA_NAME` FROM `SCHEMATA` WHERE `SCHEMA_NAME` = \"$dbcheck\"";
+	my $sth = $conn->prepare($query);
+	$sth->execute();
+	$out = 0 if (!$sth->rows());
+	$sth->finish();
+	$self->close_connection($conn);
+	return($out);
 }
 
 =head2 get

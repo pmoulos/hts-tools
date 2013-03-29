@@ -54,7 +54,7 @@ values for $what
 
 sub get_query
 {
-	my ($self,$what,$utr) = @_;
+	my ($self,$what) = @_;
 	$self->check($what);
 	my $q;
 
