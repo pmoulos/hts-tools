@@ -65,7 +65,8 @@ sub init
 	
 	# Here we must initiate a set of standard parameters like paths for external tools, local and
 	# remote database hosts, usernames, passwords, number of cores to use etc.
-	
+	my $constants = $self->load_constants
+
 	return($self);
 }
 
@@ -73,7 +74,7 @@ sub init
 
 Load constants from an external YAML file.
 
-	$const->change_constants({'BEDTOOLS_HOME' => '/opt/BEDTools','SAMTOOLS_HOME' => '/opt/SAMTools'})
+	$const->load_constants($yaml_file)
 
 =cut
 
@@ -81,10 +82,43 @@ sub load_constants
 {
 	my ($self,$file) = @_;
 	
-	# Read the YAML file using the module YAML, create a parameters hash and pass it to change_constants
-	# which will do the rest of the work like validation 
+	use YAML qw(LoadFile Dump);
+	my $pfh;
+	eval
+	{
+		open($pfh,"<",$paramfile);
+		$phref = LoadFile($pfh);
+		close($pfh);
+	};
+	if ($@)
+	{
+		disp("Bad parameter file! Will try to load defaults...");
+		$phref = $self->load_default_params();
+	}
+	return($phref);
 	
 	return($self);
+}
+
+=head2 load_default_constants
+
+Load default constants in the absence of an external YAML file.
+
+	$const->load_default_constants({'BEDTOOLS_HOME' => '/opt/BEDTools','SAMTOOLS_HOME' => '/opt/SAMTools'})
+
+=cut
+
+sub load_default_params
+{	
+	my $self = shift @_;
+
+	my $constants = {
+		"BIOMART_PATH" => "http://www.biomart.org/biomart/martservice?",
+		"REMOTE_HOST" => "genome-mysql.cse.ucsc.edu",
+		"REMOTE_USER" => "genome",
+		"BEDTOOLS_PATH" => "/opt/NGSTools/BEDTools/bin",
+		"SAMTOOLS_PATH" => "/opt/NGSTools/SAMTools"
+	}
 }
 
 =head2 change_constants

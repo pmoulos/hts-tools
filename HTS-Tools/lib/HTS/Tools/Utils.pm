@@ -51,9 +51,6 @@ use File::Path qw(make_path remove_tree);
 use DBI;
 use POSIX qw(floor ceil);
 
-use constant REMOTE_HOST => "genome-mysql.cse.ucsc.edu";
-use constant REMOTE_USER => "genome";
-
 BEGIN {
 	select(STDOUT);
 	$|=1;
@@ -73,71 +70,6 @@ sub new
 	my $self = {};
 	bless($self,$class);
 	return($self);
-}
-
-=head2 open_connection($db,@dbdata)
-
-Open a connection to a local ore remote database given a host and database connection credits. Do not
-directly use this function, it serves only internal purposes of retrieving data from UCSC database
-in order to annotate, read count and plot.
-
-	my $conn = $helper->open_connection("hg19","gbuser","gbpass");
-
-=cut
-
-sub open_connection
-{   
-	my ($self,$database,@dbdata) = @_;
-	my ($hostname,$conn);
-	if (&check_existence($database))
-	{
-		$hostname = "localhost";
-		$conn = DBI->connect("dbi:mysql:database=$database;host=$hostname;port=3306",$dbdata[0],$dbdata[1]);
-	}
-	else # Connect to the public MySQL host at UCSC
-	{
-		$hostname = REMOTE_HOST;
-		$conn = DBI->connect("dbi:mysql:database=$database;host=$hostname;port=3306",REMOTE_USER);
-	}
-    return $conn;
-}
-
-=head2 close_connection($db,@dbdata)
-
-Close the connection to a local ore remote database. Do not directly use this function, it serves only
-internal purposes of retrieving data from UCSC database in order to annotate, read count and plot.
-
-	$helper->close_connection($conn);
-
-=cut
-
-sub close_connection
-{ 
-    my ($self,$conn) = @_;
-    $conn->disconnect();
-}
-
-=head2 check_existence($db,@dbdata)
-
-Check if a local or remote database exists. Do not directly use this function, it serves only internal
-purposes of retrieving data from UCSC database in order to annotate, read count and plot.
-
-	$helper->check_db_existence("arbDB","user","pass");
-
-=cut
-
-sub check_db_existence
-{
-	my ($self,$dbcheck,@dbdata) = @_;
-	my $out = 1;
-	my $conn = DBI->connect("dbi:mysql:database=information_schema;host=localhost;port=3306",$dbdata[0],$dbdata[1]);
-	my $query = "SELECT `SCHEMA_NAME` FROM `SCHEMATA` WHERE `SCHEMA_NAME` = \"$dbcheck\"";
-	my $sth = $conn->prepare($query);
-	$sth->execute();
-	$out = 0 if (!$sth->rows());
-	$sth->finish();
-	&close_connection($conn);
-	return($out);
 }
 
 =head2 now($format)
@@ -164,6 +96,26 @@ sub now
 	$sec = "0".$sec if (length($sec)==1);
 	($format ne "machine") ? (return($day."/".$month."/".$year." ".$hour.":".$min.":".$sec)) :
 	(return($year.$month.$day.$hour.$min.$sec));
+}
+
+=head2 unique(@array)
+
+Returns a hash whose keys are the unique elements of an array
+
+	my %uhash = $helper->unique(@array);
+	my @uniques = keys(%uhash);
+
+=cut
+
+sub unique
+{
+	my ($self,@list) = @_;
+	my (%seen,$item);
+	foreach $item (@list) 
+	{
+		$seen{$item}++;
+	}
+	return(%seen);
 }
 
 =head2 count_lines($file)
@@ -407,7 +359,7 @@ sub try_module
 					 "to answer some questions). After this type \"install $module\" to install\n".
 					 "the module. If you don't know how to install the module, contact your\n".
 					 "system administrator.";
-		die "\n$killer\n\n";
+		croak "\n$killer\n\n";
 	}
 	else
 	{

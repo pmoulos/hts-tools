@@ -105,22 +105,28 @@ from the source defined by the I<source> parameter:
 
 =item I<source> B<(optional)>
 
-Use this option to set the online data source in the case of selecting one of the prefefined region 
+Use this option to set the online data source in the case of selecting one of the predefined region 
 templates with I<region>. It can be one of "ucsc", "refseq" or "ensembl" and Default to "ensembl".
+
+=item I<splicing> B<(optional)>
+
+Use this option with I<source> to determine whether the canonical or alternatively spliced transcripts will
+be used for counting. It can be "canonical" or "alternative" and defaults to "canonical"
 
 =item I<sort> B<(optional)>
 
-Use this option if you wish to sort the input files first. It is obligatory if the files are not already
-sorted. If you do not use it and the files are not sorted, results will be incorrect if the program will 
-not crash. If you wish to sort the files manually, be sure to sort firstly by chromosome (1st column) 
-and then by region start. In Linux systems, the command should look like this: 
+Use this option if you wish to sort the input files first. This is not obligatory as the new implementation
+using the interval trees structure does not require sorting, however, it will run faster if the input files
+are already sorted. If you wish to sort the files outside HTS::Tools::Count, in Linux systems, the command
+should look like this: 
 
 	sort -k1,1 -k2g,2 inputfile > outputfile 
 
 In Windows systems, it would be better to use a spreadsheet program like Excel to perform sorting by 
 columns. Both the input bed files and the region file should be sorted. If the structure of the region 
 file is as described (1st column: chromosome, 2nd column: start 3rd column: end, 4th column: unique ID 
-etc.) the sorting command is exactly the same as in common bed files (3 or 6 columns).
+etc.) the sorting command is exactly the same as in common bed files (3 or 6 columns). Keep in mind that
+in future versions, the I<sort> parameter will be deprecated.
 
 =item I<percent> B<(optional)>
 
@@ -161,6 +167,11 @@ equal to that of the area. Note also that when using this option, tags that are 
 are not assigned to those sub-areas based on scoring schemes (options I<percent>, I<lscore> and I<escore>)
 but tags are assigned based on the location of their center.
 
+=nbins I<nbins> B<(optional)>
+
+Use this option if you wish to further split your genomic regions in a predefined number (nbins) of smaller
+areas. The same things as in I<split> apply.
+
 =item I<stats> B<(optional)>
 
 Use this option to also return basic statistics of counts in the windows used returned by using I<split>.
@@ -170,6 +181,13 @@ It should be set to 1 (defaults to 0).
 
 If the machine has multicore processor(s) and the package Parallel::ForkManager is installed, you can use
 parallel processing. Default is 1 and can go up to 12.
+
+=item I<keeporder> B<(optional)>
+
+Use this parameter if you want to force the lines of the output counts table to be in the same order (e.g.
+sorted per chromosome or gene name) as the region file. This is accomplished through the use of the module
+Tie::IxHash::Easy which must be present in your machine. If the module is not present, the I<keeporder>
+option is deactivated. Keep in mind that maintaining the order requires slighlty more memory during runtime.
 
 =item I<output> B<(optional)>
 
@@ -207,6 +225,7 @@ use File::Basename;
 use File::Temp;
 use File::Spec;
 use File::Path qw(make_path remove_tree);
+use IntervalTree;
 
 use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools::Fetch;
@@ -246,9 +265,9 @@ sub new
 	$helper->advertise($MODNAME,$VERSION,$AUTHOR,$EMAIL,$DESC);
 
 	# Validate the input parameters
-	my $checker = HTS::Tools::Paramcheck->new();
-	$checker->set("tool","count");
-	$checker->set("params",$params);
+	my $checker = HTS::Tools::Paramcheck->new({"tool" => "count", "params" => $params});
+	#$checker->set("tool","count");
+	#$checker->set("params",$params);
 	$params = $checker->validate;
 
 	# After validating, bless and initialize
@@ -293,31 +312,89 @@ sub run
 	my @infile = @{$self->get("input")};
 	my @originfile = @infile; # Keep original filenames (verbose purposes)
 	
+	$regionfile = $self->fetch_regions($regionfile) if (! -f $regionfile);
+	$self->set("region",$regionfile) if ($regionfile ne $self->get("region"));
+	
+	my ($chromosome,$gencounts,$splitcounts,$theHeader) = $self->read_region_file($regionfile,\@originfile);
+	($gencounts,$splitcounts) = $self->count_all_reads($chromosome,$gencounts,$splitcounts,\@infile,\@originfile);
+	$self->write_reads($chromosome,$gencounts,$splitcounts,\@originfile,$theHeader);
+
+	$helper->disp("Finished!\n\n");
+}
+
+sub fetch_regions
+{
+	my ($self,$regionfile) = @_;
+	my $fetcher = HTS::Tools::Fetch->new({"tmpdir" => $self->get("tmpdir"), "silent" => $self->get("silent")});
+	my $source = $self->get("source");
+	my $splicing = $self->get("splicing");
+	
 	use v5.14;
-	my $fetcher = HTS::Tools::Fetch->new({"tmpdir" => $self->get("tmpdir")});
 	given($regionfile)
 	{
 		when(/human-gene|mouse-gene|rat-gene|fly-gene|zebrafish-gene/i)
 		{
-			$regionfile = $fetcher->fetch_ensembl_genes($regionfile);
-			$regionfile = $fetcher->sort_ensembl_genes($regionfile);
+			given($source)
+			{
+				when(/ensembl/i)
+				{
+					$regionfile = $fetcher->fetch_ensembl_genes($regionfile);
+					$regionfile = $fetcher->sort_ensembl_genes($regionfile);
+				}
+				when(/ucsc|refseq/i)
+				{
+					$regionfile = $fetcher->fetch_ucsc_genes($regionfile,$splicing,$source);
+				}
+			}
 		}
 		when(/human-exon|mouse-exon|rat-exon|fly-exon|zebrafish-exon/i)
 		{
-			$regionfile = $fetcher->fetch_ensembl_exons($regionfile);
-			$regionfile = $fetcher->sort_ensembl_exons($regionfile);
+			given($source)
+			{
+				when(/ensembl/i)
+				{
+					$regionfile = $fetcher->fetch_ensembl_exons($regionfile);
+					$regionfile = $fetcher->sort_ensembl_exons($regionfile);
+				}
+				when(/ucsc|refseq/i)
+				{
+					$regionfile = $fetcher->fetch_ucsc_exons($regionfile,$splicing,$source);
+				}
+			}
 		}
 		when(/human-(5|3)utr|mouse-(5|3)utr|rat-(5|3)utr|fly-(5|3)utr|zebrafish-(5|3)utr/i)
 		{
-			($regionfile =~ m/5utr/i) ?
-			($regionfile = $fetcher->fetch_ensembl_utr($regionfile,5)) :
-			($regionfile = $fetcher->fetch_ensembl_utr($regionfile,3));
-			$regionfile = $fetcher->sort_ensembl_exons($regionfile);
+			given($source)
+			{
+				when(/ensembl/i)
+				{
+					($regionfile =~ m/5utr/i) ?
+					($regionfile = $fetcher->fetch_ensembl_utr($regionfile,5)) :
+					($regionfile = $fetcher->fetch_ensembl_utr($regionfile,3));
+					$regionfile = $fetcher->sort_ensembl_exons($regionfile);
+				}
+				when(/ucsc|refseq/i)
+				{
+					($regionfile =~ m/5utr/i) ?
+					($regionfile = $fetcher->fetch_ucsc_utr($regionfile,$splicing,$source,5)) :
+					($regionfile = $fetcher->fetch_ensembl_utr($regionfile,$splicing,$source,3));
+				}
+			}
 		}
 		when(/human-cds|mouse-cds|rat-cds|fly-cds|zebrafish-cds/i)
 		{
-			$regionfile = $fetcher->fetch_ensembl_cds($regionfile);
-			$regionfile = $fetcher->sort_ensembl_exons($regionfile);
+			given($source)
+			{
+				when(/ensembl/i)
+				{
+					$regionfile = $fetcher->fetch_ensembl_cds($regionfile);
+					$regionfile = $fetcher->sort_ensembl_exons($regionfile);
+				}
+				when(/ucsc|refseq/i)
+				{
+					$regionfile = $fetcher->fetch_ucsc_cds($regionfile,$splicing,$source);
+				}
+			}
 		}
 		default
 		{
@@ -326,13 +403,7 @@ sub run
 		}
 	}
 
-	$self->set("region",$regionfile) if ($regionfile ne $self->get("region"));
-	
-	my ($chromosome,$gencounts,$splitcounts,$theHeader) = $self->read_region_file($regionfile,\@originfile);
-	($gencounts,$splitcounts) = $self->count_all_reads($chromosome,$gencounts,$splitcounts,\@infile,\@originfile);
-	$self->write_reads($chromosome,$gencounts,$splitcounts,\@originfile,$theHeader);
-
-	$helper->disp("Finished!\n\n");
+	return($regionfile);
 }
 
 =head2 split_area
@@ -349,22 +420,22 @@ sub split_area
 	
 	my $regstart;
 	my $regend = $start - 1;
-	my @subareas;
+	my $subtree = IntervalTree->new();
+	my $regcount = 0;
 	
 	while ($regend < $end)
 	{
 		$regstart = $regend + 1;
 		$regend = $regstart + $splitlen - 1;
-		push(@subareas,$regstart."\t".$regend);
+		$subtree->insert($regstart,$regend,{"binid" => $regcount});
+		$regcount++;
 	}
-	if ($regend > $end)
-	{
-		pop(@subareas);
-		$regend = $end;
-		push(@subareas,$regstart."\t".$regend);
-	}
+
+	# Note: there is no remove function for this CPAN implementation of IntervalTree. It is not such
+	# a harm as the overlap of any read will be found even if the subtree goes beyond the splitted
+	# genomic region
 	
-	return @subareas;
+	return $subtree;
 }
 
 =head2 bin_search_loc
@@ -422,16 +493,18 @@ sub read_region_file
 	my $regionfile = shift @_;
 	my @originfile = @{shift @_};
 	@originfile = @{$self->get("input")} unless(@originfile);
-	
-	my ($theHeader,$chr,$start,$end,$uid,$score,$strand,$rest);
-	my @arest;
 
 	my (%chromosome,%gencounts,%splitcounts);
-	tie %chromosome, "Tie::IxHash::Easy";
-	tie %gencounts, "Tie::IxHash::Easy";
-
-	my ($f,$regstart,$regend,$regconts,$regcount,$regline);
-	my @tempconts;
+	if ($self->get("keeporder"))
+	{
+		tie %chromosome, "Tie::IxHash::Easy";
+		tie %gencounts, "Tie::IxHash::Easy";
+	}
+	
+	my ($theHeader,$chr,$start,$end,$uid);
+	my ($f,$regstart,$regend,$regconts,$regcount,$regline,$step);
+	my @rest;
+	my %strands = ("+" => 1,"-" => -1,"1" => 1,"-1" => -1,"F" => 1,"R" => -1);
 
 	$helper->disp("Reading genomic regions file...");
 	$helper->disp("...also splitting genomic regions in areas of ".$self->get("split")." base pairs...") if ($self->get("split"));
@@ -442,27 +515,41 @@ sub read_region_file
 	seek(REGIONS,0,0) if (!$theHeader);
 	while ($regline = <REGIONS>)
 	{
+		next if ($regline =~ m/chrM|rand|chrU|hap/i);
 		$regline =~ s/\r|\n$//g; # Make sure to remove carriage returns
+		($chr,$start,$end,$uid,@rest) = split(/\t/,$regline);
 		
-		($chr,$start,$end,$uid,@arest) = split(/\t/,$regline);
-		$rest = join("\t",@arest);
-		($rest eq "") ? ($chromosome{$chr}{$uid} = $start."\t".$end) :
-			($chromosome{$chr}{$uid} = $start."\t".$end."\t".$rest);
-		
+		$chromosome{$chr} = IntervalTree->new() if (!$chromosome{$chr});
+
+		# Fill the IntervalTree
+		$chromosome{$chr}->insert_interval(
+			IntervalTree::Interval->new(
+				$start,$end,{
+					"id" => $uid,
+					"strand" => (grep {$_ eq $rest[1]} keys(%strands)) ? ($strands{$rest[1]}) : undef,
+					"rest" => join("\t",@rest)
+				}));
+
+		# Initialize the main count hash
 		foreach $f (@originfile)
 		{
 			($self->get("ncore") > 1) ? ($gencounts{basename($f)}{$chr}{$uid} = 0) :
 				($gencounts{$chr}{$uid}{basename($f)} = 0);
+		}
 
-			if ($self->get("split"))
-			{
+		# Initialize the bin count hash if requested
+		$step = $self->get("split") if ($self->get("split"));
+		$step = ceil(($end-$start)/$self->get("nbins")) if ($self->get("nbins"));
+		if ($step)
+		{
+			foreach $f (@originfile)
+			{		
 				$regcount = 0;
 				$regend = $start - 1;
 				while ($regend < $end)
 				{
 					$regstart = $regend + 1;
-					$regend = $regstart + $self->get("split") - 1;
-					push(@tempconts,$regstart." ".$regend."\t");
+					$regend = $regstart + $step - 1;
 					($self->get("ncore") > 1) ? ($splitcounts{basename($f)}{$chr}{$uid}{$regcount} = 0) :
 						($splitcounts{$chr}{$uid}{basename($f)}{$regcount} = 0);
 					$regcount++;
@@ -569,171 +656,177 @@ sub count_reads
 	my ($self,$chromosome,$gencounts,$splitcounts,$infile,$originfile) = @_;
 	$originfile = $infile unless($originfile);
 
-	my (@k,@v);
-	my ($gene,$coords,$diff,$score,$p,$filename,$bprog,$numberlines);
-	my ($tmp1,$tmp2);
 	my ($bedchr,$bedstart,$bedend,$bedrest);
-	my ($currhash,$currchr,$currstart,$currend,$currrest);
-	my (@regarr,@bsr);
+	my ($i,$j,$currstart,$currend,$gene);
+	my ($overstru,$sostru,$subtree,$bin);
+	my ($diff,$score,$p,$filename);
+
+	$bin = $self->get("split") if ($self->get("split"));
+	$bin = $self->get("nbins") if ($self->get("nbins"));
 	my $c = $self->get("constant");
 	
 	$helper->disp("Reading and processing file $originfile...");
-	
+
 	$filename = basename($originfile);
 	open(BEDFILE,$infile);
-	my $nextchr = "";
 
 	while (<BEDFILE>)
 	{
 		chomp $_;
 		($bedchr,$bedstart,$bedend,$bedrest) = split(/\t/,$_);
 
-		if ($bedchr ne $nextchr)
-		{
-			$currhash = $chromosome->{$bedchr};
-			@k = keys(%$currhash);
-			@v = values(%$currhash);
-			$nextchr = $bedchr;
-		}
+		$overstru = $chromosome->{$bedchr}->find($bedstart,$bedend);
 
-		# Start binary search
-		my $i;
-		my ($l,$u) = (0,$#k);
-		while ($l <= $u)
+		# If overlap found, check conditions that satisfy our parameters
+		if ($overstru)
 		{
-			$i = int(($l + $u)/2);
-			my $gene = $k[$i];
-			my $coords = $v[$i];
-			($currstart,$currend,$currrest) = split(/\t/,$coords);
-
-			# Conditions that satisfy our search
-			# Security, too small region, tag does not fit?
-			# Mark that there is something there if user wishes and proceed
-			if ($currstart >= $bedstart && $currend <= $bedend)
+			for ($i=0; $i< scalar @$overstru; $i++)
 			{
-				$gencounts->{$bedchr}->{$gene}->{$filename}++ if ($self->get("small"));
-				if ($self->get("split") && $self->get("small")) # If splitting of regions
+				$currstart = $overstru->[$i]->{"start"};
+				$currend = $overstru->[$i]->{"end"};
+				$gene = $overstru->[$i]->{"value"}->{"id"};
+			
+				# Security, too small region, tag does not fit? Mark that there is something there if user wishes and proceed
+				if ($currstart >= $bedstart && $currend <= $bedend)
 				{
-					@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-					@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-					$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
-				}
-				last;
-			}
-			# Ideal case... whole tag inside gene... no problem
-			elsif ($currstart <= $bedstart && $currend >= $bedend)
-			{
-				$gencounts->{$bedchr}->{$gene}->{$filename}++;
-				if ($self->get("split")) # If splitting of regions
-				{
-					@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-					@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-					$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
-				}
-				last;
-			}
-			# Part of tag outside after region
-			elsif ($currstart < $bedstart && $currend < $bedend && $bedstart < $currend)
-			{
-				$diff = $currend - $bedstart;
-				if ($self->get("lscore") || $self->get("escore")) # Linear or exponential scoring
-				{
-					if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside no need for further check
+					$gencounts->{$bedchr}->{$gene}->{$filename}++ if ($self->get("small"));
+					if ($bin && $self->get("small")) # If splitting of regions
 					{
-						$gencounts->{$bedchr}->{$gene}->{$filename}++;
-						if ($self->get("split")) # If splitting of regions
+						$subtree = $self->split_area($currstart,$currend,$bin);
+						$sostru = $subtree->find($bedstart,$bedend);
+						for ($j=0; $j< scalar @$sostru; $j++)
 						{
-							@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-							@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-							$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
-						}
-					}
-					else # Use probabilistic scoring scheme
-					{
-						$score = ($currend - $bedstart)/(($bedend - $bedstart)/2) if ($self->get("lscore")); # Linear
-						$score = exp(-$c**2/($currend - $bedstart)) if ($self->get("escore")); # Exponential
-						$p = rand();
-						if ($p < $score)
-						{
-							$gencounts->{$bedchr}->{$gene}->{$filename}++; 
-							if ($self->get("split")) # If splitting of regions
-							{
-								@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-								@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-								$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
-							}
+							$splitcounts->{$bedchr}->{$gene}->{$filename}->{$sostru->[$j]->{"value"}->{"binid"}}++;
 						}
 					}
 				}
-				else # Simple overlap
+				# Ideal case... whole tag inside gene... no problem
+				elsif ($currstart <= $bedstart && $currend >= $bedend)
 				{
-					if ($diff >= $self->get("percent")*($bedend - $bedstart))
+					$gencounts->{$bedchr}->{$gene}->{$filename}++;
+					if ($bin) # If splitting of regions
 					{
-						$gencounts->{$bedchr}->{$gene}->{$filename}++;
-						if ($self->get("split")) # If splitting of regions
+						$subtree = $self->split_area($currstart,$currend,$bin);
+						$sostru = $subtree->find($bedstart,$bedend);
+						for ($j=0; $j< scalar @$sostru; $j++)
 						{
-							@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-							@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-							$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
+							$splitcounts->{$bedchr}->{$gene}->{$filename}->{$sostru->[$j]->{"value"}->{"binid"}}++;
 						}
 					}
 				}
-				last;
-			}
-			# Part of tag outside before region
-			elsif ($currstart > $bedstart && $currend > $bedend && $bedend > $currstart)
-			{
-				$diff = $bedend - $currstart;
-				if ($self->get("lscore") || $self->get("escore")) # Linear or exponential scoring
+				# Part of tag outside after region
+				elsif ($currstart < $bedstart && $currend < $bedend && $bedstart < $currend)
 				{
-					if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside
+					$diff = $currend - $bedstart;
+					if ($self->get("lscore") || $self->get("escore")) # Linear or exponential scoring
 					{
-						$gencounts->{$bedchr}->{$gene}->{$filename}++;
-						if ($self->get("split")) # If splitting of regions
-						{
-							@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-							@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-							$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
-						}
-					}
-					else # Use probabilistic scoring scheme
-					{
-						$score = ($bedend - $currstart)/(($bedend - $bedstart)/2) if ($self->get("lscore")); # Linear
-						$score = exp(-$c**2/($bedend - $currstart)) if ($self->get("escore")); # Exponential
-						$p = rand();
-						if ($p < $score)
+						if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside no need for further check
 						{
 							$gencounts->{$bedchr}->{$gene}->{$filename}++;
-							if ($self->get("split")) # If splitting of regions
+							if ($bin) # If splitting of regions
 							{
-								@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-								@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-								$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
+								$subtree = $self->split_area($currstart,$currend,$bin);
+								$sostru = $subtree->find($bedstart,$bedend);
+								for ($j=0; $j< scalar @$sostru; $j++)
+								{
+									$splitcounts->{$bedchr}->{$gene}->{$filename}->{$sostru->[$j]->{"value"}->{"binid"}}++;
+								}
+							}
+						}
+						else # Use probabilistic scoring scheme
+						{
+							$score = ($currend - $bedstart)/(($bedend - $bedstart)/2) if ($self->get("lscore")); # Linear
+							$score = exp(-$c**2/($currend - $bedstart)) if ($self->get("escore")); # Exponential
+							$p = rand();
+							if ($p < $score)
+							{
+								$gencounts->{$bedchr}->{$gene}->{$filename}++; 
+								if ($bin) # If splitting of regions
+								{
+									$subtree = $self->split_area($currstart,$currend,$bin);
+									$sostru = $subtree->find($bedstart,$bedend);
+									for ($j=0; $j< scalar @$sostru; $j++)
+									{
+										$splitcounts->{$bedchr}->{$gene}->{$filename}->{$sostru->[$j]->{"value"}->{"binid"}}++;
+									}
+								}
+							}
+						}
+					}
+					else # Simple overlap
+					{
+						if ($diff >= $self->get("percent")*($bedend - $bedstart))
+						{
+							$gencounts->{$bedchr}->{$gene}->{$filename}++;
+							if ($bin) # If splitting of regions
+							{
+								$subtree = $self->split_area($currstart,$currend,$bin);
+								$sostru = $subtree->find($bedstart,$bedend);
+								for ($j=0; $j< scalar @$sostru; $j++)
+								{
+									$splitcounts->{$bedchr}->{$gene}->{$filename}->{$sostru->[$j]->{"value"}->{"binid"}}++;
+								}
 							}
 						}
 					}
 				}
-				else # Simple overlap
+				# Part of tag outside before region
+				elsif ($currstart > $bedstart && $currend > $bedend && $bedend > $currstart)
 				{
-					if ($diff >= $self->get("percent")*($bedend - $bedstart))
+					$diff = $bedend - $currstart;
+					if ($self->get("lscore") || $self->get("escore")) # Linear or exponential scoring
 					{
-						$gencounts->{$bedchr}->{$gene}->{$filename}++;
-						if ($self->get("split")) # If splitting of regions
+						if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside
 						{
-							@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-							@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-							$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
+							$gencounts->{$bedchr}->{$gene}->{$filename}++;
+							if ($bin) # If splitting of regions
+							{
+								$subtree = $self->split_area($currstart,$currend,$bin);
+								$sostru = $subtree->find($bedstart,$bedend);
+								for ($j=0; $j< scalar @$sostru; $j++)
+								{
+									$splitcounts->{$bedchr}->{$gene}->{$filename}->{$sostru->[$j]->{"value"}->{"binid"}}++;
+								}
+							}
+						}
+						else # Use probabilistic scoring scheme
+						{
+							$score = ($bedend - $currstart)/(($bedend - $bedstart)/2) if ($self->get("lscore")); # Linear
+							$score = exp(-$c**2/($bedend - $currstart)) if ($self->get("escore")); # Exponential
+							$p = rand();
+							if ($p < $score)
+							{
+								$gencounts->{$bedchr}->{$gene}->{$filename}++;
+								if ($bin) # If splitting of regions
+								{
+									$subtree = $self->split_area($currstart,$currend,$bin);
+									$sostru = $subtree->find($bedstart,$bedend);
+									for ($j=0; $j< scalar @$sostru; $j++)
+									{
+										$splitcounts->{$bedchr}->{$gene}->{$filename}->{$sostru->[$j]->{"value"}->{"binid"}}++;
+									}
+								}
+							}
+						}
+					}
+					else # Simple overlap
+					{
+						if ($diff >= $self->get("percent")*($bedend - $bedstart))
+						{
+							$gencounts->{$bedchr}->{$gene}->{$filename}++;
+							if ($bin) # If splitting of regions
+							{
+								$subtree = $self->split_area($currstart,$currend,$bin);
+								$sostru = $subtree->find($bedstart,$bedend);
+								for ($j=0; $j< scalar @$sostru; $j++)
+								{
+									$splitcounts->{$bedchr}->{$gene}->{$filename}->{$sostru->[$j]->{"value"}->{"binid"}}++;
+								}
+							}
 						}
 					}
 				}
-				last;
 			}
-			else # If none of them met, reduce the searching subset
-			{
-				$u = $i - 1 if ($bedend <= $currstart);
-				$l = $i + 1 if ($bedstart >= $currend);
-			}
-
 		}
 	}
 	close(BEDFILE);
@@ -754,168 +847,176 @@ sub count_reads_multi
 	my ($self,$chromosome,$gencounts,$splitcounts,$infile,$originfile) = @_;
 	$originfile = $infile unless($originfile);
 
-	my (@k,@v);
-	my ($gene,$coords,$diff,$score,$p,$filename,$bprog,$numberlines);
 	my ($bedchr,$bedstart,$bedend,$bedrest);
-	my ($currhash,$currchr,$currstart,$currend,$currrest);
-	my (@regarr,@bsr);
+	my ($i,$j,$currstart,$currend,$gene);
+	my ($overstru,$sostru,$subtree,$bin);
+	my ($diff,$score,$p,$filename);
+
+	$bin = $self->get("split") if ($self->get("split"));
+	$bin = $self->get("nbins") if ($self->get("nbins"));
 	my $c = $self->get("constant");
 	
 	$helper->disp("Reading and processing file $originfile...");
 
 	$filename = basename($originfile);
 	open(BEDFILE,$infile);
-	my $nextchr = "";
 
 	while (<BEDFILE>)
 	{
 		chomp $_;
 		($bedchr,$bedstart,$bedend,$bedrest) = split(/\t/,$_);
-		
-		if ($bedchr ne $nextchr)
-		{
-			$currhash = $chromosome->{$bedchr};
-			@k = keys(%$currhash);
-			@v = values(%$currhash);
-			$nextchr = $bedchr;
-		}
 
-		# Start binary search
-		my $i;
-		my ($l,$u) = (0,$#k);
-		while ($l <= $u)
-		{
-			$i = int(($l + $u)/2);
-			my $gene = $k[$i];
-			my $coords = $v[$i];
-			($currstart,$currend,$currrest) = split(/\t/,$coords);
+		$overstru = $chromosome->{$bedchr}->find($bedstart,$bedend);
 
-			# Conditions that satisfy our search
-			# Security, too small region, tag does not fit?
-			# Mark that there is something there if user wishes and proceed
-			if ($currstart >= $bedstart && $currend <= $bedend)
+		# If overlap found, check conditions that satisfy our parameters
+		if ($overstru)
+		{
+			for ($i=0; $i< scalar @$overstru; $i++)
 			{
-				$gencounts->{$bedchr}->{$gene}++ if ($self->get("small"));
-				if ($self->get("split") && $self->get("small")) # If splitting of regions
+				$currstart = $overstru->[$i]->{"start"};
+				$currend = $overstru->[$i]->{"end"};
+				$gene = $overstru->[$i]->{"value"}->{"id"};
+			
+				# Security, too small region, tag does not fit? Mark that there is something there if user wishes and proceed
+				if ($currstart >= $bedstart && $currend <= $bedend)
 				{
-					@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-					@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-					$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
-				}
-				last;
-			}
-			# Ideal case... whole tag inside gene... no problem
-			elsif ($currstart <= $bedstart && $currend >= $bedend)
-			{
-				$gencounts->{$bedchr}->{$gene}++;
-				if ($self->get("split")) # If splitting of regions
-				{
-					@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-					@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-					$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
-				}
-				last;
-			}
-			# Part of tag outside after region
-			elsif ($currstart < $bedstart && $currend < $bedend && $bedstart < $currend)
-			{
-				$diff = $currend - $bedstart;
-				if ($self->get("lscore") || $self->get("escore")) # Linear or exponential scoring
-				{
-					if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside no need for further check
+					$gencounts->{$bedchr}->{$gene}++ if ($self->get("small"));
+					if ($bin && $self->get("small")) # If splitting of regions
 					{
-						$gencounts->{$bedchr}->{$gene}++;
-						if ($self->get("split")) # If splitting of regions
+						$subtree = $self->split_area($currstart,$currend,$bin);
+						$sostru = $subtree->find($bedstart,$bedend);
+						for ($j=0; $j< scalar @$sostru; $j++)
 						{
-							@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-							@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-							$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
-						}
-					}
-					else # Use probabilistic scoring scheme
-					{
-						$score = ($currend - $bedstart)/(($bedend - $bedstart)/2) if ($self->get("lscore")); # Linear
-						$score = exp(-$c**2/($currend - $bedstart)) if ($self->get("escore")); # Exponential
-						$p = rand();
-						if ($p < $score)
-						{
-							$gencounts->{$bedchr}->{$gene}++; 
-							if ($self->get("split")) # If splitting of regions
-							{
-								@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-								@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-								$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
-							}
+							$splitcounts->{$filename}->{$bedchr}->{$gene}->{$sostru->[$j]->{"value"}->{"binid"}}++;
 						}
 					}
 				}
-				else # Simple overlap
+				# Ideal case... whole tag inside gene... no problem
+				elsif ($currstart <= $bedstart && $currend >= $bedend)
 				{
-					if ($diff >= $self->get("percent")*($bedend - $bedstart))
+					$gencounts->{$bedchr}->{$gene}++;
+					if ($bin) # If splitting of regions
 					{
-						$gencounts->{$bedchr}->{$gene}++;
-						if ($self->get("split")) # If splitting of regions
+						$subtree = $self->split_area($currstart,$currend,$bin);
+						$sostru = $subtree->find($bedstart,$bedend);
+						for ($j=0; $j< scalar @$sostru; $j++)
 						{
-							@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-							@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-							$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+							$splitcounts->{$filename}->{$bedchr}->{$gene}->{$sostru->[$j]->{"value"}->{"binid"}}++;
 						}
 					}
 				}
-				last;
-			}
-			# Part of tag outside before region
-			elsif ($currstart > $bedstart && $currend > $bedend && $bedend > $currstart)
-			{
-				$diff = $bedend - $currstart;
-				if ($self->get("lscore") || $self->get("escore")) # Linear or exponential scoring
+				# Part of tag outside after region
+				elsif ($currstart < $bedstart && $currend < $bedend && $bedstart < $currend)
 				{
-					if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside
+					$diff = $currend - $bedstart;
+					if ($self->get("lscore") || $self->get("escore")) # Linear or exponential scoring
 					{
-						$gencounts->{$bedchr}->{$gene}++;
-						if ($self->get("split")) # If splitting of regions
-						{
-							@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-							@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-							$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
-						}
-					}
-					else # Use probabilistic scoring scheme
-					{
-						$score = ($bedend - $currstart)/(($bedend - $bedstart)/2) if ($self->get("lscore")); # Linear
-						$score = exp(-$c**2/($bedend - $currstart)) if ($self->get("escore")); # Exponential
-						$p = rand();
-						if ($p < $score)
+						if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside no need for further check
 						{
 							$gencounts->{$bedchr}->{$gene}++;
-							if ($self->get("split")) # If splitting of regions
+							if ($bin) # If splitting of regions
 							{
-								@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-								@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-								$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+								$subtree = $self->split_area($currstart,$currend,$bin);
+								$sostru = $subtree->find($bedstart,$bedend);
+								for ($j=0; $j< scalar @$sostru; $j++)
+								{
+									$splitcounts->{$filename}->{$bedchr}->{$gene}->{$sostru->[$j]->{"value"}->{"binid"}}++;
+								}
+							}
+						}
+						else # Use probabilistic scoring scheme
+						{
+							$score = ($currend - $bedstart)/(($bedend - $bedstart)/2) if ($self->get("lscore")); # Linear
+							$score = exp(-$c**2/($currend - $bedstart)) if ($self->get("escore")); # Exponential
+							$p = rand();
+							if ($p < $score)
+							{
+								$gencounts->{$bedchr}->{$gene}++; 
+								if ($bin) # If splitting of regions
+								{
+									$subtree = $self->split_area($currstart,$currend,$bin);
+									$sostru = $subtree->find($bedstart,$bedend);
+									for ($j=0; $j< scalar @$sostru; $j++)
+									{
+										$splitcounts->{$filename}->{$bedchr}->{$gene}->{$sostru->[$j]->{"value"}->{"binid"}}++;
+									}
+								}
+							}
+						}
+					}
+					else # Simple overlap
+					{
+						if ($diff >= $self->get("percent")*($bedend - $bedstart))
+						{
+							$gencounts->{$bedchr}->{$gene}++;
+							if ($bin) # If splitting of regions
+							{
+								$subtree = $self->split_area($currstart,$currend,$bin);
+								$sostru = $subtree->find($bedstart,$bedend);
+								for ($j=0; $j< scalar @$sostru; $j++)
+								{
+									$splitcounts->{$filename}->{$bedchr}->{$gene}->{$sostru->[$j]->{"value"}->{"binid"}}++;
+								}
 							}
 						}
 					}
 				}
-				else # Simple overlap
+				# Part of tag outside before region
+				elsif ($currstart > $bedstart && $currend > $bedend && $bedend > $currstart)
 				{
-					if ($diff >= $self->get("percent")*($bedend - $bedstart))
+					$diff = $bedend - $currstart;
+					if ($self->get("lscore") || $self->get("escore")) # Linear or exponential scoring
 					{
-						$gencounts->{$bedchr}->{$gene}++;
-						if ($self->get("split")) # If splitting of regions
+						if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside
 						{
-							@regarr = $self->split_area($currstart,$currend,$self->get("split"));
-							@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
-							$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+							$gencounts->{$bedchr}->{$gene}++;
+							if ($bin) # If splitting of regions
+							{
+								$subtree = $self->split_area($currstart,$currend,$bin);
+								$sostru = $subtree->find($bedstart,$bedend);
+								for ($j=0; $j< scalar @$sostru; $j++)
+								{
+									$splitcounts->{$filename}->{$bedchr}->{$gene}->{$sostru->[$j]->{"value"}->{"binid"}}++;
+								}
+							}
+						}
+						else # Use probabilistic scoring scheme
+						{
+							$score = ($bedend - $currstart)/(($bedend - $bedstart)/2) if ($self->get("lscore")); # Linear
+							$score = exp(-$c**2/($bedend - $currstart)) if ($self->get("escore")); # Exponential
+							$p = rand();
+							if ($p < $score)
+							{
+								$gencounts->{$bedchr}->{$gene}++;
+								if ($bin) # If splitting of regions
+								{
+									$subtree = $self->split_area($currstart,$currend,$bin);
+									$sostru = $subtree->find($bedstart,$bedend);
+									for ($j=0; $j< scalar @$sostru; $j++)
+									{
+										$splitcounts->{$filename}->{$bedchr}->{$gene}->{$sostru->[$j]->{"value"}->{"binid"}}++;
+									}
+								}
+							}
+						}
+					}
+					else # Simple overlap
+					{
+						if ($diff >= $self->get("percent")*($bedend - $bedstart))
+						{
+							$gencounts->{$bedchr}->{$gene}++;
+							if ($bin) # If splitting of regions
+							{
+								$subtree = $self->split_area($currstart,$currend,$bin);
+								$sostru = $subtree->find($bedstart,$bedend);
+								for ($j=0; $j< scalar @$sostru; $j++)
+								{
+									$splitcounts->{$filename}->{$bedchr}->{$gene}->{$sostru->[$j]->{"value"}->{"binid"}}++;
+								}
+							}
 						}
 					}
 				}
-				last;
-			}
-			else # If none of them met, reduce the searching subset
-			{
-				$u = $i - 1 if ($bedend <= $currstart);
-				$l = $i + 1 if ($bedstart >= $currend);
 			}
 		}
 	}
@@ -942,12 +1043,10 @@ sub write_reads
 	my $theHeader = shift @_;
 	@originfile = @{$self->get("input")} unless(@originfile);
 	
-	my (@outrest,@distr,@filenames,@outchrs,@outgeneids);
-	my ($outgene,$outcount,$files,$filename,$b,$retrhash,$outhead,$outsubhead);
-	my ($outchr,$outgeneid,$outcounts,$outstart,$outend,$outrest,$finalout);
+	my ($filename,$retrhash,$outhead,$outsubhead,$chr,$tree,$finalout);
 	my ($mean,$median,$stdev,$mad,$jdistr);
+	my (@base,@distr);
 	
-	my @base;
 	foreach my $of (@originfile)
 	{
 		my $bb = fileparse($of,'\.[^.]*');
@@ -973,7 +1072,6 @@ sub write_reads
 			$helper->disp("Writing reads per genomic regions for file to standard output...\n");
 	}
 
-	$outcount = 1;
 	if ($theHeader) # Add a header based on what we did plus additional data given
 	{
 		$outhead = $theHeader;
@@ -1005,90 +1103,78 @@ sub write_reads
 
 	if ($self->get("ncore") == 1)
 	{
-		while(($outchr,$outgene) = each(%$gencounts))
+		while(($chr,$tree) = each(%$chromosome))
 		{
-			while (($outgeneid,$files) = each(%$outgene))
-			{
-				$outcount++;
-				
-				($outstart,$outend,@outrest) = split(/\t/,$chromosome->{$outchr}->{$outgeneid});
-				if (scalar @outrest != 0)
-				{
-					$outrest = join("\t",@outrest);
-					$finalout = $outchr."\t".$outstart."\t".$outend."\t".$outgeneid."\t".$outrest;
+			$tree->traverse(sub {
+				if ($_[0]->{"interval"}->{"value"}->{"rest"}) {
+					$finalout = $chr."\t".
+						$_[0]->{"interval"}->{"start"}."\t".
+						$_[0]->{"interval"}->{"end"}."\t".
+						$_[0]->{"interval"}->{"value"}->{"id"}."\t".
+						$_[0]->{"interval"}->{"value"}->{"rest"};
 				}
-				else
-				{
-					$finalout = $outchr."\t".$outstart."\t".$outend."\t".$outgeneid;
+				else {
+					$finalout = $chr."\t". 
+						$_[0]->{"interval"}->{"start"}."\t".
+						$_[0]->{"interval"}->{"end"}."\t".
+						$_[0]->{"interval"}->{"value"}->{"id"};
 				}
-
-				while (($filename,$outcounts) = each(%$files))
-				{
-					if ($self->get("split")) # Retrieve calculated distributions per region
-					{
-						$retrhash = $splitcounts->{$outchr}->{$outgeneid}->{$filename};
+				foreach $filename (@originfile) {
+					if ($self->get("split") || $self->get("nbins")) { # Retrieve calculated distributions per region 
+						$retrhash = $splitcounts->{$chr}->{$_[0]->{"interval"}->{"value"}->{"id"}}->{basename($filename)};
 						@distr = values(%$retrhash);
 						$jdistr = join(" ",@distr);
-						if ($self->get("stats")) # Calculate stats
-						{
+						if ($self->get("stats")) { # Calculate stats
 							$mean = $helper->mean(@distr);
 							$median = $helper->median(@distr);
 							$stdev = $helper->stdev(@distr);
 							$mad = $helper->mad(@distr);
 						}
 					}
-					$finalout .= "\t".$outcounts;
-					$finalout .= "\t".$jdistr if ($self->get("split"));
+					$finalout .= "\t".$gencounts->{$chr}->{$_[0]->{"interval"}->{"value"}->{"id"}}->{basename($filename)};
+					$finalout .= "\t".$jdistr if ($self->get("split") || $self->get("nbins"));
 					$finalout .= "\t".$mean."\t".$median."\t".$stdev."\t".$mad if ($self->get("stats"));
 				}
-				print $out "$finalout\n";
-			}
+				print $out $finalout,"\n";
+			});
 		}
 	}
 	else
 	{
-		@outchrs = keys(%$chromosome);
-		@filenames = keys(%$gencounts);
-		foreach my $outchr (@outchrs)
+		while(($chr,$tree) = each(%$chromosome))
 		{
-			@outgeneids = keys(%{$chromosome->{$outchr}});
-			foreach $outgeneid (@outgeneids)
-			{
-				$outcount++;
-
-				($outstart,$outend,@outrest) = split(/\t/,$chromosome->{$outchr}->{$outgeneid});
-				if (scalar @outrest != 0)
-				{
-					$outrest = join("\t",@outrest);
-					$finalout = $outchr."\t".$outstart."\t".$outend."\t".$outgeneid."\t".$outrest;
+			$tree->traverse(sub {
+				if ($_[0]->{"interval"}->{"value"}->{"rest"}) {
+					$finalout = $chr."\t".
+						$_[0]->{"interval"}->{"start"}."\t".
+						$_[0]->{"interval"}->{"end"}."\t".
+						$_[0]->{"interval"}->{"value"}->{"id"}."\t".
+						$_[0]->{"interval"}->{"value"}->{"rest"};
 				}
-				else
-				{
-					$finalout = $outchr."\t".$outstart."\t".$outend."\t".$outgeneid;
+				else {
+					$finalout = $chr."\t".
+						$_[0]->{"interval"}->{"start"}."\t".
+						$_[0]->{"interval"}->{"end"}."\t".
+						$_[0]->{"interval"}->{"value"}->{"id"};
 				}
-
-				foreach $filename (@filenames)
-				{
-					$outcounts = $gencounts->{$filename}->{$outchr}->{$outgeneid};
-					if ($self->get("split")) # Retrieve calculated distributions per region
-					{
-						$retrhash = $splitcounts->{$filename}->{$outchr}->{$outgeneid};
+				foreach $filename (@originfile) {
+					if ($self->get("split") || $self->get("nbins")) { # Retrieve calculated distributions per region 
+						$retrhash = $splitcounts->{basename($filename)}->{$chr}->{$_[0]->{"interval"}->{"value"}->{"id"}};
 						@distr = values(%$retrhash);
 						$jdistr = join(" ",@distr);
-						if ($self->get("stats")) # Calculate stats
-						{
+						if ($self->get("stats")) { # Calculate stats
 							$mean = $helper->mean(@distr);
 							$median = $helper->median(@distr);
 							$stdev = $helper->stdev(@distr);
 							$mad = $helper->mad(@distr);
 						}
 					}
-					$finalout .= "\t".$outcounts;
-					$finalout .= "\t".$jdistr if ($self->get("split"));
+					$finalout .= "\t".$gencounts->{basename($filename)}->{$chr}->{$_[0]->{"interval"}->{"value"}->{"id"}};
+					$finalout .= "\t".$jdistr if ($self->get("split") || $self->get("nbins"));
 					$finalout .= "\t".$mean."\t".$median."\t".$stdev."\t".$mad if ($self->get("stats"));
 				}
-				print $out "$finalout\n";
-			}
+				print $out $finalout,"\n";
+			});
 		}
 	}
 	close(OUTPUT) if ($self->get("output"));
@@ -1273,8 +1359,12 @@ sub set
 
 =head1 DEPENDENCIES
 
-Tie::IxHash::Easy (mandatory)
+Tie::IxHash::Easy (optional)
 File::Sort (optional)
+
+= head1 TODO
+
+Check how we can use gtf2tree.pl from the ngsplot package (https://code.google.com/p/ngsplot/)
 
 =head1 AUTHOR
 
@@ -1362,3 +1452,597 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 =cut
 
 1; # End of HTS::Tools::Count
+
+############################### LEGACY SUBROUTINES, USING BINARY SEARCH ############################
+
+#sub read_region_file
+#{
+	#my $self = shift @_;
+	#my $regionfile = shift @_;
+	#my @originfile = @{shift @_};
+	#@originfile = @{$self->get("input")} unless(@originfile);
+	
+	#my ($theHeader,$chr,$start,$end,$uid,$score,$strand,$rest);
+	#my @arest;
+
+	#my (%chromosome,%gencounts,%splitcounts);
+	#tie %chromosome, "Tie::IxHash::Easy";
+	#tie %gencounts, "Tie::IxHash::Easy";
+
+	#my ($f,$regstart,$regend,$regconts,$regcount,$regline);
+	#my @tempconts;
+
+	#$helper->disp("Reading genomic regions file...");
+	#$helper->disp("...also splitting genomic regions in areas of ".$self->get("split")." base pairs...") if ($self->get("split"));
+	
+	#open(REGIONS,$regionfile) or croak "\nThe file $regionfile does not exist!\n";
+	#$regline = <REGIONS>;
+	#$theHeader = $self->decide_header($regline);
+	#seek(REGIONS,0,0) if (!$theHeader);
+	#while ($regline = <REGIONS>)
+	#{
+		#$regline =~ s/\r|\n$//g; # Make sure to remove carriage returns
+		
+		#($chr,$start,$end,$uid,@arest) = split(/\t/,$regline);
+		#$rest = join("\t",@arest);
+		#($rest eq "") ? ($chromosome{$chr}{$uid} = $start."\t".$end) :
+			#($chromosome{$chr}{$uid} = $start."\t".$end."\t".$rest);
+		
+		#foreach $f (@originfile)
+		#{
+			#($self->get("ncore") > 1) ? ($gencounts{basename($f)}{$chr}{$uid} = 0) :
+				#($gencounts{$chr}{$uid}{basename($f)} = 0);
+
+			#if ($self->get("split"))
+			#{
+				#$regcount = 0;
+				#$regend = $start - 1;
+				#while ($regend < $end)
+				#{
+					#$regstart = $regend + 1;
+					#$regend = $regstart + $self->get("split") - 1;
+					#push(@tempconts,$regstart." ".$regend."\t");
+					#($self->get("ncore") > 1) ? ($splitcounts{basename($f)}{$chr}{$uid}{$regcount} = 0) :
+						#($splitcounts{$chr}{$uid}{basename($f)}{$regcount} = 0);
+					#$regcount++;
+				#}
+			#}
+		#}
+	#}
+	#close(REGIONS);
+
+	#return(\%chromosome,\%gencounts,\%splitcounts,$theHeader);
+#}
+
+#sub split_area
+#{
+	#my ($self,$start,$end,$splitlen) = @_;
+	
+	#my $regstart;
+	#my $regend = $start - 1;
+	#my @subareas;
+	
+	#while ($regend < $end)
+	#{
+		#$regstart = $regend + 1;
+		#$regend = $regstart + $splitlen - 1;
+		#push(@subareas,$regstart."\t".$regend);
+	#}
+	#if ($regend > $end)
+	#{
+		#pop(@subareas);
+		#$regend = $end;
+		#push(@subareas,$regstart."\t".$regend);
+	#}
+	
+	#return @subareas;
+#}
+#
+#sub count_reads
+#{
+	#my ($self,$chromosome,$gencounts,$splitcounts,$infile,$originfile) = @_;
+	#$originfile = $infile unless($originfile);
+
+	#my (@k,@v);
+	#my ($gene,$coords,$diff,$score,$p,$filename,$bprog,$numberlines);
+	#my ($tmp1,$tmp2);
+	#my ($bedchr,$bedstart,$bedend,$bedrest);
+	#my ($currhash,$currchr,$currstart,$currend,$currrest);
+	#my (@regarr,@bsr);
+	#my $c = $self->get("constant");
+	
+	#$helper->disp("Reading and processing file $originfile...");
+	
+	#$filename = basename($originfile);
+	#open(BEDFILE,$infile);
+	#my $nextchr = "";
+
+	#while (<BEDFILE>)
+	#{
+		#chomp $_;
+		#($bedchr,$bedstart,$bedend,$bedrest) = split(/\t/,$_);
+
+		#if ($bedchr ne $nextchr)
+		#{
+			#$currhash = $chromosome->{$bedchr};
+			#@k = keys(%$currhash);
+			#@v = values(%$currhash);
+			#$nextchr = $bedchr;
+		#}
+
+		## Start binary search
+		#my $i;
+		#my ($l,$u) = (0,$#k);
+		#while ($l <= $u)
+		#{
+			#$i = int(($l + $u)/2);
+			#my $gene = $k[$i];
+			#my $coords = $v[$i];
+			#($currstart,$currend,$currrest) = split(/\t/,$coords);
+
+			## Conditions that satisfy our search
+			## Security, too small region, tag does not fit?
+			## Mark that there is something there if user wishes and proceed
+			#if ($currstart >= $bedstart && $currend <= $bedend)
+			#{
+				#$gencounts->{$bedchr}->{$gene}->{$filename}++ if ($self->get("small"));
+				#if ($self->get("split") && $self->get("small")) # If splitting of regions
+				#{
+					#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+					#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+					#$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
+				#}
+				#last;
+			#}
+			## Ideal case... whole tag inside gene... no problem
+			#elsif ($currstart <= $bedstart && $currend >= $bedend)
+			#{
+				#$gencounts->{$bedchr}->{$gene}->{$filename}++;
+				#if ($self->get("split")) # If splitting of regions
+				#{
+					#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+					#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+					#$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
+				#}
+				#last;
+			#}
+			## Part of tag outside after region
+			#elsif ($currstart < $bedstart && $currend < $bedend && $bedstart < $currend)
+			#{
+				#$diff = $currend - $bedstart;
+				#if ($self->get("lscore") || $self->get("escore")) # Linear or exponential scoring
+				#{
+					#if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside no need for further check
+					#{
+						#$gencounts->{$bedchr}->{$gene}->{$filename}++;
+						#if ($self->get("split")) # If splitting of regions
+						#{
+							#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+							#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+							#$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
+						#}
+					#}
+					#else # Use probabilistic scoring scheme
+					#{
+						#$score = ($currend - $bedstart)/(($bedend - $bedstart)/2) if ($self->get("lscore")); # Linear
+						#$score = exp(-$c**2/($currend - $bedstart)) if ($self->get("escore")); # Exponential
+						#$p = rand();
+						#if ($p < $score)
+						#{
+							#$gencounts->{$bedchr}->{$gene}->{$filename}++; 
+							#if ($self->get("split")) # If splitting of regions
+							#{
+								#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+								#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+								#$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
+							#}
+						#}
+					#}
+				#}
+				#else # Simple overlap
+				#{
+					#if ($diff >= $self->get("percent")*($bedend - $bedstart))
+					#{
+						#$gencounts->{$bedchr}->{$gene}->{$filename}++;
+						#if ($self->get("split")) # If splitting of regions
+						#{
+							#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+							#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+							#$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
+						#}
+					#}
+				#}
+				#last;
+			#}
+			## Part of tag outside before region
+			#elsif ($currstart > $bedstart && $currend > $bedend && $bedend > $currstart)
+			#{
+				#$diff = $bedend - $currstart;
+				#if ($self->get("lscore") || $self->get("escore")) # Linear or exponential scoring
+				#{
+					#if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside
+					#{
+						#$gencounts->{$bedchr}->{$gene}->{$filename}++;
+						#if ($self->get("split")) # If splitting of regions
+						#{
+							#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+							#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+							#$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
+						#}
+					#}
+					#else # Use probabilistic scoring scheme
+					#{
+						#$score = ($bedend - $currstart)/(($bedend - $bedstart)/2) if ($self->get("lscore")); # Linear
+						#$score = exp(-$c**2/($bedend - $currstart)) if ($self->get("escore")); # Exponential
+						#$p = rand();
+						#if ($p < $score)
+						#{
+							#$gencounts->{$bedchr}->{$gene}->{$filename}++;
+							#if ($self->get("split")) # If splitting of regions
+							#{
+								#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+								#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+								#$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
+							#}
+						#}
+					#}
+				#}
+				#else # Simple overlap
+				#{
+					#if ($diff >= $self->get("percent")*($bedend - $bedstart))
+					#{
+						#$gencounts->{$bedchr}->{$gene}->{$filename}++;
+						#if ($self->get("split")) # If splitting of regions
+						#{
+							#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+							#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+							#$splitcounts->{$bedchr}->{$gene}->{$filename}->{$bsr[1]}++ if ($bsr[0]);
+						#}
+					#}
+				#}
+				#last;
+			#}
+			#else # If none of them met, reduce the searching subset
+			#{
+				#$u = $i - 1 if ($bedend <= $currstart);
+				#$l = $i + 1 if ($bedstart >= $currend);
+			#}
+
+		#}
+	#}
+	#close(BEDFILE);
+
+	#return($gencounts,$splitcounts);
+#}
+#
+#sub count_reads_multi
+#{
+	#my ($self,$chromosome,$gencounts,$splitcounts,$infile,$originfile) = @_;
+	#$originfile = $infile unless($originfile);
+
+	#my (@k,@v);
+	#my ($gene,$coords,$diff,$score,$p,$filename,$bprog,$numberlines);
+	#my ($bedchr,$bedstart,$bedend,$bedrest);
+	#my ($currhash,$currchr,$currstart,$currend,$currrest);
+	#my (@regarr,@bsr);
+	#my $c = $self->get("constant");
+	
+	#$helper->disp("Reading and processing file $originfile...");
+
+	#$filename = basename($originfile);
+	#open(BEDFILE,$infile);
+	#my $nextchr = "";
+
+	#while (<BEDFILE>)
+	#{
+		#chomp $_;
+		#($bedchr,$bedstart,$bedend,$bedrest) = split(/\t/,$_);
+		
+		#if ($bedchr ne $nextchr)
+		#{
+			#$currhash = $chromosome->{$bedchr};
+			#@k = keys(%$currhash);
+			#@v = values(%$currhash);
+			#$nextchr = $bedchr;
+		#}
+
+		## Start binary search
+		#my $i;
+		#my ($l,$u) = (0,$#k);
+		#while ($l <= $u)
+		#{
+			#$i = int(($l + $u)/2);
+			#my $gene = $k[$i];
+			#my $coords = $v[$i];
+			#($currstart,$currend,$currrest) = split(/\t/,$coords);
+
+			## Conditions that satisfy our search
+			## Security, too small region, tag does not fit?
+			## Mark that there is something there if user wishes and proceed
+			#if ($currstart >= $bedstart && $currend <= $bedend)
+			#{
+				#$gencounts->{$bedchr}->{$gene}++ if ($self->get("small"));
+				#if ($self->get("split") && $self->get("small")) # If splitting of regions
+				#{
+					#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+					#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+					#$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+				#}
+				#last;
+			#}
+			## Ideal case... whole tag inside gene... no problem
+			#elsif ($currstart <= $bedstart && $currend >= $bedend)
+			#{
+				#$gencounts->{$bedchr}->{$gene}++;
+				#if ($self->get("split")) # If splitting of regions
+				#{
+					#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+					#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+					#$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+				#}
+				#last;
+			#}
+			## Part of tag outside after region
+			#elsif ($currstart < $bedstart && $currend < $bedend && $bedstart < $currend)
+			#{
+				#$diff = $currend - $bedstart;
+				#if ($self->get("lscore") || $self->get("escore")) # Linear or exponential scoring
+				#{
+					#if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside no need for further check
+					#{
+						#$gencounts->{$bedchr}->{$gene}++;
+						#if ($self->get("split")) # If splitting of regions
+						#{
+							#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+							#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+							#$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+						#}
+					#}
+					#else # Use probabilistic scoring scheme
+					#{
+						#$score = ($currend - $bedstart)/(($bedend - $bedstart)/2) if ($self->get("lscore")); # Linear
+						#$score = exp(-$c**2/($currend - $bedstart)) if ($self->get("escore")); # Exponential
+						#$p = rand();
+						#if ($p < $score)
+						#{
+							#$gencounts->{$bedchr}->{$gene}++; 
+							#if ($self->get("split")) # If splitting of regions
+							#{
+								#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+								#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+								#$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+							#}
+						#}
+					#}
+				#}
+				#else # Simple overlap
+				#{
+					#if ($diff >= $self->get("percent")*($bedend - $bedstart))
+					#{
+						#$gencounts->{$bedchr}->{$gene}++;
+						#if ($self->get("split")) # If splitting of regions
+						#{
+							#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+							#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+							#$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+						#}
+					#}
+				#}
+				#last;
+			#}
+			## Part of tag outside before region
+			#elsif ($currstart > $bedstart && $currend > $bedend && $bedend > $currstart)
+			#{
+				#$diff = $bedend - $currstart;
+				#if ($self->get("lscore") || $self->get("escore")) # Linear or exponential scoring
+				#{
+					#if ($diff > ($bedend - $bedstart)/2) # If half of the tag inside
+					#{
+						#$gencounts->{$bedchr}->{$gene}++;
+						#if ($self->get("split")) # If splitting of regions
+						#{
+							#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+							#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+							#$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+						#}
+					#}
+					#else # Use probabilistic scoring scheme
+					#{
+						#$score = ($bedend - $currstart)/(($bedend - $bedstart)/2) if ($self->get("lscore")); # Linear
+						#$score = exp(-$c**2/($bedend - $currstart)) if ($self->get("escore")); # Exponential
+						#$p = rand();
+						#if ($p < $score)
+						#{
+							#$gencounts->{$bedchr}->{$gene}++;
+							#if ($self->get("split")) # If splitting of regions
+							#{
+								#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+								#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+								#$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+							#}
+						#}
+					#}
+				#}
+				#else # Simple overlap
+				#{
+					#if ($diff >= $self->get("percent")*($bedend - $bedstart))
+					#{
+						#$gencounts->{$bedchr}->{$gene}++;
+						#if ($self->get("split")) # If splitting of regions
+						#{
+							#@regarr = $self->split_area($currstart,$currend,$self->get("split"));
+							#@bsr = $self->bin_search_loc($bedstart,$bedend,@regarr);
+							#$splitcounts->{$filename}->{$bedchr}->{$gene}->{$bsr[1]}++ if ($bsr[0]);
+						#}
+					#}
+				#}
+				#last;
+			#}
+			#else # If none of them met, reduce the searching subset
+			#{
+				#$u = $i - 1 if ($bedend <= $currstart);
+				#$l = $i + 1 if ($bedstart >= $currend);
+			#}
+		#}
+	#}
+	#close(BEDFILE);
+
+	#return($gencounts,$splitcounts);
+#}
+#
+#sub write_reads
+#{
+	#my $self = shift @_;
+	#my $chromosome = shift @_;
+	#my $gencounts = shift @_;
+	#my $splitcounts = shift @_;
+	#my @originfile = @{shift @_};
+	#my $theHeader = shift @_;
+	#@originfile = @{$self->get("input")} unless(@originfile);
+	
+	#my (@outrest,@distr,@filenames,@outchrs,@outgeneids);
+	#my ($outgene,$files,$filename,$b,$retrhash,$outhead,$outsubhead);
+	#my ($outchr,$outgeneid,$outcounts,$outstart,$outend,$outrest,$finalout);
+	#my ($mean,$median,$stdev,$mad,$jdistr);
+	
+	#my @base;
+	#foreach my $of (@originfile)
+	#{
+		#my $bb = fileparse($of,'\.[^.]*');
+		#push(@base,$bb);
+	#}
+
+	#my $out;
+	#if ($self->get("output"))
+	#{
+		#open(OUTPUT,">".$self->get("output"));
+		#$out = *OUTPUT;
+	#}
+	#else { $out = *STDOUT; }
+
+	#if ($self->get("output"))
+	#{
+		#($self->get("stats")) ? ($helper->disp("Writing reads and calculating statistics per genomic regions in ".$self->get("output")."...")) :
+			#$helper->disp("Writing reads per genomic regions for file in ".$self->get("output")."...");
+	#}
+	#else
+	#{
+		#($self->get("stats")) ? ($helper->disp("Writing reads and calculating statistics per genomic regions to standard output...\n")) :
+			#$helper->disp("Writing reads per genomic regions for file to standard output...\n");
+	#}
+
+	#if ($theHeader) # Add a header based on what we did plus additional data given
+	#{
+		#$outhead = $theHeader;
+		#if (scalar @base == 1)
+		#{
+			#$outhead .= "\t".$base[0];
+			#$outhead .= "\tSub-area Counts/$self->get(\"split\") bp" if ($self->get("split")); # Return also sub-area distributions
+			#$outhead .= "\tMean Counts/$self->get(\"split\") bp\tMedian Counts/$self->get(\"split\") bp\tStDev Counts\tMAD Counts" if ($self->get("stats"));
+			#print $out "$outhead\n";
+		#}
+		#else
+		#{
+			#foreach my $b (@base)
+			#{
+				#$outhead .= "\t".$b;
+				#$outhead .= "\t" if ($self->get("split"));
+				#$outhead .= "\t"x4 if ($self->get("stats"));
+			#}
+			## We must also print a subheader in case of reporting stats
+			#$outsubhead = "Counts";
+			#$outsubhead .= "\tSub-area Counts/$self->get(\"split\") bp" if ($self->get("split"));
+			#$outsubhead .= "\tMean Counts/$self->get(\"split\") bp\tMedian Counts/$self->get(\"split\") bp\tStDev Counts\tMAD Counts" if ($self->get("stats"));
+			#$outsubhead = "$outsubhead"x(scalar @base);
+			#$outsubhead = ("\t"x(scalar split(/\t/,$theHeader))).$outsubhead;
+			#print $out "$outhead\n";
+			#print $out "$outsubhead\n" if ($self->get("split"));
+		#}
+	#}
+
+	#if ($self->get("ncore") == 1)
+	#{
+		#while(($outchr,$outgene) = each(%$gencounts))
+		#{
+			#while (($outgeneid,$files) = each(%$outgene))
+			#{	
+				#($outstart,$outend,@outrest) = split(/\t/,$chromosome->{$outchr}->{$outgeneid});
+				#if (scalar @outrest != 0)
+				#{
+					#$outrest = join("\t",@outrest);
+					#$finalout = $outchr."\t".$outstart."\t".$outend."\t".$outgeneid."\t".$outrest;
+				#}
+				#else
+				#{
+					#$finalout = $outchr."\t".$outstart."\t".$outend."\t".$outgeneid;
+				#}
+
+				#while (($filename,$outcounts) = each(%$files))
+				#{
+					#if ($self->get("split")) # Retrieve calculated distributions per region
+					#{
+						#$retrhash = $splitcounts->{$outchr}->{$outgeneid}->{basename($filename)};
+						#@distr = values(%$retrhash);
+						#$jdistr = join(" ",@distr);
+						#if ($self->get("stats")) # Calculate stats
+						#{
+							#$mean = $helper->mean(@distr);
+							#$median = $helper->median(@distr);
+							#$stdev = $helper->stdev(@distr);
+							#$mad = $helper->mad(@distr);
+						#}
+					#}
+					#$finalout .= "\t".$outcounts;
+					#$finalout .= "\t".$jdistr if ($self->get("split"));
+					#$finalout .= "\t".$mean."\t".$median."\t".$stdev."\t".$mad if ($self->get("stats"));
+				#}
+				#print $out "$finalout\n";
+			#}
+		#}
+	#}
+	#else
+	#{
+		#@outchrs = keys(%$chromosome);
+		#@filenames = keys(%$gencounts);
+		#foreach my $outchr (@outchrs)
+		#{
+			#@outgeneids = keys(%{$chromosome->{$outchr}});
+			#foreach $outgeneid (@outgeneids)
+			#{
+				#($outstart,$outend,@outrest) = split(/\t/,$chromosome->{$outchr}->{$outgeneid});
+				#if (scalar @outrest != 0)
+				#{
+					#$outrest = join("\t",@outrest);
+					#$finalout = $outchr."\t".$outstart."\t".$outend."\t".$outgeneid."\t".$outrest;
+				#}
+				#else
+				#{
+					#$finalout = $outchr."\t".$outstart."\t".$outend."\t".$outgeneid;
+				#}
+
+				#foreach $filename (@filenames)
+				#{
+					#$outcounts = $gencounts->{$filename}->{$outchr}->{$outgeneid};
+					#if ($self->get("split")) # Retrieve calculated distributions per region
+					#{
+						#$retrhash = $splitcounts->{basename($filename)}->{$outchr}->{$outgeneid};
+						#@distr = values(%$retrhash);
+						#$jdistr = join(" ",@distr);
+						#if ($self->get("stats")) # Calculate stats
+						#{
+							#$mean = $helper->mean(@distr);
+							#$median = $helper->median(@distr);
+							#$stdev = $helper->stdev(@distr);
+							#$mad = $helper->mad(@distr);
+						#}
+					#}
+					#$finalout .= "\t".$outcounts;
+					#$finalout .= "\t".$jdistr if ($self->get("split"));
+					#$finalout .= "\t".$mean."\t".$median."\t".$stdev."\t".$mad if ($self->get("stats"));
+				#}
+				#print $out "$finalout\n";
+			#}
+		#}
+	#}
+	#close(OUTPUT) if ($self->get("output"));
+#}

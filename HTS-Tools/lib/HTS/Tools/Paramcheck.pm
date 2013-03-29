@@ -68,7 +68,7 @@ sub new
 	my $self = {};
 
 	# Pass global variables to the helper
-	(defined($args->{"silent"})) ? ($helper->set("silent",$args->{"silent"})) :
+	(defined($args->{"params"}->{"silent"})) ? ($helper->set("silent",$args->{"params"}->{"silent"})) :
 		($helper->set("silent",0));
 		
 	bless($self,$class);
@@ -205,20 +205,30 @@ sub validate_count
 {
 	my $self = shift @_;
 	my $modname = "HTS::Tools::Count";
+	my $status;
 
 	# Check required packages
-	$helper->try_module("Tie::IxHash::Easy");
 	$helper->try_module("IntervalTree");
+	if ($self->{"params"}->{"keeporder"})
+	{
+		$status = eval { $helper->try_module("Tie::IxHash::Easy") };
+		if ($status)
+		{
+			$helper->disp("Module Tie::IxHash::Easy is required for the keeporder parameter! Deactivating...");
+			$self->{"params"}->{"keeporder"} = 0;
+		}
+		else { use Tie::IxHash::Easy; }
+	}
 
-	my @accept = ("input","region","sort","percent","lscore","escore","constant","small","split","stats",
-		"pass","output","ncore","source","silent","tmpdir");
+	my @accept = ("input","region","sort","percent","lscore","escore","constant","small","split","nbins",
+		"stats","output","ncore","source","splicing","keeporder","silent","tmpdir");
 
 	# Check fatal
 	my $stop;
     $stop .= "--- Please specify input file(s) ---\n" if (!$self->{"params"}->{"input"});
     $stop .= "--- Please specify region file ---\n" if (!$self->{"params"}->{"region"});
-    $stop .= "--- The supported genomes are organism-type, where organism is human, mouse, rat, fly or zebrafish and type is gene, exon, 5utr, 3utr or cds! ---\n"
-		if ( !-f $self->{"params"}->{"region"}
+    $stop .= "--- The supported genomes are organism-type, where organism is human, mouse, rat, fly or zebrafish and type is gene, exon, 5utr, 3utr or cds! Alternatively, it must be a file ---\n"
+		if ( ! -f $self->{"params"}->{"region"}
 			&& $self->{"params"}->{"region"} !~ m/human-(gene|exon|(5|3)utr|cds)|mouse-(gene|exon|(5|3)utr|cds)|rat-(gene|exon|(5|3)utr|cds)|fly-(gene|exon|(5|3)utr|cds)|zebrafish-(gene|exon|(5|3)utr|cds)/i);
     if ($stop)
     {
@@ -243,15 +253,14 @@ sub validate_count
     	$helper->disp("You chose both linear and exponential scoring. Only exponential will be used...");
     	$self->{"params"}->{"lscore"} = 0;
     }
-    if ($self->{"params"}->{"stats"} && !$self->{"params"}->{"split"})
+    if ($self->{"params"}->{"stats"} && !($self->{"params"}->{"split"} || $self->{"params"}->{"nbins"}))
     {
-    	$helper->disp("You can't calculate area statistics without splitting to sub-areas. Option deactivated...");
+    	$helper->disp("You can't calculate area statistics without splitting to sub-areas or defining a number of bins! Option deactivated...");
     	$self->{"params"}->{"stats"} = 0;
     }
     if ($self->{"params"}->{"ncore"})
     {
-		#$helper->try_module("Parallel::ForkManager");
-		my $status = eval { $helper->try_module("Parallel::ForkManager") };
+		$status = eval { $helper->try_module("Parallel::ForkManager") };
 		if ($status)
 		{
 			$helper->disp("Module Parallel::ForkManager not found, proceeding with one core...");
@@ -278,10 +287,11 @@ sub validate_count
 	{
 		my %sources = ("ucsc" => "UCSC","refseq" => "RefSeq","ensembl" => "Ensembl");
 		my $source = $self->{"params"}->{"source"};
+		my $splicing = $self->{"params"}->{"splicing"};
 		if ($source)
 		{
 			$source = lc($source);
-			if ($source ~~ keys(%sources))
+			if (grep {$_ eq $source} keys(%sources))
 			{
 				$helper->disp("Selected template regions source: ",$sources{$source});
 			}
@@ -296,12 +306,44 @@ sub validate_count
 			$helper->disp("Source for template region files not given! Using default (ensembl)...");
 			$self->{"params"}->{"source"} = "ensembl";
 		}
+		if ($splicing)
+		{
+			$splicing = lc($splicing);			
+			if (grep {$_ eq $splicing} ("canonical","alternative"))
+			{
+				$helper->disp("Selected splicing for template regions source: ",$splicing);
+			}
+			else
+			{
+				$helper->disp("Splicing for template region files is not well-defined! Using default (canonical)...");
+				$self->{"params"}->{"splicing"} = "canonical";
+			}
+			
+		}
+		else
+		{
+			if ($source eq "ucsc" || $source eq "refseq")
+			{
+				$helper->disp("Splicing for template region files required but not defined! Using default (canonical)...");
+				$self->{"params"}->{"splicing"} = "canonical";
+			}
+			else
+			{
+				$helper->disp("Splicing is not supported for Ensembl!");
+				delete $self->{"params"}->{"splicing"};
+			}
+		}
 	}
-	if ($self->{"params"}->{"pass"})
+	if ($self->{"params"}->{"nbins"})
     {
-		$helper->disp("Number of binary search passes must be a positive integer! Using default (3)...")
-			if ($self->{"params"}->{"pass"} < 0 || $self->{"params"}->{"pass"} !~ m/\d+/);
-    	$self->{"params"}->{"pass"} = 3;
+		$helper->disp("Number of genomic bins must be a positive integer! Using default (20)...")
+			if ($self->{"params"}->{"nbins"} < 0 || $self->{"params"}->{"nbins"} !~ m/\d+/);
+    	$self->{"params"}->{"nbins"} = 20;
+    }
+    if ($self->{"params"}->{"nbins"} && $self->{"params"}->{"split"})
+    {
+		$helper->disp("nbins and split parameters are mutually exclusive! Using nbins...");
+    	delete $self->{"params"}->{"split"};
     }
 
 	return($self->{"params"});
@@ -551,9 +593,9 @@ function instead
 
 sub validate_queries
 {
-	my ($self,$params) = @_;
+	my $self = shift @_;
 	my $modname = "HTS::Tools::Queries";
-	my $query = $params->{"query"};
+	my $query = $self->{"params"}->{"query"};
 
 	my @accept = (
 		"ucsc_canonical_genes",
