@@ -8,11 +8,15 @@ Version 0.01
 
 =head1 SYNOPSIS
 
-MySQL queries for HTS::Tools::Constants
-	
+This module initiates a set of standard parameters that can be used from HTS::Tools like paths to external
+tools, local and remote database hosts, usernames, passwords, number of cores to use etc. A full list of
+possible constants will be provided soon...
+		
 	# Just load the module so that constants can be used
     use HTS::Tools::Constants;
     my $const->HTS::Tools::Constants->new();
+    # Load constants from external YAML file
+    my $const->HTS::Tools::Constants->new({'file' => 'my_constans.yml'});
 	# Change constant
     $const->set('BEDTOOLS_HOME','/opt/BEDTools');
     # Massively set new constants
@@ -24,8 +28,8 @@ MySQL queries for HTS::Tools::Constants
     $const->change_constants(\%new_constants);
     # Get constant
     $const->get('MAX_CORES');
-    # Load external constants from a YAML file
-    $const->load_constants('my_constants.yml');
+    # Reload external constants from a YAML file
+    $const->load_constants('my_new_constants.yml');
 
 =head1 SUBROUTINES/METHODS
 
@@ -47,9 +51,10 @@ Constructor for HTS::Tools::Constants
 
 sub new
 {
-	my $class = shift @_;
+	my ($class,$params) = shift @_;
 	my $self = {};
 	bless($self,$class);
+	$self->init($params);
 	return($self);
 }
 
@@ -62,11 +67,25 @@ HTS::Tools::Constants object initialization method. NEVER use this directly, use
 sub init
 {
 	my ($self,$params) = @_;
+	my ($constants,$loaded,$checker);
 	
-	# Here we must initiate a set of standard parameters like paths for external tools, local and
-	# remote database hosts, usernames, passwords, number of cores to use etc.
-	my $constants = $self->load_constants
-
+	if (defined($params->{"file"}))
+	{
+		($constants,$loaded) = $self->load_constants($params->{"file"});
+		# In the case that an external file has succesfully loaded, we have to validate, else, no need
+		# as the defaults are loaded, which are error-free of course! 
+		if ($loaded)
+		{
+			$checker = HTS::Tools::Paramcheck->new({"tool" => "constants","params" => $constants});
+			$constants = $checker->validate;
+		}
+	}
+	else
+	{
+		$constants = $self->load_default_constants;
+	}
+	$self->change_constants($constants,"skip");
+	
 	return($self);
 }
 
@@ -81,23 +100,32 @@ Load constants from an external YAML file.
 sub load_constants
 {
 	my ($self,$file) = @_;
+	my ($pfh,$phref,$status,$hasloaded);
 	
-	use YAML qw(LoadFile Dump);
-	my $pfh;
-	eval
+	$status = eval { $helper->try_module("YAML") };
+	if ($status)
 	{
-		open($pfh,"<",$paramfile);
-		$phref = LoadFile($pfh);
-		close($pfh);
-	};
-	if ($@)
-	{
-		disp("Bad parameter file! Will try to load defaults...");
-		$phref = $self->load_default_params();
+		$helper->disp("Module YAML is required to read an external constants file! Will try with the defaults...");
+		$self->load_default_constants;
 	}
-	return($phref);
-	
-	return($self);
+	else
+	{
+		use YAML qw(LoadFile Dump);
+		eval
+		{
+			open($pfh,"<",$file);
+			$phref = LoadFile($pfh);
+			close($pfh);
+			$hasloaded = 1;
+		};
+		if ($@)
+		{
+			$helper->disp("Bad constants file! Will try to load defaults...");
+			$phref = $self->load_default_constants;
+			$hasloaded = 0;
+		}
+	}
+	return($phref,$hasloaded);
 }
 
 =head2 load_default_constants
@@ -108,16 +136,27 @@ Load default constants in the absence of an external YAML file.
 
 =cut
 
-sub load_default_params
+sub load_default_constants
 {	
 	my $self = shift @_;
-
+	
+	# Will add more
 	my $constants = {
+		"LOCAL_HOST" => "localhost",
+		"LOCAL_USER" => "user",
+		"LOCAL_PASS" => "password",
 		"BIOMART_PATH" => "http://www.biomart.org/biomart/martservice?",
 		"REMOTE_HOST" => "genome-mysql.cse.ucsc.edu",
 		"REMOTE_USER" => "genome",
-		"BEDTOOLS_PATH" => "/opt/NGSTools/BEDTools/bin",
-		"SAMTOOLS_PATH" => "/opt/NGSTools/SAMTools"
+		"BEDTOOLS_HOME" => "/opt/NGSTools/BEDTools/bin",
+		"SAMTOOLS_HOME" => "/opt/NGSTools/SAMTools",
+		"GENOMICTOOLS_HOME" => "/opt/NGSTools/GenomicTools",
+		"MAX_CORES" => 12,
+		"MACS_HOME" => "/usr/bin/macs14",
+		"MACS2_HOME" => "/usr/local/bin/macs2",
+		"SICER_HOME" => "/opt/NGSTools/",
+		"RSEG_HOME" => "/opt/NGSTools/rseg",
+		"LOCAL_GENOMES" => "/opt/genomes"
 	}
 }
 
@@ -131,15 +170,16 @@ Massively change the parameters of an HTS::Tools::Constants object.
 
 sub change_constants
 {
-	my ($self,$params) = @_;
+	my ($self,$params,$check) = @_;
+	$check = "do" unless($check);
 	
-	# Validate the new parameters 
-	my $checker = HTS::Tools::Paramcheck->new();
-	$checker->set("tool","constants");
-	$checker->set("params",$params);
-	$params = $checker->validate;
+	if ($check eq "do") # Validate the new parameters
+	{
+		my $checker = HTS::Tools::Paramcheck->new({"tool" => "constants","params" => $params});
+		$params = $checker->validate;
+	}
 	
-	# If validator does not complain, change the parameters
+	# If validator does not complain or if we are loading the defaults, change/set the constants
 	while (my ($name,$value) = each(%$params))
 	{
 		$self->set($name,$value);

@@ -197,6 +197,7 @@ use Carp;
 use File::Basename;
 use File::Temp;
 use File::Spec;
+use IntervalTree;
 
 use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools::Paramcheck;
@@ -328,33 +329,18 @@ sub run
 
 	if (($op || $np) && !$mode)
 	{
-		$helper->$helper->disp("overpairs and nonpairs output formats can only be given with a peak summit column! Ignoring...");
+		$helper->disp("overpairs and nonpairs output formats can only be given with a peak summit column! Ignoring...");
 		$op = 0;
 		$np = 0;
 	}
-	$helper->$helper->disp("Retrieving distances between non-overlapping regions if distance <= $agap bps") if (($op || $np) && $agap);
-	$helper->$helper->disp(" ");
+	$helper->disp("Retrieving distances between non-overlapping regions if distance <= $agap bps") if (($op || $np) && $agap);
+	$helper->disp(" ");
 
 	# Get number of lines for fileA (mostly for waitbar, I know, inefficient but I like waitbars ;-)
 	my $linesA = $helper->count_lines($fileA) if ($waitbar);
 
 	# Suck in fileB
-	my $chr;
-	my @rest;
-	my (%hashB,%onlyB);
-	open(INB,$fileB) or croak "\nThe file $fileB does not exist!\n";
-	$helper->$helper->disp("Reading file $ofileB...");
-	my $headerB = <INB> if ($header);
-	while (my $line = <INB>)
-	{
-		next if ($line =~/^chrM/);
-		next if ($line =~/rand|hap|chrU/);
-		$line =~ s/\r|\n$//g;
-		($chr,@rest) = split(/\t/,$line);
-		push(@{$hashB{$chr}},join("\t",@rest));
-		$onlyB{$chr}{join("\t",@rest)}++ if ($oB);
-	}
-	close(INB);
+	my $chromtreeB = $self->read_input($fileB,$ofileB);
 	
 	##########################################################################################
 
@@ -366,54 +352,55 @@ sub run
 		my ($cchr,@crest);
 		my ($bsr,$ci,$bsf,$n,@currvals);
 		my $linB = $helper->count_lines($fileB);
-		$linB-- if ($header);
+		#$linB-- if ($header);
 
 		if (@extend || $autoxtend)
 		{	
 			if ($autoxtend) # We have to suck in the whole peak file once...
 			{
-				open (INA,$fileA) or croak "\nThe file $fileA does not exist!\n";;
-				$helper->$helper->disp("Reading file $ofileA and processing overlaps...");
-				my $headerA = <INA> if ($header);
-				my (@lines,@medmodes);
-				$helper->waitbar_init if ($waitbar);
-				while (my $line = <INA>)
+				my @medmodes;
+				$helper->disp("Reading file $ofileA and processing overlaps...");
+				my ($chromtreeA,$headerA) = $self->read_input($fileA,$ofileA);
+				while(($chr,$tree) = each(%$chromtreeA))
 				{
-					$helper->waitbar_update($.,$linesA) if ($waitbar);
-					next if ($line =~/^chrM/);
-					next if ($line =~/rand|hap|chrU/);
-					$line =~ s/\r|\n$//g;
-					push(@lines,$line);
-					@crest = split(/\t/,$line);
-					push(@medmodes,$crest[2] - $crest[1]); # BED format
+					$tree->traverse(sub {
+						push(@medmodes,$_[0]->{"interval"}->{"end"} - $_[0]->{"interval"}->{"start"});
+					}
 				}
-				close(INA);
-				my $med = $helper->median((@medmodes,$self->get_lengths(\%hashB)));
+				my $med = $helper->median((@medmodes,$self->get_lengths($chromtreeB)));
 				@extend = (int($med/2),int($med/2));
-				$helper->$helper->disp("Median region length is $med bps. Extending each region mode $extend[1] bps on each side...\n");
+				$helper->disp("Median region length is $med bps. Extending each region mode $extend[1] bps on each side...\n");
 				for ($i=0; $i<@percent; $i++)
 				{	
 					$helper->disp("Overlap percentage: $percent[$i]");
-					my (%overlapA,%overlapB,%onlyA,%conlyB);
+					#my (%overlapA,%overlapB,%onlyA,%conlyB);
+					my ($overlapA,$overlapB,$onlyA,$onlyB);
 					my @overpairs;
-					# Make a hard copy of onlyB hash
-					foreach my $ock (keys(%onlyB))
+					## Make a hard copy of onlyB hash
+					#foreach my $ock (keys(%onlyB))
+					#{
+						#foreach my $ick (keys(%{$onlyB{$ock}})) 
+						#{
+							#$conlyB{$ock}{$ick} = $onlyB{$ock}{$ick};
+						#}
+					#}
+					#my $countopic = 0;
+					#$helper->waitbar_init if ($waitbar);
+					# Again, it's about traversing the chromtreeA in a proper way.
+					while(($chr,$tree) = each($chromtreeA)) 
+					#foreach my $l (@lines)
 					{
-						foreach my $ick (keys(%{$onlyB{$ock}})) 
-						{
-							$conlyB{$ock}{$ick} = $onlyB{$ock}{$ick};
-						}
-					}
-					my $countopic = 0;
-					$helper->waitbar_init if ($waitbar);
-					foreach my $l (@lines)
-					{
-						$countopic++;
-						$helper->waitbar_update($countopic,$linesA-1) if ($waitbar);
+						#$countopic++;
+						#$helper->waitbar_update($countopic,$linesA-1) if ($waitbar);
+						$tree->traverse(sub{
+							@currvals = ($_[0]->{"interval"}->{"start"},$_[0]->{"interval"}->{"end"});
+							($ci,$bsr) = $self->bin_search_percent_center($crest[$mode],$mode,@extend,$percent[$i]/100,@currvals);
+						});
 						($cchr,@crest) = split(/\t/,$l);
 						@currvals = @{$hashB{$cchr}} if ($hashB{$cchr}); 
 						$n = 0;
 						$bsf = 0;
+						# FIXME: Continue from here when I finish with the search functions
 						while ($n < $npass) 
 						{
 							($ci,$bsr) = $self->bin_search_percent_center($crest[$mode],$mode,@extend,$percent[$i]/100,@currvals);
@@ -897,6 +884,55 @@ sub run
 	$helper->disp("Finished!\n\n") if (!$multi);
 }
 
+sub read_input
+{
+	my ($self,$file,$ofile) = @_;
+	$ofile = $file unless ($ofile);
+	my $line;
+	my @rest;
+	my %chromosome;
+	my %strands = ("+" => 1,"-" => -1,"1" => 1,"-1" => -1,"F" => 1,"R" => -1);
+	
+	open(INPUT,$file) or croak "\nThe file $file does not exist!\n";
+	$helper->disp("Reading file $ofile...");
+	$line = <INPUT>;
+	$header = $self->decide_header($line);
+	seek(INPUT,0,0) if (!$header);
+	while ($line = <INPUT>)
+	{
+		next if ($line =~ m/chrM|rand|chrU|hap/i);
+		$line =~ s/\r|\n$//g; # Make sure to remove carriage returns
+		($chr,$start,$end,@rest) = split(/\t/,$line);
+		
+		$chromosome{$chr} = IntervalTree->new() if (!$chromosome{$chr});
+
+		# Fill the IntervalTree
+		$chromosome{$chr}->insert_interval(
+			IntervalTree::Interval->new(
+				$start,$end,{
+					"id" => $chr.":".$start."-".$end,
+					"strand" => (grep {$_ eq $rest[2]} keys(%strands)) ? ($strands{$rest[2]}) : undef,
+					"rest" => join("\t",@rest)
+				}));
+				
+		# If we have to define the "onlyB" structure, make a copy of the above, following the old style	
+	}
+	close(INPUT);
+	
+	return(\%chromosome,$header);
+}
+
+# Each binary search subroutine should be changed to accept as input the reference to the interval tree 
+# corresponding to the chromosome of fileB, replacing @currvals with $chromosome->{$currchromtree} and 
+# the rest of the inputs (starts, ends, modes etc.) as they are. The code performing binary search in 
+# each function will be replaced by the $tree->find($start,$end) function and the results will be handled 
+# as in ::Count with an additional for loop to handle multiple overlaps. The $npass will be removed of 
+# course! 
+# The whole idea must also change: the overlapA, overlapB, onlyA, onlyB hashes must become overlap trees.
+# We begin by constructing an interval tree for fileB. If we want to run in batch mode (the first part of
+# the script) we also construct an interval tree for fileA. During the run, the onlyA and onlyB interval
+# trees are constructed dynamically and in the end we traverse and print the results.
+
 =head2 bin_search_any
 
 Binary search algorithm for any overlap between genomic regions. Internal use.
@@ -907,29 +943,55 @@ Binary search algorithm for any overlap between genomic regions. Internal use.
 
 sub bin_search_any
 {
-	my ($self,$start,$end,@areas) = @_;
-	my ($ind,$currstart,$currend);
-	my ($l,$u) = (0,$#areas);
-	$u = 1 if ($#areas == 0); # Kavourmadies...
-	while ($l <= $u)
+	my ($self,$start,$end,$tree) = @_;
+	my ($ind,$currstart,$currend,$overstru);
+	my @result;
+	
+	$overstru = $tree->find($start,$end);
+	if ($overstru)
 	{
-		$ind = int(($l + $u)/2);
-		($currstart,$currend) = split(/\t/,$areas[$ind]);
-		if (($currstart >= $start && $currend <= $end) ||
+		for ($i=0; $i< scalar @$overstru; $i++)
+		{	
+			$currstart = $overstru->[$i]->{"start"};
+			$currend = $overstru->[$i]->{"end"};
+			
+			if (($currstart >= $start && $currend <= $end) ||
 		    ($currstart <= $start && $currend >= $end) ||
 			($currstart < $start && $currend < $end && $start < $currend) ||
 			($currstart > $start && $currend > $end && $end > $currstart))
-		{
-			return($ind,$areas[$ind]);
+			{
+				push(@result,$overstru->[$i]);
+			}
 		}
-		else
-		{
-			$u = $ind - 1 if ($end <= $currstart);
-            $l = $ind + 1 if ($start >= $currend);
-		}
-	}
-	return(0);
+		return(\@result);
+	} else { return(0) };
 }
+
+#sub bin_search_any
+#{
+	#my ($self,$start,$end,@areas) = @_;
+	#my ($ind,$currstart,$currend);
+	#my ($l,$u) = (0,$#areas);
+	#$u = 1 if ($#areas == 0); # Kavourmadies...
+	#while ($l <= $u)
+	#{
+		#$ind = int(($l + $u)/2);
+		#($currstart,$currend) = split(/\t/,$areas[$ind]);
+		#if (($currstart >= $start && $currend <= $end) ||
+		    #($currstart <= $start && $currend >= $end) ||
+			#($currstart < $start && $currend < $end && $start < $currend) ||
+			#($currstart > $start && $currend > $end && $end > $currstart))
+		#{
+			#return($ind,$areas[$ind]);
+		#}
+		#else
+		#{
+			#$u = $ind - 1 if ($end <= $currstart);
+            #$l = $ind + 1 if ($start >= $currend);
+		#}
+	#}
+	#return(0);
+#}
 
 =head2 bin_search_percent
 
@@ -941,37 +1003,69 @@ Binary search algorithm for percent overlap between genomic regions. Internal us
 
 sub bin_search_percent
 {
-	my ($self,$start,$end,$p,@areas) = @_;
-	my ($ind,$currstart,$currend);
-	my ($l,$u) = (0,$#areas);
-	$u = 1 if ($#areas == 0); # Kavourmadies...
-	while ($l <= $u)
+	my ($self,$start,$end,$p,$tree) = @_;
+	my ($ind,$currstart,$currend,$overstru);
+	my @result;
+	
+	$overstru = $tree->find($start,$end);
+	if ($overstru)
 	{
-		$ind = int(($l + $u)/2);
-		($currstart,$currend) = split(/\t/,$areas[$ind]);
-		if (($currstart >= $start && $currend <= $end) ||
+		for ($i=0; $i< scalar @$overstru; $i++)
+		{	
+			$currstart = $overstru->[$i]->{"start"};
+			$currend = $overstru->[$i]->{"end"};
+			
+			if (($currstart >= $start && $currend <= $end) ||
 		    ($currstart <= $start && $currend >= $end))
-		{
-			return($ind,$areas[$ind]);
+			{
+				push(@result,$overstru->[$i]);
+			}
+			elsif ($currstart < $start && $currend < $end && $start < $currend)
+			{
+				push(@result,$overstru->[$i]) if (($currend - $start) >= $p*($end - $start));
+			}
+			elsif ($currstart > $start && $currend > $end && $end > $currstart)
+			{
+				push(@result,$overstru->[$i]) if (($end - $currstart) >= $p*($end - $start));
+			}
 		}
-		elsif ($currstart < $start && $currend < $end && $start < $currend)
-		{
-			(($currend - $start) >= $p*($end - $start)) ? (return($ind,$areas[$ind])) : 
-			(return($ind,0));
-		}
-		elsif ($currstart > $start && $currend > $end && $end > $currstart)
-		{
-			(($end - $currstart) >= $p*($end - $start)) ? (return($ind,$areas[$ind])) :
-			(return($ind,0));
-		}
-		else
-		{
-			$u = $ind - 1 if ($end <= $currstart);
-            $l = $ind + 1 if ($start >= $currend);
-		}
-	}
-	return(0);
+		return(\@result);
+	} else { return(0); }
 }
+
+#sub bin_search_percent
+#{
+	#my ($self,$start,$end,$p,@areas) = @_;
+	#my ($ind,$currstart,$currend);
+	#my ($l,$u) = (0,$#areas);
+	#$u = 1 if ($#areas == 0); # Kavourmadies...
+	#while ($l <= $u)
+	#{
+		#$ind = int(($l + $u)/2);
+		#($currstart,$currend) = split(/\t/,$areas[$ind]);
+		#if (($currstart >= $start && $currend <= $end) ||
+		    #($currstart <= $start && $currend >= $end))
+		#{
+			#return($ind,$areas[$ind]);
+		#}
+		#elsif ($currstart < $start && $currend < $end && $start < $currend)
+		#{
+			#(($currend - $start) >= $p*($end - $start)) ? (return($ind,$areas[$ind])) : 
+			#(return($ind,0));
+		#}
+		#elsif ($currstart > $start && $currend > $end && $end > $currstart)
+		#{
+			#(($end - $currstart) >= $p*($end - $start)) ? (return($ind,$areas[$ind])) :
+			#(return($ind,0));
+		#}
+		#else
+		#{
+			#$u = $ind - 1 if ($end <= $currstart);
+            #$l = $ind + 1 if ($start >= $currend);
+		#}
+	#}
+	#return(0);
+#}
 
 =head2 bin_search_any_center
 
@@ -983,16 +1077,16 @@ Binary search algorithm for any overlap between genomic regions using their cent
 
 sub bin_search_any_center
 {
-	my ($self,$mode,$mpos,$dxval,$uxval,@areas) = @_;
-	my ($ind,$start,$end,$currstart,$currend,@arr);
+	my ($self,$mode,$mpos,$dxval,$uxval,$tree) = @_;
+	my ($start,$end,$currstart,$currend,$overstru,@arr);
+	my @result;
+	
 	$start = $mode - $dxval;
 	$end = $mode + $uxval;
-	my ($l,$u) = (0,$#areas);
-	$u = 1 if ($#areas == 0); # Kavourmadies...
-	while ($l <= $u)
+	$overstru = $tree->find($start,$end);
+	if ($overstru)
 	{
-		$ind = int(($l + $u)/2);
-		@arr = split(/\t/,$areas[$ind]);
+		@arr = split(/\t/,$overstru->[$i]->{"value"}->{"rest"}); 
 		$currstart = $arr[$mpos] - $dxval;
 		$currend = $arr[$mpos] + $uxval;
 		if (($currstart >= $start && $currend <= $end) ||
@@ -1000,16 +1094,41 @@ sub bin_search_any_center
 			($currstart < $start && $currend < $end && $start < $currend) ||
 			($currstart > $start && $currend > $end && $end > $currstart))
 		{
-			return($ind,$areas[$ind]);
+			push(@result,$overstru->[$i]);
 		}
-		else
-		{
-			$u = $ind - 1 if ($end <= $currstart);
-            $l = $ind + 1 if ($start >= $currend);
-		}
-	}
-	return(0);
+		return(\@result);
+	} else { return(0) };
 }
+
+#sub bin_search_any_center
+#{
+	#my ($self,$mode,$mpos,$dxval,$uxval,@areas) = @_;
+	#my ($ind,$start,$end,$currstart,$currend,@arr);
+	#$start = $mode - $dxval;
+	#$end = $mode + $uxval;
+	#my ($l,$u) = (0,$#areas);
+	#$u = 1 if ($#areas == 0); # Kavourmadies...
+	#while ($l <= $u)
+	#{
+		#$ind = int(($l + $u)/2);
+		#@arr = split(/\t/,$areas[$ind]);
+		#$currstart = $arr[$mpos] - $dxval;
+		#$currend = $arr[$mpos] + $uxval;
+		#if (($currstart >= $start && $currend <= $end) ||
+		    #($currstart <= $start && $currend >= $end) ||
+			#($currstart < $start && $currend < $end && $start < $currend) ||
+			#($currstart > $start && $currend > $end && $end > $currstart))
+		#{
+			#return($ind,$areas[$ind]);
+		#}
+		#else
+		#{
+			#$u = $ind - 1 if ($end <= $currstart);
+            #$l = $ind + 1 if ($start >= $currend);
+		#}
+	#}
+	#return(0);
+#}
 
 =head2 bin_search_any_center
 
@@ -1021,41 +1140,70 @@ Binary search algorithm for percentage overlap between genomic regions using the
 
 sub bin_search_percent_center
 {
-	my ($self,$mode,$mpos,$dxval,$uxval,$p,@areas) = @_;
-	my ($ind,$start,$end,$currstart,$currend,@arr);
+	my ($self,$mode,$mpos,$dxval,$uxval,$p,$tree) = @_;
+	my ($start,$end,$currstart,$currend,$overstru,@arr);
+	
 	$start = $mode - $dxval;
 	$end = $mode + $uxval;
-	my ($l,$u) = (0,$#areas);
-	$u = 1 if ($#areas == 0); # Kavourmadies...
-	while ($l <= $u)
+	$overstru = $tree->find($start,$end);
+	if ($overstru)
 	{
-		$ind = int(($l + $u)/2);
-		@arr = split(/\t/,$areas[$ind]);
+		@arr = split(/\t/,$overstru->[$i]->{"value"}->{"rest"});
 		$currstart = $arr[$mpos] - $dxval;
 		$currend = $arr[$mpos] + $uxval;
 		if (($currstart >= $start && $currend <= $end) ||
 		    ($currstart <= $start && $currend >= $end))
 		{
-			return($ind,$areas[$ind]);
+			push(@result,$overstru->[$i]);
 		}
 		elsif ($currstart < $start && $currend < $end && $start < $currend)
 		{
-			(($currend - $start) >= $p*($end - $start)) ? (return($ind,$areas[$ind])) : 
-			(return($ind,0));
+			push(@result,$overstru->[$i]) if (($currend - $start) >= $p*($end - $start));
 		}
 		elsif ($currstart > $start && $currend > $end && $end > $currstart)
 		{
-			(($end - $currstart) >= $p*($end - $start)) ? (return($ind,$areas[$ind])) :
-			(return($ind,0));
+			push(@result,$overstru->[$i]) if (($end - $currstart) >= $p*($end - $start));
 		}
-		else
-		{
-			$u = $ind - 1 if ($end <= $currstart);
-            $l = $ind + 1 if ($start >= $currend);
-		}
-	}
-	return(0);
+	} else { return(0); }
 }
+
+#sub bin_search_percent_center
+#{
+	#my ($self,$mode,$mpos,$dxval,$uxval,$p,@areas) = @_;
+	#my ($ind,$start,$end,$currstart,$currend,@arr);
+	#$start = $mode - $dxval;
+	#$end = $mode + $uxval;
+	#my ($l,$u) = (0,$#areas);
+	#$u = 1 if ($#areas == 0); # Kavourmadies...
+	#while ($l <= $u)
+	#{
+		#$ind = int(($l + $u)/2);
+		#@arr = split(/\t/,$areas[$ind]);
+		#$currstart = $arr[$mpos] - $dxval;
+		#$currend = $arr[$mpos] + $uxval;
+		#if (($currstart >= $start && $currend <= $end) ||
+		    #($currstart <= $start && $currend >= $end))
+		#{
+			#return($ind,$areas[$ind]);
+		#}
+		#elsif ($currstart < $start && $currend < $end && $start < $currend)
+		#{
+			#(($currend - $start) >= $p*($end - $start)) ? (return($ind,$areas[$ind])) : 
+			#(return($ind,0));
+		#}
+		#elsif ($currstart > $start && $currend > $end && $end > $currstart)
+		#{
+			#(($end - $currstart) >= $p*($end - $start)) ? (return($ind,$areas[$ind])) :
+			#(return($ind,0));
+		#}
+		#else
+		#{
+			#$u = $ind - 1 if ($end <= $currstart);
+            #$l = $ind + 1 if ($start >= $currend);
+		#}
+	#}
+	#return(0);
+#}
 
 =head2 bin_search_percent_both
 
@@ -1067,39 +1215,72 @@ Binary search algorithm for percentage overlap between genomic regions for the "
 
 sub bin_search_percent_both
 {
-	my ($self,$start,$end,$p,@areas) = @_;
-	my ($ind,$currstart,$currend,$diff);
-	my ($l,$u) = (0,$#areas);
-	$u = 1 if ($#areas == 0); # Kavourmadies...
-	while ($l <= $u)
+	my ($self,$start,$end,$p,$tree) = @_;
+	my ($currstart,$currend,$diff,$overstru);
+	
+	$overstru = $tree->find($start,$end);
+	if ($overstru)
 	{
-		$ind = int(($l + $u)/2);
-		($currstart,$currend) = split(/\t/,$areas[$ind]);
-		if (($currstart >= $start && $currend <= $end) ||
-		    ($currstart <= $start && $currend >= $end))
-		{
-			return($ind,$areas[$ind]);
+		for ($i=0; $i< scalar @$overstru; $i++)
+		{	
+			$currstart = $overstru->[$i]->{"start"};
+			$currend = $overstru->[$i]->{"end"};
+			
+			if (($currstart >= $start && $currend <= $end) ||
+				($currstart <= $start && $currend >= $end))
+			{
+				push(@result,$overstru->[$i]);
+			}
+			elsif ($currstart < $start && $currend < $end && $start < $currend)
+			{
+				$diff = $currend - $start;
+				push(@result,$overstru->[$i]) if ($diff >= $p*($end - $start) || $diff >= $p*($currend - $currstart)));
+			}
+			elsif ($currstart > $start && $currend > $end && $end > $currstart)
+			{
+				$diff = $end - $currstart;
+				push(@result,$overstru->[$i]) if (($diff >= $p*($end - $start) || $diff >= $p*($currend - $currstart)));
+			}
 		}
-		elsif ($currstart < $start && $currend < $end && $start < $currend)
-		{
-			$diff = $currend - $start;
-			($diff >= $p*($end - $start) || $diff >= $p*($currend - $currstart)) ? 
-			(return($ind,$areas[$ind])) : (return($ind,0));
-		}
-		elsif ($currstart > $start && $currend > $end && $end > $currstart)
-		{
-			$diff = $end - $currstart;
-			($diff >= $p*($end - $start) || $diff >= $p*($currend - $currstart)) ? 
-			(return($ind,$areas[$ind])) : (return($ind,0));
-		}
-		else
-		{
-			$u = $ind - 1 if ($end <= $currstart);
-            $l = $ind + 1 if ($start >= $currend);
-		}
-	}
-	return(0);
+		return(\@result);
+	} else { return(0) };
 }
+
+#sub bin_search_percent_both
+#{
+	#my ($self,$start,$end,$p,@areas) = @_;
+	#my ($ind,$currstart,$currend,$diff);
+	#my ($l,$u) = (0,$#areas);
+	#$u = 1 if ($#areas == 0); # Kavourmadies...
+	#while ($l <= $u)
+	#{
+		#$ind = int(($l + $u)/2);
+		#($currstart,$currend) = split(/\t/,$areas[$ind]);
+		#if (($currstart >= $start && $currend <= $end) ||
+		    #($currstart <= $start && $currend >= $end))
+		#{
+			#return($ind,$areas[$ind]);
+		#}
+		#elsif ($currstart < $start && $currend < $end && $start < $currend)
+		#{
+			#$diff = $currend - $start;
+			#($diff >= $p*($end - $start) || $diff >= $p*($currend - $currstart)) ? 
+			#(return($ind,$areas[$ind])) : (return($ind,0));
+		#}
+		#elsif ($currstart > $start && $currend > $end && $end > $currstart)
+		#{
+			#$diff = $end - $currstart;
+			#($diff >= $p*($end - $start) || $diff >= $p*($currend - $currstart)) ? 
+			#(return($ind,$areas[$ind])) : (return($ind,0));
+		#}
+		#else
+		#{
+			#$u = $ind - 1 if ($end <= $currstart);
+            #$l = $ind + 1 if ($start >= $currend);
+		#}
+	#}
+	#return(0);
+#}
 
 =head2 bin_search_percent_exact
 
@@ -1109,6 +1290,7 @@ Binary search algorithm for percentgae overlap between genomic regions for the "
 	
 =cut
 
+# FIXME: I am here!
 sub bin_search_percent_exact
 {
 	my ($self,$start,$end,$p,@areas) = @_;
@@ -1147,6 +1329,45 @@ sub bin_search_percent_exact
 	}
 	return(0);
 }
+
+#sub bin_search_percent_exact
+#{
+	#my ($self,$start,$end,$p,@areas) = @_;
+	#my ($ind,$currstart,$currend);
+	#my ($l,$u) = (0,$#areas);
+	#$u = 1 if ($#areas == 0); # Kavourmadies...
+	#while ($l <= $u)
+	#{
+		#$ind = int(($l + $u)/2);
+		#($currstart,$currend) = split(/\t/,$areas[$ind]);
+		#if ($currstart >= $start && $currend <= $end) # TagB <= TagA
+		#{
+			#(($currend - $currstart) >= $p*($end - $start)) ? (return($ind,$areas[$ind])) : 
+			#(return($ind,0));
+		#}
+		#elsif ($currstart <= $start && $currend >= $end) # TagB >= TagA
+		#{
+			#(($end - $start) >= $p*($currend - $currstart)) ? (return($ind,$areas[$ind])) : 
+			#(return($ind,0));
+		#}
+		#elsif ($currstart < $start && $currend < $end && $start < $currend)
+		#{
+			#(($currend - $start) >= $p*($end - $start)) ? (return($ind,$areas[$ind])) : 
+			#(return($ind,0));
+		#}
+		#elsif ($currstart > $start && $currend > $end && $end > $currstart)
+		#{
+			#(($end - $currstart) >= $p*($end - $start)) ? (return($ind,$areas[$ind])) :
+			#(return($ind,0));
+		#}
+		#else
+		#{
+			#$u = $ind - 1 if ($end <= $currstart);
+            #$l = $ind + 1 if ($start >= $currend);
+		#}
+	#}
+	#return(0);
+#}
 
 =head2 bin_search_percent_both
 
@@ -1197,6 +1418,47 @@ sub bin_search_percent_exact_both
 	}
 	return(0);
 }
+
+#sub bin_search_percent_exact_both
+#{
+	#my ($self,$start,$end,$p,@areas) = @_;
+	#my ($ind,$currstart,$currend,$diff);
+	#my ($l,$u) = (0,$#areas);
+	#$u = 1 if ($#areas == 0); # Kavourmadies...
+	#while ($l <= $u)
+	#{
+		#$ind = int(($l + $u)/2);
+		#($currstart,$currend) = split(/\t/,$areas[$ind]);
+		#if ($currstart >= $start && $currend <= $end) # TagB <= TagA
+		#{
+			#(($currend - $currstart) >= $p*($end - $start)) ? (return($ind,$areas[$ind])) : 
+			#(return($ind,0));
+		#}
+		#elsif ($currstart <= $start && $currend >= $end) # TagB >= TagA
+		#{
+			#(($end - $start) >= $p*($currend - $currstart)) ? (return($ind,$areas[$ind])) : 
+			#(return($ind,0));
+		#}
+		#elsif ($currstart < $start && $currend < $end && $start < $currend)
+		#{
+			#$diff = $currend - $start;
+			#($diff >= $p*($end - $start) || $diff >= $p*($currend - $currstart)) ? 
+			#(return($ind,$areas[$ind])) : (return($ind,0));
+		#}
+		#elsif ($currstart > $start && $currend > $end && $end > $currstart)
+		#{
+			#$diff = $end - $currstart;
+			#($diff >= $p*($end - $start) || $diff >= $p*($currend - $currstart)) ? 
+			#(return($ind,$areas[$ind])) : (return($ind,0));
+		#}
+		#else
+		#{
+			#$u = $ind - 1 if ($end <= $currstart);
+            #$l = $ind + 1 if ($start >= $currend);
+		#}
+	#}
+	#return(0);
+#}
 
 =head2 dists_every
 
@@ -1316,15 +1578,13 @@ Get lengths of input genomic regions. Internal use.
 
 sub get_lengths
 {
-	my ($self,$inhash) = @_;
+	my ($self,$ctree) = @_;
 	my @lens;
-	my ($c,$l,@t);
-	foreach $c (keys(%$inhash))
+	my ($c,$t);
+	while(($c,$t) = each($ctree))
 	{
-		foreach $l (@{$inhash->{$c}})
-		{
-			@t = split(/\t/,$l);
-			push(@lens,$t[1] - $t[0]);
+		$t->traverse(sub {
+			push(@lens,$_[0]->{"interval"}->{"end"} - $_[0]->{"interval"}->{"start"});
 		}
 	}
 	return(@lens);

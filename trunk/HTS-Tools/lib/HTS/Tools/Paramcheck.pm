@@ -638,7 +638,7 @@ sub validate_constants
 {
 	my ($self,$params) = @_;
 	my $modname = "HTS::Tools::Constants";
-	my $wrongs = 0;
+	my $wrongs = 0;	
 
 	my @accept = ();
 
