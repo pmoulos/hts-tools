@@ -266,8 +266,6 @@ sub new
 
 	# Validate the input parameters
 	my $checker = HTS::Tools::Paramcheck->new({"tool" => "count", "params" => $params});
-	#$checker->set("tool","count");
-	#$checker->set("params",$params);
 	$params = $checker->validate;
 
 	# After validating, bless and initialize
@@ -436,46 +434,6 @@ sub split_area
 	# genomic region
 	
 	return $subtree;
-}
-
-=head2 bin_search_loc
-
-Binary search for genomic regions. Internal use.
-
-	$counter->bin_search_loc($start,$end,@array_of_coordinates);
-	
-=cut
-
-sub bin_search_loc
-{
-	my ($self,$start,$end,@areas) = @_;
-	
-	my ($ind,$currstart,$currend,$center);
-	my ($l,$u) = (0,$#areas);
-	while ($l <= $u)
-	{
-		$ind = int(($l + $u)/2);
-		($currstart,$currend) = split(/\t/,$areas[$ind]);
-		$center = $start + $helper->round(($end - $start)/2); # Location of center of the tag
-		if ($currstart < $center && $currend > $center)
-		{
-			return (1,$ind);
-		}
-		elsif ($currstart == $center) # Randomly assign to one window
-		{
-			(int(10*rand(1)) < 5) ? (return(1,$ind-1)) : (return(1,$ind));
-		}
-		elsif ($currend == $center)
-		{
-			(int(10*rand(1)) < 5) ? (return(1,$ind)) : (return(1,$ind+1));
-		}
-		else
-		{
-			$u = $ind - 1 if ($center <= $currstart);
-            $l = $ind + 1 if ($center >= $currend);
-		}
-	}
-	return (0,-1);
 }
 
 =head2 read_region_file
@@ -2045,4 +2003,44 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 		#}
 	#}
 	#close(OUTPUT) if ($self->get("output"));
+#}
+#
+#=head2 bin_search_loc
+
+#Binary search for genomic regions. Internal use.
+
+	#$counter->bin_search_loc($start,$end,@array_of_coordinates);
+	
+#=cut
+
+#sub bin_search_loc
+#{
+	#my ($self,$start,$end,@areas) = @_;
+	
+	#my ($ind,$currstart,$currend,$center);
+	#my ($l,$u) = (0,$#areas);
+	#while ($l <= $u)
+	#{
+		#$ind = int(($l + $u)/2);
+		#($currstart,$currend) = split(/\t/,$areas[$ind]);
+		#$center = $start + $helper->round(($end - $start)/2); # Location of center of the tag
+		#if ($currstart < $center && $currend > $center)
+		#{
+			#return (1,$ind);
+		#}
+		#elsif ($currstart == $center) # Randomly assign to one window
+		#{
+			#(int(10*rand(1)) < 5) ? (return(1,$ind-1)) : (return(1,$ind));
+		#}
+		#elsif ($currend == $center)
+		#{
+			#(int(10*rand(1)) < 5) ? (return(1,$ind)) : (return(1,$ind+1));
+		#}
+		#else
+		#{
+			#$u = $ind - 1 if ($center <= $currstart);
+            #$l = $ind + 1 if ($center >= $currend);
+		#}
+	#}
+	#return (0,-1);
 #}
