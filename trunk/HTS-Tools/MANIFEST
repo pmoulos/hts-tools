@@ -8,7 +8,6 @@ lib/HTS/Tools/Count.pm
 lib/HTS/Tools/Fetch.pm
 lib/HTS/Tools/Intersect.pm
 lib/HTS/Tools/Motifscan.pm
-lib/HTS/Tools/Multisect.pm
 lib/HTS/Tools/Normalize.pm
 lib/HTS/Tools/Paramcheck.pm
 lib/HTS/Tools/Profile.pm

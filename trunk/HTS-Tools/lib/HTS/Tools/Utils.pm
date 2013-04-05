@@ -84,8 +84,8 @@ can be "human" (default) or "machine"
 
 sub now
 {
-	my ($self,$format) = shift @_;
-	$format = "human" if (!$format);
+	my ($self,$format) = @_;
+	#$format = "human" if (!$format);
 	my ($sec,$min,$hour,$day,$month,$year) = localtime(time);
 	$year += 1900;
 	$month++;
@@ -156,6 +156,30 @@ sub count_unique_lines
 	close(IN);
 	my $totlines = keys(%lh);
 	return $totlines;
+}
+
+=head2 decide_header
+
+Parse the first line of a bed-like file and decide if it has a header line that describes each column or data start right away.
+Internal use.
+
+	my $has_header = $helper->decide_header($first_line);
+	
+=cut
+
+sub decide_header
+{
+	my ($self,$line)= @_;
+	$line =~ s/\r|\n$//g;
+	my @cols = split(/\t/,$line);
+	if ($cols[0] =~ m/^chr/ && $cols[1] =~ m/\d+/ && $cols[2] =~ m/\d+/)
+	{
+		return(0); # Does not contain a header, is proper bed line
+	}
+	else
+	{
+		return($line);
+	}
 }
 
 =head2 count_fasta($fasta_file)
@@ -495,7 +519,7 @@ Very simple waitbar inititation
 sub waitbar_init
 {
 	my ($self,$initlen) = @_;
-	$initlen = 50 if ($initlen eq "");
+	$initlen = 50 if (!$initlen);
 	my $printlen = ' 'x$initlen;
 	print "\nProgress\n";
 	print "|$printlen|\n";
@@ -512,8 +536,8 @@ Very simple waitbar progress
 
 sub waitbar_update
 {
-	my ($self,$curr,$tot,$waitbarlen) = $_[2];
-	$waitbarlen = 50 if ($waitbarlen eq "");
+	my ($self,$curr,$tot,$waitbarlen) = @_;
+	$waitbarlen = 50 if (!$waitbarlen);
 	my $step;
 	if ($tot > $waitbarlen)
 	{

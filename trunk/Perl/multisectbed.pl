@@ -9,21 +9,27 @@
 # lost and the BEDTools have to be installed.
 
 use strict;
+use Carp;
 use Getopt::Long;
 use File::Copy;
 use File::Spec;
 use File::Temp;
 use File::Basename;
-use File::Path qw(make_path remove_tree);
 
-use constant INTERSECT => "perl /media/HD4/Fleming/hts-tools/Perl/intersectbed.pl ";
+use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
+use HTS::Tools::Constants;
+use HTS::Tools::Intersect;
+use HTS::Tools::Utils;
+
+# Init the helper which contains usefult routines
+our $helper->HTS::Tools::Utils->new();
 
 # Make sure output is unbuffered
 select(STDOUT);
 $|=1;
 
 # On Ctrl-C or die, do cleanup
-$SIG{INT} = \&catch_cleanup;
+$SIG{INT} = \sub { $helper->catch_cleanup; };
 
 # Set defaults
 our $scriptname = "multisectbed.pl";
@@ -42,10 +48,10 @@ our $mode;
 our $autoxtend;
 our $both;
 our $exact;
-our $npass;
+our $reportonce;
+our $keeporder;
 our $agap;
-our $outdir;
-our $header;
+our $outdir;;
 our $waitbar;
 our $silent;
 our $help;
@@ -56,9 +62,12 @@ our $help;
 # Global temp dir
 our $tmpdir = File::Temp->newdir();
 
+# Check the files for headers
+our $header = &check_header;
+
 # Record progress...
-my $date = &now;
-disp("\n$date - Started...");
+my $date = $helper->now;
+$helper->disp("\n$date - Started...");
 # Run the intersections pipeline...
 &run_intersections;
 # Run time...
@@ -82,12 +91,12 @@ sub check_inputs
     		   "any|y" => \$any,
     		   "extend|e=i{,}" => \@extend,
     		   "mode|m=i" => \$mode,
-    		   "autoextend|u" => \$autoxtend,
+    		   "autoextend|x" => \$autoxtend,
     		   "both|t" => \$both,
     		   "exact|c" => \$exact,
-    		   "pass|n=i" => \$npass,
+    		   "reportonce|u=i" => \$reportonce,
     		   "gap|g=i" => \$agap,
-    		   "header|d" => \$header,
+    		   "keeporder|d" => \$keeporder,
     		   "waitbar|w" => \$waitbar,
     		   "silent|s" => \$silent,
     		   "help|h" => \$help);
@@ -115,7 +124,6 @@ sub check_inputs
 		disp("Name for the Venn diagram figure not given! It will be auto-generated...");
 		$name = (scalar @input)."_venn_".&now("machine");
 	}
-    $mode -= 2 if ($mode);
     if ($figtype ne "png" && $figtype ne "jpg" && $figtype ne "bmp" && $figtype ne "pdf" && $figtype ne "ps")
 	{
 		disp("--figformat must be one of png or pdf! Using pdf...");
@@ -137,18 +145,26 @@ sub run_intersections
 	my $alias = &copy_targets;
 	my $pairs = &construct_run_pairs;
 	my $optargs = &construct_optargs;
-
+	my $intersecter = HTS::Tools::Intersect->new($optargs);
+	
 	# Run the actual intersections
 	foreach $k (keys(%$pairs))
 	{
 		$a = File::Spec->catfile($tmpdir,${$pairs->{$k}}[0]);
 		$b = File::Spec->catfile($tmpdir,${$pairs->{$k}}[1]);
-		(!$usebedtools) ? ($cmd = INTERSECT."--inputA $a --inputB $b --multi$optargs") :
-		($cmd = File::Spec->catfile($bedtoolspath,"intersectBed")." -a $a -b $b -wa > ".File::Spec->catfile($tmpdir,"${$pairs->{$k}}[0]"."${$pairs->{$k}}[1]"));
 		disp("\nIntersecting ${$pairs->{$k}}[0] and ${$pairs->{$k}}[1]...");
-		disp("The command is:");
-		disp($cmd);
-		system($cmd);
+		if ($usebedtools)
+		{
+			$cmd = File::Spec->catfile($bedtoolspath,"intersectBed")." -a $a -b $b -wa > ".File::Spec->catfile($tmpdir,"${$pairs->{$k}}[0]"."${$pairs->{$k}}[1]");
+			disp("The command is:");
+			disp($cmd);
+			system($cmd);
+		}
+		else
+		{
+			$intersecter->change_params({"inputA" => $a,"inputB" => $b});
+			$intersecter->run;
+		}
 	}
 
 	# Get the the areas and their length
@@ -587,75 +603,75 @@ sub count_areas
 	{
 		case 2 {
 			%counts = (
-				"area1" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"area1"})),
-				"area2" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"area2"})),
-				"cross.area" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"cross.area"})),
+				"area1" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area1"})),
+				"area2" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area2"})),
+				"cross.area" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"cross.area"})),
 			);
 		}
 		case 3 {
 			%counts = (
-				"area1" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"area1"})),
-				"area2" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"area2"})),
-				"area3" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"area3"})),
-				"n12" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n12"})),
-				"n23" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n23"})),
-				"n13" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n13"})),
-				"n123" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n123"}))
+				"area1" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area1"})),
+				"area2" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area2"})),
+				"area3" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area3"})),
+				"n12" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n12"})),
+				"n23" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n23"})),
+				"n13" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n13"})),
+				"n123" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n123"}))
 			);
 		}
 		case 4 {
 			%counts = (
-				"area1" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"area1"})),
-				"area2" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"area2"})),
-				"area3" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"area3"})),
-				"area4" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"area4"})),
-				"area5" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"area4"})),
-				"n12" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n12"})),
-				"n13" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n13"})),
-				"n14" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n14"})),
-				"n23" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n23"})),
-				"n24" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n24"})),
-				"n34" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n34"})),
-				"n123" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n123"})),
-				"n124" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n124"})),
-				"n134" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n134"})),
-				"n234" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n234"})),
-				"n1234" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n1234"}))
+				"area1" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area1"})),
+				"area2" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area2"})),
+				"area3" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area3"})),
+				"area4" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area4"})),
+				"area5" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area4"})),
+				"n12" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n12"})),
+				"n13" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n13"})),
+				"n14" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n14"})),
+				"n23" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n23"})),
+				"n24" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n24"})),
+				"n34" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n34"})),
+				"n123" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n123"})),
+				"n124" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n124"})),
+				"n134" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n134"})),
+				"n234" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n234"})),
+				"n1234" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n1234"}))
 			)
 		}
 		case 5 {
 			%counts = (
-				"area1" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"area1"})),
-				"area2" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"area2"})),
-				"area3" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"area3"})),
-				"area4" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"area4"})),
-				"area5" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"area5"})),
-				"n12" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n12"})),
-				"n13" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n13"})),
-				"n14" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n14"})),
-				"n15" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n15"})),
-				"n23" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n23"})),
-				"n24" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n24"})),
-				"n25" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n25"})),
-				"n34" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n34"})),
-				"n35" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n35"})),
-				"n45" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n45"})),
-				"n123" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n123"})),
-				"n124" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n124"})),
-				"n125" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n125"})),
-				"n134" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n134"})),
-				"n135" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n135"})),
-				"n145" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n145"})),
-				"n234" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n234"})),
-				"n235" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n235"})),
-				"n245" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n245"})),
-				"n345" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n345"})),
-				"n1234" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n1234"})),
-				"n1235" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n1235"})),
-				"n1245" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n1245"})),
-				"n1345" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n1345"})),
-				"n2345" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n2345"})),
-				"n12345" => &count_lines(File::Spec->catfile($tmpdir,$areas->{"n12345"}))
+				"area1" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area1"})),
+				"area2" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area2"})),
+				"area3" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area3"})),
+				"area4" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area4"})),
+				"area5" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area5"})),
+				"n12" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n12"})),
+				"n13" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n13"})),
+				"n14" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n14"})),
+				"n15" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n15"})),
+				"n23" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n23"})),
+				"n24" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n24"})),
+				"n25" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n25"})),
+				"n34" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n34"})),
+				"n35" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n35"})),
+				"n45" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n45"})),
+				"n123" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n123"})),
+				"n124" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n124"})),
+				"n125" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n125"})),
+				"n134" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n134"})),
+				"n135" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n135"})),
+				"n145" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n145"})),
+				"n234" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n234"})),
+				"n235" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n235"})),
+				"n245" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n245"})),
+				"n345" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n345"})),
+				"n1234" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n1234"})),
+				"n1235" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n1235"})),
+				"n1245" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n1245"})),
+				"n1345" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n1345"})),
+				"n2345" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n2345"})),
+				"n12345" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"n12345"}))
 			);
 		}
 	}
@@ -669,34 +685,34 @@ sub count_areas
 	return(\%counts);
 }
 
-sub count_lines
+sub check_header
 {
-	open(IN,$_[0]) or die "\nThe file $_[0] does not exist!\n\n";
-	disp("Counting lines of $_[0]...");
-	my $totlines=0;
-	$totlines += tr/\n/\n/ while sysread(IN,$_,2**16);
-	close(IN);
-	return $totlines;
+	open(HE,$input[0]) or croak "\nFile $input[0] does not exist!\n";
+	my $li = <HE>;
+	close(HE);
+	($helper->decide_header($li)) ? (return(1)) : (return(0));
 }
 
 sub construct_optargs
 {
-	my $str;
-	$str.= " --sort" if ($sort);
-	$str.= " --percent $percent" if ($percent);
-	$str.= " --any" if ($any);
-	$str.= " --extend $extend[0] $extend[1]" if (@extend);
-	$str.= " --mode $mode" if ($mode);
-	$str.= " --autoextend" if ($autoxtend);
-	$str.= " --both" if ($both);
-	$str.= " --exact" if ($exact);
-	$str.= " --pass $npass" if ($npass);
-	$str.= " --gap $agap" if ($agap);
-	$str.= " --header" if ($header);
-	$str.= " --waitbar" if ($waitbar);
-	$str.= " --silent" if ($silent);
-	$str.= " --output overlapA";	
-	return($str);
+	my %args = ("inputA" => "foo", "inputB" => "bar"); # So as the validator does not complain
+	$args{"sort"} = $sort if ($sort);
+	$args{"percent"} = $percent if ($percent);
+	$args{"any"} = $any if ($any);
+	$args{"extend"} = \@extend if (@extend);
+	$args{"mode"} = $mode if ($mode);
+	$args{"autoextend"} = $autoxtend if ($autoxtend);
+	$args{"both"} = $both if ($both);
+	$args{"exact"} = $exact if ($exact);
+	$args{"reportonce"} = $reportonce if ($reportonce);
+	$args{"gap"} = $agap if ($agap);
+	$args{"keeporder"} = $keeporder if ($keeporder);
+	$args{"waitbar"} = $waitbar if ($waitbar);
+	$args{"silent"} = $silent if ($silent);
+	$args{"output"} = "overlapA";
+	$args{"multi"} = 1;
+	$args{"tmpdir"} = $tmpdir;
+	return(\%args);
 }
 
 sub copy_targets
@@ -719,7 +735,8 @@ sub format_for_bedtools
 	my @cols;
 	open(IN,$input);
 	open(OUT,">$target");
-	my $line = <IN> if ($header); # Header to oblivion
+	$line = <IN>;
+	seek(IN,0,0) if ($helper->decide_header($line));
 	while ($line = <IN>)
 	{
 		$line =~ s/\r|\n$//g;
@@ -766,38 +783,10 @@ sub close_Rgraphics
 	return("dev.off()\n");
 }
 
-sub now
-{
-	my $format = shift @_;
-	$format = "human" if (!$format);
-	my ($sec,$min,$hour,$day,$month,$year) = localtime(time);
-	$year += 1900;
-	$month++;
-	$month = "0".$month if (length($month)==1);
-	$day = "0".$day if (length($day)==1);
-	$hour = "0".$hour if (length($hour)==1);
-	$min = "0".$min if (length($min)==1);
-	$sec = "0".$sec if (length($sec)==1);
-	($format ne "machine") ? (return($day."/".$month."/".$year." ".$hour.":".$min.":".$sec)) :
-	(return($year.$month.$day.$hour.$min.$sec));
-}
-
-sub catch_cleanup 
-{
-	print STDERR "\nCatching ctrl-C, cleaning temporary files!";
-	&cleanup;
-	die;
-}
-
-sub cleanup 
-{
-	remove_tree($tmpdir);
-}
-
-sub disp
-{
-	print "\n@_" if (!$silent);
-}
+#sub disp
+#{
+	#print "\n@_" if (!$silent);
+#}
 
 sub program_usage 
 {

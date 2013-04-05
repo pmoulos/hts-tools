@@ -45,7 +45,6 @@ use HTS::Tools::Count;
 use HTS::Tools::Fetch;
 use HTS::Tools::Intersect;
 use HTS::Tools::Motifscan;
-use HTS::Tools::Multisect;
 use HTS::Tools::Normalize;
 use HTS::Tools::Profile;
 use HTS::Tools::QC;
@@ -113,9 +112,6 @@ sub init
 		}
 		when(/motifscan/i) {
 			$self->set("tool",HTS::Tools::Motifscan->new($args->{"params"}));
-		}
-		when(/multisect/i) {
-			$self->set("tool",HTS::Tools::Multisect->new($args->{"params"}));
 		}
 		when(/normalize/i) {
 			$self->set("tool",HTS::Tools::Normalize->new($args->{"params"}));

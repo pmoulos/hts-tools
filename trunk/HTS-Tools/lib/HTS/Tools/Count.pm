@@ -469,7 +469,7 @@ sub read_region_file
 	
 	open(REGIONS,$regionfile) or croak "\nThe file $regionfile does not exist!\n";
 	$regline = <REGIONS>;
-	$theHeader = $self->decide_header($regline);
+	$theHeader = $helper->decide_header($regline);
 	seek(REGIONS,0,0) if (!$theHeader);
 	while ($regline = <REGIONS>)
 	{
@@ -484,9 +484,9 @@ sub read_region_file
 			IntervalTree::Interval->new(
 				$start,$end,{
 					"id" => $uid,
-					"strand" => (grep {$_ eq $rest[1]} keys(%strands)) ? ($strands{$rest[1]}) : undef,
 					"rest" => join("\t",@rest)
-				}));
+				},$chr,
+				(grep {$_ eq $rest[1]} keys(%strands)) ? ($strands{$rest[1]}) : (undef)));
 
 		# Initialize the main count hash
 		foreach $f (@originfile)
@@ -1238,29 +1238,6 @@ sub sort_one
 	return($file);
 }
 
-=head2 decide_header
-
-Parse the first line of region file and decide if it has a header line or data start right away. Internal use.
-
-	$counter->decide_header($first_line);
-	
-=cut
-
-sub decide_header
-{
-	my ($self,$line )= @_;
-	$line =~ s/\r|\n$//g;
-	my @cols = split(/\t/,$line);
-	if ($cols[0] =~ m/^chr/ && $cols[1] =~ m/\d+/ && $cols[2] =~ m/\d+/)
-	{
-		return(0); # Does not contain a header, is proper bed line
-	}
-	else
-	{
-		return($line);
-	}
-}
-
 =head2 change_params
 
 Massively change the parameters of an HTS::Tools::Count object.
@@ -1435,7 +1412,7 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 	
 	#open(REGIONS,$regionfile) or croak "\nThe file $regionfile does not exist!\n";
 	#$regline = <REGIONS>;
-	#$theHeader = $self->decide_header($regline);
+	#$theHeader = $helper->decide_header($regline);
 	#seek(REGIONS,0,0) if (!$theHeader);
 	#while ($regline = <REGIONS>)
 	#{
