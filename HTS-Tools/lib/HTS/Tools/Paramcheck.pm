@@ -387,8 +387,8 @@ sub validate_intersect
 	my $self = shift @_;
 	my $modname = "HTS::Tools::Intersect";
 	
-	my @accept = ("inputA","inputB","sort","percent","any","extend","mode","autoextend","both","exact",
-			"pass","gap","output","multi","header","waitbar","silent","tmpdir");
+	my @accept = ("inputA","inputB","sort","percent","any","extend","mode","autoextend","both","exact","keeporder","maxud",
+			"reportonce","gap","output","multi","dryrun","waitbar","silent","tmpdir");
 	
 	# Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
@@ -399,17 +399,20 @@ sub validate_intersect
 	# Check fatal
 	my $stop;
     $stop .= "--- Please specify input file(s) ---\n" if (!$self->{"params"}->{"inputA"} || !$self->{"params"}->{"inputB"});
-    if (${$self->{"params"}->{"percent"}}[0] =~ /\d\:\d+/) 
+    if (@{$self->{"params"}->{"percent"}})
     {
-    	my ($s,$e) = split(":",${$self->{"params"}->{"percent"}}[0]);
-    	@{$self->{"params"}->{"percent"}} = ($s..$e);
-	}
-	foreach my $cpp (@{$self->{"params"}->{"percent"}})
-	{
-		if ($cpp < 0 || $cpp > 100)
+		if (${$self->{"params"}->{"percent"}}[0] =~ /\d\:\d+/) 
 		{
-			$stop .= "--- Overlap percentage should be a value between 0 and 100 ---\n";
-			last;
+			my ($s,$e) = split(":",${$self->{"params"}->{"percent"}}[0]);
+			@{$self->{"params"}->{"percent"}} = ($s..$e);
+		}
+		foreach my $cpp (@{$self->{"params"}->{"percent"}})
+		{
+			if ($cpp < 0 || $cpp > 100)
+			{
+				$stop .= "--- Overlap percentage should be a value between 0 and 100 ---\n";
+				last;
+			}
 		}
 	}
     if ($stop)
@@ -418,33 +421,60 @@ sub validate_intersect
 		croak "Type perldoc $modname for help in usage.\n\n";
 		exit;
     }
-	
-	if ($self->{"params"}->{"pass"} < 0)
-	{
-		disp("The number of passes for dynamic binary search should be >0! Using default (3)...");
-		$self->{"params"}->{"pass"} = 3;
-	}
+
+	# At least the "any" parameter must be explicitly specified...
+	$self->{"params"}->{"any"} = 1 if (!$self->{"params"}->{"any"} && !@{$self->{"params"}->{"percent"}});
     # Check gap
-    disp("The gap parameter should be >=0! Using default (10000)...") if ($self->{"params"}->{"gap"} < 0);
+    disp("The gap parameter should be >=0! Using default (10000)...") if ($self->{"params"}->{"gap"} && $self->{"params"}->{"gap"} < 0);
+	# Mode
+    if ($self->{"params"}->{"mode"})
+	{
+		if ($self->{"params"}->{"mode"} < 3) # Can't be 0,1,2 as we are talking about bed-like file
+		{
+			$helper->disp("Invalid peak mode column: ".$self->{"params"}->{"mode"}." It will not be used...");
+			delete $self->{"params"}->{"mode"};
+		}
+		else
+		{
+			$self->{"params"}->{"mode"} -= 4;
+		}
+	}
     # Check what is given on extend
     if (@{$self->{"params"}->{"extend"}})
     {
-    	if (!${$self->{"params"}->{"extend"}}[1])
-    	{
-    		disp("The extend parameter has one argument... Assuming same extension in both sides.");
-    		${$self->{"params"}->{"extend"}}[1] = ${$self->{"params"}->{"extend"}}[0];
-    	}
-    }
-    if (@{$self->{"params"}->{"extend"}} && $self->{"params"}->{"autoextend"})
-    {
-    	disp("extend and autoextend options cannot be given together! Ignoring autoextend...");
-    	$self->{"params"}->{"autoextend"} = 0;
+		if (!$self->{"params"}->{"mode"})
+		{
+			$helper->disp("Region mode/summit column must be provided with extend lengths! Assuming the middle of the region...");
+			$self->{"params"}->{"mode"} = -1;
+		}
+		if (!${$self->{"params"}->{"extend"}}[1])
+		{
+			$helper->disp("The extend parameter has one argument... Assuming same extension in both sides.");
+			${$self->{"params"}->{"extend"}}[1] = ${$self->{"params"}->{"extend"}}[0];
+		}
+		if ($self->{"params"}->{"autoextend"})
+		{
+			$helper->disp("extend and autoextend options cannot be given together! Ignoring autoextend...");
+			$self->{"params"}->{"autoextend"} = 0;
+		}
 	}
-    $self->{"params"}->{"mode"} -= 2 if ($self->{"params"}->{"mode"});
+	else
+	{
+		if ($self->{"params"}->{"autoextend"} && !$self->{"params"}->{"mode"})
+		{
+			$helper->disp("Region mode/summit column must be provided with autoextend option! Assuming the middle of the region...");
+			$self->{"params"}->{"mode"} = -1;
+		}
+	}
+	if ($self->{"params"}->{"maxud"} && $self->{"params"}->{"maxud"} < 0)
+	{
+		$helper->disp("The maxud parameter must be greater than 0! Using default (5)...");
+		$self->{"params"}->{"maxud"} = 5;
+	}
     # Check proper output format
-    if (@{$self->{"params"}->{"out"}})
+    if (@{$self->{"params"}->{"output"}})
     {
-		foreach my $c (@{$self->{"params"}->{"out"}})
+		foreach my $c (@{$self->{"params"}->{"output"}})
 		{
 			if ($c ne "overlapA" && $c ne "overlapB" && $c ne "onlyA" && $c ne "onlyB" && $c ne "overpairs" &&
 			    $c ne "nonpairs")
@@ -452,8 +482,29 @@ sub validate_intersect
 				my $msg = "WARNING! Output options should be one or more of \"overlapA\", \"overlapB\",".
 				          " \"onlyA\", \"onlyB\", \"overpairs\" or \"nonpairs\",\n".
 						  "Using default (\"overlapA\")...";
-				disp($msg);
-				@{$self->{"params"}->{"extend"}} = ("overlapA");
+				$helper->disp($msg);
+				@{$self->{"params"}->{"output"}} = ("overlapA");
+			}
+			if ($c eq "nonpairs" || $c eq "overpairs")
+			{
+				if (!$self->{"params"}->{"mode"})
+				{
+					$helper->disp("Region mode/summit column must be provided with nonpairs and overpairs output options! Assuming the middle of the region...");
+					$self->{"params"}->{"mode"} = -1;
+				}
+			}
+			if ($c eq "nonpairs")
+			{
+				if (!$self->{"params"}->{"gap"})
+				{
+					$helper->disp("Acceptable gap for non-overlapping regions not specified! Using default (1000)...");
+					$self->{"params"}->{"gap"} = 1000;
+				}
+				if (!$self->{"params"}->{"maxud"})
+				{
+					$helper->disp("Maximum number of non-overlapping regions to report not specified! Using default (5)...");
+					$self->{"params"}->{"maxud"} = 5;
+				}
 			}
 		}
 	}
@@ -462,8 +513,18 @@ sub validate_intersect
 		if (!${$self->{"params"}->{"percent"}}[1])
 		{
 			$helper->disp("Output file type not given! Using default (overlapA)...") ;
-			@{$self->{"params"}->{"out"}} = ("overlapA");
+			@{$self->{"params"}->{"output"}} = ("overlapA");
 		}
+	}
+	if ($self->{"params"}->{"keeporder"})
+	{
+		my $status = eval { $helper->try_module("Tie::IxHash::Easy") };
+		if ($status)
+		{
+			$helper->disp("Module Tie::IxHash::Easy is required for the keeporder parameter! Deactivating...");
+			$self->{"params"}->{"keeporder"} = 0;
+		}
+		else { use Tie::IxHash::Easy; }
 	}
 	
 	return($self->{"params"});
@@ -480,29 +541,6 @@ sub validate_motifscan
 {
 	my $self = shift @_;
 	my $modname = "HTS::Tools::Motifscan";
-	
-	my @accept = ();
-	
-	# Check and warn for unrecognized parameters
-    foreach my $p (keys(%{$self->{"params"}}))
-    {
-		$helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
-	}
-	
-	return($self->{"params"});
-}
-
-=head2 validate_multisect
-
-The parameter validator function of the HTS::Multisect module. Do not use this directly, use the validate
-function instead
-
-=cut
-
-sub validate_multisect
-{
-	my $self = shift @_;
-	my $modname = "HTS::Tools::Multisect";
 	
 	my @accept = ();
 	
