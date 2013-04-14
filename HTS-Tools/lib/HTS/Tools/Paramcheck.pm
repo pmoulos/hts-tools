@@ -167,7 +167,181 @@ function instead
 sub validate_assign
 {
 	my $self = shift @_;
-	my $modname = "HTS::Tools::Assign";
+	my $modname = "HTS::Tools::Assign";	
+	my $status;
+	
+	my @accept = ("input","region","background","span","idstrand","idmode","test","pvalue","outformat",
+		"source","splicing","silent","tmpdir");
+	
+	# Check fatal
+	my $stop;
+    $stop .= "--- Please specify input query region file(s) ---\n" if (!@{$self->{"params"}->{"input"}});
+    $stop .= "--- Please specify significant region file ---\n" if (!$self->{"params"}->{"region"});
+    $stop .= "--- Please specify background region file ---\n" if (!$self->{"params"}->{"background"} && $self->{"params"}->{"test"} ne "none");
+    $stop .= "--- The supported genomes for the region parameter are organism-type, where organism is human, mouse, rat, fly or zebrafish and type is gene, exon, 5utr, 3utr or cds! Alternatively, it must be a file ---\n"
+		if ( ! -f $self->{"params"}->{"region"}
+			&& $self->{"params"}->{"region"} !~ m/human-(gene|exon|(5|3)utr|cds)|mouse-(gene|exon|(5|3)utr|cds)|rat-(gene|exon|(5|3)utr|cds)|fly-(gene|exon|(5|3)utr|cds)|zebrafish-(gene|exon|(5|3)utr|cds)/i);
+    $stop .= "--- The supported genomes for the background parameter are organism-type, where organism is human, mouse, rat, fly or zebrafish and type is gene, exon, 5utr, 3utr or cds! Alternatively, it must be a file ---\n"
+		if ( ! -f $self->{"params"}->{"background"} && $self->{"params"}->{"test"} ne "none"
+			&& $self->{"params"}->{"background"} !~ m/human-(gene|exon|(5|3)utr|cds)|mouse-(gene|exon|(5|3)utr|cds)|rat-(gene|exon|(5|3)utr|cds)|fly-(gene|exon|(5|3)utr|cds)|zebrafish-(gene|exon|(5|3)utr|cds)/i);
+    if ($stop)
+    {
+		$helper->disp("$stop\n");
+		croak "Type perldoc $modname for help in usage.\n\n";
+		exit;
+    }
+	
+	# Check and warn for unrecognized parameters
+    foreach my $p (keys(%{$self->{"params"}}))
+    {
+		$helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+	}
+	
+	# Check required packages
+	if ($self->{"params"}->{"test"} && $self->{"params"}->{"test"} eq "chi2")
+	{
+		$status = eval { $helper->try_module("Math::Cephes") };
+		if ($status)
+		{
+			$helper->disp("Module Math::Cephes is required to perform the chi-square test! Using default (none)...");
+			$self->{"params"}->{"test"} = "none";
+		}
+		else { use Math::Cephes; }
+	}
+	if (@{$self->{"params"}->{"outformat"}} && @{$self->{"params"}->{"outformat"}} ~~ /matrix/)
+	{
+		$status = eval { $helper->try_module("Tie::IxHash::Easy") };
+		if ($status)
+		{
+			$helper->disp("Module Tie::IxHash::Easy is required for one or more of the selected outputs! Using default (gff-peak)...");
+			@{$self->{"params"}->{"outformat"}} = ("gff-peak");
+		}
+		else { use Tie::IxHash::Easy; }
+	}
+	
+	# Check the rest
+	# Check statistical test
+	if ($self->{"params"}->{"test"} && $self->{"params"}->{"test"} ne "hypgeom" && $self->{"params"}->{"test"} ne "chi2" && 
+		$self->{"params"}->{"test"} ne "none" && $self->{"params"}->{"test"} ne "auto")
+	{
+		$helper->disp("test parameter should be one of \"hypgeom\", \"chi2\", \"none\" or \"auto\"! Using default (none)...");
+		$self->{"params"}->{"test"} = "none";
+	}
+	else # A test must be set
+	{
+		$self->{"params"}->{"test"} = "none";
+	}
+    # Check if span given
+    if (!@{$self->{"params"}->{"span"}})
+    {
+    	$helper->disp("Search range from region start points (e.g. TSS) not given! Using defaults (-10kbp,10kbp)");
+    	@{$self->{"params"}->{"span"}} = (-10000,10000);
+	}
+	# Check if id and strand columns given for sig/back files
+    if (!@{$self->{"params"}->{"idstrand"}})
+    {
+    	$helper->disp("Unique ID and strand columns for region and background files not given! Using defaults as from BED format (4,6)...");
+    	@{$self->{"params"}->{"idstrand"}} = (3,5);
+	}
+	else # Proper perl indexing
+	{
+		${$self->{"params"}->{"idstrand"}}[0]--;
+		${$self->{"params"}->{"idstrand"}}[1]--;
+	}
+	# Check if id and mode columns given for peak files
+    if (!@{$self->{"params"}->{"idmode"}})
+    {
+    	$helper->disp("Unique ID and mode columns for query region files not given! Using default ID as from BED format (4) and");
+    	$helper->disp("query modes will be assumed to be the centers of the input regions...")
+    	@{$self->{"params"}->{"idmode"}} = (3);
+	}
+	else # Proper perl indexing
+	{
+		${$self->{"params"}->{"idmode"}}[0]--;
+		if (!${$self->{"params"}->{"idmode"}}[1])
+		{
+			$helper->disp("Input query regions modes not given! The region centers will be used instead...");
+		}
+		else
+		{
+			${$self->{"params"}->{"idmode"}}[1]--;
+		}
+	}
+	# Check proper output format
+	if (@{$self->{"params"}->{"outformat"}})
+	{
+		foreach my $c (@{$self->{"params"}->{"outformat"}})
+		{
+			if ($c ne "stats" && $c ne "gff-peak" && $c ne "gff-gene" && $c ne "peak" &&  
+				$c ne "gene" && $c ne "all-peak" && $c ne "all-gene" && $c ne "pretty-peak" && 
+				$c ne "pretty-gene" && $c ne "gff-peak-db" && $c ne "gff-gene-db" && $c ne "peakdata"
+				&& $c ne "matrix-number" && $c ne "matrix-presence" && $c ne "matrix-peaks")
+			{
+				my $msg = "WARNING! outformat parameter options should be one or more of \"gff-peak\", \"gff-gene\",\n".
+						  "\"peak\", \"gene\", \"all-peak\", \"all-gene\", \"pretty-peak\", \"pretty-gene\",\n".
+						  "\"gff-peak-db\", \"gff-gene-db\", \"peakdata\", \"stats\", \"matrix-number\", \"matrix-presence\"".
+						  "or \"matrix-peaks\"! \nUsing default (\"gff-peak\")...";
+				$helper->disp($msg);
+				@{$self->{"params"}->{"outformat"}} = ("gff-peak");
+			}
+		}
+	}
+	else
+	{
+		$helper->disp("Output format not given! Using default (gff-peak)");
+		@{$self->{"params"}->{"outformat"}} = ("gff-peak");
+	}
+	if ($self->{"params"}->{"region"} =~ m/human-(gene|exon|(5|3)utr|cds)|mouse-(gene|exon|(5|3)utr|cds)|rat-(gene|exon|(5|3)utr|cds)|fly-(gene|exon|(5|3)utr|cds)|zebrafish-(gene|exon|(5|3)utr|cds)/i)
+	{
+		my %sources = ("ucsc" => "UCSC","refseq" => "RefSeq","ensembl" => "Ensembl");
+		my $source = $self->{"params"}->{"source"};
+		my $splicing = $self->{"params"}->{"splicing"};
+		if ($source)
+		{
+			$source = lc($source);
+			if (grep {$_ eq $source} keys(%sources))
+			{
+				$helper->disp("Selected template regions source: ",$sources{$source});
+			}
+			else
+			{
+				$helper->disp("Source for template region files is not well-defined! Using default (ensembl)...");
+				$self->{"params"}->{"source"} = "ensembl";
+			}
+		}
+		else
+		{
+			$helper->disp("Source for template region files not given! Using default (ensembl)...");
+			$self->{"params"}->{"source"} = "ensembl";
+		}
+		if ($splicing)
+		{
+			$splicing = lc($splicing);			
+			if (grep {$_ eq $splicing} ("canonical","alternative"))
+			{
+				$helper->disp("Selected splicing for template regions source: ",$splicing);
+			}
+			else
+			{
+				$helper->disp("Splicing for template region files is not well-defined! Using default (canonical)...");
+				$self->{"params"}->{"splicing"} = "canonical";
+			}		
+		}
+		else
+		{
+			if ($source eq "ucsc" || $source eq "refseq")
+			{
+				$helper->disp("Splicing for template region files required but not defined! Using default (canonical)...");
+				$self->{"params"}->{"splicing"} = "canonical";
+			}
+			else
+			{
+				$helper->disp("Splicing is not supported for Ensembl!");
+				delete $self->{"params"}->{"splicing"};
+			}
+		}
+	}
+	
 	return($self->{"params"});
 }
 
@@ -207,19 +381,6 @@ sub validate_count
 	my $modname = "HTS::Tools::Count";
 	my $status;
 
-	# Check required packages
-	$helper->try_module("IntervalTree");
-	if ($self->{"params"}->{"keeporder"})
-	{
-		$status = eval { $helper->try_module("Tie::IxHash::Easy") };
-		if ($status)
-		{
-			$helper->disp("Module Tie::IxHash::Easy is required for the keeporder parameter! Deactivating...");
-			$self->{"params"}->{"keeporder"} = 0;
-		}
-		else { use Tie::IxHash::Easy; }
-	}
-
 	my @accept = ("input","region","sort","percent","lscore","escore","constant","small","split","nbins",
 		"stats","output","ncore","source","splicing","keeporder","silent","tmpdir");
 
@@ -241,6 +402,18 @@ sub validate_count
     foreach my $p (keys(%{$self->{"params"}}))
     {
 		$helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+	}
+	# Check required packages
+	$helper->try_module("IntervalTree");
+	if ($self->{"params"}->{"keeporder"})
+	{
+		$status = eval { $helper->try_module("Tie::IxHash::Easy") };
+		if ($status)
+		{
+			$helper->disp("Module Tie::IxHash::Easy is required for the keeporder parameter! Deactivating...");
+			$self->{"params"}->{"keeporder"} = 0;
+		}
+		else { use Tie::IxHash::Easy; }
 	}
 	# Check the rest
     if (!$self->{"params"}->{"percent"} && !$self->{"params"}->{"lscore"} && !$self->{"params"}->{"escore"}) # If both given, use exponential scoring
@@ -318,7 +491,6 @@ sub validate_count
 				$helper->disp("Splicing for template region files is not well-defined! Using default (canonical)...");
 				$self->{"params"}->{"splicing"} = "canonical";
 			}
-			
 		}
 		else
 		{

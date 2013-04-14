@@ -322,10 +322,10 @@ sub run
 
 sub fetch_regions
 {
-	my ($self,$regionfile) = @_;
+	my ($self,$regionfile,$source,$splicing) = @_;
 	my $fetcher = HTS::Tools::Fetch->new({"tmpdir" => $self->get("tmpdir"), "silent" => $self->get("silent")});
-	my $source = $self->get("source");
-	my $splicing = $self->get("splicing");
+	$source = $self->get("source") unless($source);
+	$splicing = $self->get("splicing") unless($splicing);
 	
 	use v5.14;
 	given($regionfile)
