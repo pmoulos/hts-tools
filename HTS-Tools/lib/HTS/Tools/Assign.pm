@@ -1,6 +1,6 @@
 =head1 NAME
 
-HTS::Tools::Assign - The great new HTS::Tools::Assign!
+HTS::Tools::Assign - Genomic region distance-based assignment, with optional statistical significance.
 
 =head1 VERSION
 
@@ -27,7 +27,7 @@ are described in the parameters below. The hypergeometric method is NOT verified
 out there that may perform better. Again, use at your own risk. The tools works very nicely to calculate 
 peak-gene distances with a set of very nice and informative outputs.
 
-    use HTS::Tools::Assign;
+	use HTS::Tools::Assign;
 	my %params = (
 		'input' => ['normal_nfkb_peaks.txt','cancer_nfkb_peaks.txt']
 		'region' => 'my_experiment_de_genes.txt',
@@ -359,7 +359,7 @@ sub run
 			}
 		}
 	}
-	close(SIG);
+	close(REG);
 	
 	# Suck in background region file if test is to be performed
 	if ($test ne "none")
@@ -370,7 +370,7 @@ sub run
 			@sbcols = (4,6);
 		}
 		open (BACK,$background) or croak "\nThe file $background does not exist!\n";
-		$helper->disp("Reading background file $backfile...");
+		$helper->disp("Reading background file $background...");
 		$line = <BACK>;
 		my $backhead = $helper->decide_header($line);
 		seek(BACK,0,0) if ($backhead);
@@ -397,7 +397,7 @@ sub run
 			}
 			else # Some self-defense
 			{
-				disp("Improper strand format... Skipping line $. from $backfile");
+				disp("Improper strand format... Skipping line $. from $background");
 				next;
 			}
 			push(@{$backID{$chr}},$id);
@@ -450,7 +450,7 @@ sub run
 			$allPeakData{$pid} = join("\t",@pall) if ($pdataout);
 			$lenpeak[$i]++;
 		}
-		close(PEAK);
+		close(INPUT);
 		
 		$helper->disp("Processing file $input[$i]...");
 		croak "\nThe region IDs in file $input[$i] are not unique! Exiting...\n" if (!$self->check_unique(%peakID));
@@ -780,7 +780,7 @@ sub run
 				my $outfile = $self->create_output_file($input[$i],$opt);
 				$helper->disp("Writing output in $outfile...");
 				open(OUTPUT,">$outfile");
-				print OUTPUT "$headerline" if ($header);
+				print OUTPUT "$reghead" if ($reghead);
 				my @fkeys = keys(%finalPeaks);
 				foreach $currpeak (@fkeys)
 				{
@@ -978,7 +978,7 @@ sub print_matrix
 {
 	my ($self,$inhash,$type) = @_;
 	my ($row,$column,$colhash);
-	my $outfilename = $self->create_output_file($peakfile[0],$type);
+	my $outfilename = $self->create_output_file(${$self->get("input")}[0],$type);
 	$helper->disp("Writing output in $outfilename...");
 	my @rows = keys(%$inhash);
 	open(OUTPUT,">$outfilename");

@@ -486,7 +486,7 @@ sub read_region_file
 					"id" => $uid,
 					"rest" => join("\t",@rest)
 				},$chr,
-				(grep {$_ eq $rest[1]} keys(%strands)) ? ($strands{$rest[1]}) : (undef)));
+				($rest[1] && grep {$_ eq $rest[1]} keys(%strands)) ? ($strands{$rest[1]}) : (undef)));
 
 		# Initialize the main count hash
 		foreach $f (@originfile)

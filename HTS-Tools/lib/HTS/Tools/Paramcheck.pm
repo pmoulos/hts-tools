@@ -252,7 +252,7 @@ sub validate_assign
     if (!@{$self->{"params"}->{"idmode"}})
     {
     	$helper->disp("Unique ID and mode columns for query region files not given! Using default ID as from BED format (4) and");
-    	$helper->disp("query modes will be assumed to be the centers of the input regions...")
+    	$helper->disp("query modes will be assumed to be the centers of the input regions...");
     	@{$self->{"params"}->{"idmode"}} = (3);
 	}
 	else # Proper perl indexing
