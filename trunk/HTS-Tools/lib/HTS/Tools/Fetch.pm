@@ -1,6 +1,6 @@
 =head1 NAME
 
-HTS::Tools::Fetch - The great new HTS::Tools::Fetch!
+HTS::Tools::Fetch - Annotation downloader for several widely used genomes and genomic features.
 
 =head1 VERSION
 
