@@ -182,7 +182,7 @@ sub validate_assign
 		if ( ! -f $self->{"params"}->{"region"}
 			&& $self->{"params"}->{"region"} !~ m/human-(gene|exon|(5|3)utr|cds)|mouse-(gene|exon|(5|3)utr|cds)|rat-(gene|exon|(5|3)utr|cds)|fly-(gene|exon|(5|3)utr|cds)|zebrafish-(gene|exon|(5|3)utr|cds)/i);
     $stop .= "--- The supported genomes for the background parameter are organism-type, where organism is human, mouse, rat, fly or zebrafish and type is gene, exon, 5utr, 3utr or cds! Alternatively, it must be a file ---\n"
-		if ( ! -f $self->{"params"}->{"background"} && $self->{"params"}->{"test"} ne "none"
+		if (($self->{"params"}->{"background"} && ! -f $self->{"params"}->{"background"}) && ($self->{"params"}->{"test"} && $self->{"params"}->{"test"} ne "none")
 			&& $self->{"params"}->{"background"} !~ m/human-(gene|exon|(5|3)utr|cds)|mouse-(gene|exon|(5|3)utr|cds)|rat-(gene|exon|(5|3)utr|cds)|fly-(gene|exon|(5|3)utr|cds)|zebrafish-(gene|exon|(5|3)utr|cds)/i);
     if ($stop)
     {
@@ -389,7 +389,7 @@ sub validate_count
     $stop .= "--- Please specify input file(s) ---\n" if (!$self->{"params"}->{"input"});
     $stop .= "--- Please specify region file ---\n" if (!$self->{"params"}->{"region"});
     $stop .= "--- The supported genomes are organism-type, where organism is human, mouse, rat, fly or zebrafish and type is gene, exon, 5utr, 3utr or cds! Alternatively, it must be a file ---\n"
-		if ( ! -f $self->{"params"}->{"region"}
+		if (($self->{"params"}->{"region"} && ! -f $self->{"params"}->{"region"})
 			&& $self->{"params"}->{"region"} !~ m/human-(gene|exon|(5|3)utr|cds)|mouse-(gene|exon|(5|3)utr|cds)|rat-(gene|exon|(5|3)utr|cds)|fly-(gene|exon|(5|3)utr|cds)|zebrafish-(gene|exon|(5|3)utr|cds)/i);
     if ($stop)
     {
@@ -571,7 +571,8 @@ sub validate_intersect
 	# Check fatal
 	my $stop;
     $stop .= "--- Please specify input file(s) ---\n" if (!$self->{"params"}->{"inputA"} || !$self->{"params"}->{"inputB"});
-    if (@{$self->{"params"}->{"percent"}})
+
+    if ($self->{"params"}->{"percent"} && @{$self->{"params"}->{"percent"}})
     {
 		if (${$self->{"params"}->{"percent"}}[0] =~ /\d\:\d+/) 
 		{
@@ -595,7 +596,7 @@ sub validate_intersect
     }
 
 	# At least the "any" parameter must be explicitly specified...
-	$self->{"params"}->{"any"} = 1 if (!$self->{"params"}->{"any"} && !@{$self->{"params"}->{"percent"}});
+	$self->{"params"}->{"any"} = 1 if (!$self->{"params"}->{"any"} && !$self->{"params"}->{"percent"});
     # Check gap
     disp("The gap parameter should be >=0! Using default (10000)...") if ($self->{"params"}->{"gap"} && $self->{"params"}->{"gap"} < 0);
 	# Mode
@@ -612,7 +613,7 @@ sub validate_intersect
 		}
 	}
     # Check what is given on extend
-    if (@{$self->{"params"}->{"extend"}})
+    if ($self->{"params"}->{"extend"} && @{$self->{"params"}->{"extend"}})
     {
 		if (!$self->{"params"}->{"mode"})
 		{
@@ -644,7 +645,7 @@ sub validate_intersect
 		$self->{"params"}->{"maxud"} = 5;
 	}
     # Check proper output format
-    if (@{$self->{"params"}->{"output"}})
+    if ($self->{"params"}->{"output"} && @{$self->{"params"}->{"output"}})
     {
 		foreach my $c (@{$self->{"params"}->{"output"}})
 		{

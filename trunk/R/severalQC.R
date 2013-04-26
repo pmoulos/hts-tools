@@ -512,7 +512,8 @@ prepareAutoGenName <- function(fil,output)
 {
 	real.fil <- character(4)
 	real.fil[1] <- dirname(fil)
-	real.fil[2] <- sub("^([^.]*).*","\\1",basename(fil))
+	#real.fil[2] <- sub("^([^.]*).*","\\1",basename(fil))
+	real.fil[2] <- sub("(.+)[.][^.]+$", "\\1", basename(treatment))
 	#real.fil[3] remains empty to be filled with the plot type
 	real.fil[4] <- paste(".",output,sep="")
 	return(real.fil)
