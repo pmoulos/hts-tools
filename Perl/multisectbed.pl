@@ -12,6 +12,7 @@ use strict;
 use Carp;
 use Getopt::Long;
 use File::Copy;
+use File::Path qw(remove_tree);
 use File::Spec;
 use File::Temp;
 use File::Basename;
@@ -22,7 +23,7 @@ use HTS::Tools::Intersect;
 use HTS::Tools::Utils;
 
 # Init the helper which contains usefult routines
-our $helper->HTS::Tools::Utils->new();
+our $helper = HTS::Tools::Utils->new();
 
 # Make sure output is unbuffered
 select(STDOUT);
@@ -41,7 +42,7 @@ our $figtype = "pdf";
 our $usebedtools;
 our $bedtoolspath;
 our $sort;
-our $percent;
+our @percent;
 our $any;
 our @extend;
 our $mode;
@@ -51,8 +52,7 @@ our $exact;
 our $reportonce;
 our $keeporder;
 our $agap;
-our $outdir;;
-our $waitbar;
+our $outdir;
 our $silent;
 our $help;
 
@@ -71,8 +71,8 @@ $helper->disp("\n$date - Started...");
 # Run the intersections pipeline...
 &run_intersections;
 # Run time...
-$date = &now;
-disp("\n$date - Finished!\n\n");
+$date = $helper->now;
+$helper->disp("\n$date - Finished!\n\n");
 
 # Process inputs
 sub check_inputs
@@ -87,7 +87,7 @@ sub check_inputs
 			   "usebedtools|b" => \$usebedtools,
 			   "bedtoolspath|j" => \$bedtoolspath,
     		   "sort|r" => \$sort,
-    		   "percent|p=f" => \$percent,
+    		   "percent|p=f" => \@percent,
     		   "any|y" => \$any,
     		   "extend|e=i{,}" => \@extend,
     		   "mode|m=i" => \$mode,
@@ -97,7 +97,6 @@ sub check_inputs
     		   "reportonce|u=i" => \$reportonce,
     		   "gap|g=i" => \$agap,
     		   "keeporder|d" => \$keeporder,
-    		   "waitbar|w" => \$waitbar,
     		   "silent|s" => \$silent,
     		   "help|h" => \$help);
     # Check if the required arguments are set
@@ -116,22 +115,22 @@ sub check_inputs
     }
     if (!$outdir)
     {
-		disp("Output directory not given! Assuming the current...");
+		$helper->disp("Output directory not given! Assuming the current...");
 		$outdir = ".";
 	}
 	if (!$name)
     {
-		disp("Name for the Venn diagram figure not given! It will be auto-generated...");
+		$helper->disp("Name for the Venn diagram figure not given! It will be auto-generated...");
 		$name = (scalar @input)."_venn_".&now("machine");
 	}
     if ($figtype ne "png" && $figtype ne "jpg" && $figtype ne "bmp" && $figtype ne "pdf" && $figtype ne "ps")
 	{
-		disp("--figformat must be one of png or pdf! Using pdf...");
+		$helper->disp("--figformat must be one of png or pdf! Using pdf...");
 		$figtype = "pdf";
 	}
-	if (!$bedtoolspath)
+	if ($usebedtools && !$bedtoolspath)
 	{
-		disp("--bedtoolspath not provided! Assuming /opt/NGSTools/BEDTools/bin...");
+		$helper->disp("--bedtoolspath not provided! Assuming /opt/NGSTools/BEDTools/bin...");
 		$bedtoolspath = "/opt/NGSTools/BEDTools/bin";
 	}
 	# We do not check intersectbed.pl specific inputs, they are passed there and it checks
@@ -145,6 +144,7 @@ sub run_intersections
 	my $alias = &copy_targets;
 	my $pairs = &construct_run_pairs;
 	my $optargs = &construct_optargs;
+	$optargs->{"silent"} = 1 if ($usebedtools);
 	my $intersecter = HTS::Tools::Intersect->new($optargs);
 	
 	# Run the actual intersections
@@ -152,12 +152,13 @@ sub run_intersections
 	{
 		$a = File::Spec->catfile($tmpdir,${$pairs->{$k}}[0]);
 		$b = File::Spec->catfile($tmpdir,${$pairs->{$k}}[1]);
-		disp("\nIntersecting ${$pairs->{$k}}[0] and ${$pairs->{$k}}[1]...");
+		$helper->disp("\nIntersecting ${$pairs->{$k}}[0] and ${$pairs->{$k}}[1]...");
 		if ($usebedtools)
 		{
-			$cmd = File::Spec->catfile($bedtoolspath,"intersectBed")." -a $a -b $b -wa > ".File::Spec->catfile($tmpdir,"${$pairs->{$k}}[0]"."${$pairs->{$k}}[1]");
-			disp("The command is:");
-			disp($cmd);
+			#$cmd = File::Spec->catfile($bedtoolspath,"intersectBed")." -a $a -b $b -wa > ".File::Spec->catfile($tmpdir,"${$pairs->{$k}}[0]"."${$pairs->{$k}}[1]");
+			$cmd = File::Spec->catfile($bedtoolspath,"intersectBed")." -a $a -b $b > ".File::Spec->catfile($tmpdir,"${$pairs->{$k}}[0]"."${$pairs->{$k}}[1]");
+			$helper->disp("The command is:");
+			$helper->disp($cmd);
 			system($cmd);
 		}
 		else
@@ -238,7 +239,6 @@ sub export_areas
 				File::Spec->catfile($tmpdir,$areas->{"area2"}),
 				File::Spec->catfile($tmpdir,$areas->{"area3"}),
 				File::Spec->catfile($tmpdir,$areas->{"area4"}),
-				File::Spec->catfile($tmpdir,$areas->{"area4"}),
 				File::Spec->catfile($tmpdir,$areas->{"n12"}),
 				File::Spec->catfile($tmpdir,$areas->{"n13"}),
 				File::Spec->catfile($tmpdir,$areas->{"n14"}),
@@ -258,6 +258,7 @@ sub export_areas
 				File::Spec->catfile($tmpdir,$areas->{"area2"}),
 				File::Spec->catfile($tmpdir,$areas->{"area3"}),
 				File::Spec->catfile($tmpdir,$areas->{"area4"}),
+				File::Spec->catfile($tmpdir,$areas->{"area5"}),
 				File::Spec->catfile($tmpdir,$areas->{"n12"}),
 				File::Spec->catfile($tmpdir,$areas->{"n13"}),
 				File::Spec->catfile($tmpdir,$areas->{"n14"}),
@@ -317,7 +318,7 @@ sub export_areas
 	# Remove the 2nd temporary directory and the original pdf file, since in the tar
 	remove_tree($localdir);
 	unlink(File::Spec->catfile($outdir,$name.".".$figtype));
-	disp("All output areas stored in $archive!");
+	$helper->disp("All output areas stored in $archive!");
 }
 
 sub create_venn
@@ -697,7 +698,7 @@ sub construct_optargs
 {
 	my %args = ("inputA" => "foo", "inputB" => "bar"); # So as the validator does not complain
 	$args{"sort"} = $sort if ($sort);
-	$args{"percent"} = $percent if ($percent);
+	$args{"percent"} = \@percent if (@percent);
 	$args{"any"} = $any if ($any);
 	$args{"extend"} = \@extend if (@extend);
 	$args{"mode"} = $mode if ($mode);
@@ -707,9 +708,8 @@ sub construct_optargs
 	$args{"reportonce"} = $reportonce if ($reportonce);
 	$args{"gap"} = $agap if ($agap);
 	$args{"keeporder"} = $keeporder if ($keeporder);
-	$args{"waitbar"} = $waitbar if ($waitbar);
 	$args{"silent"} = $silent if ($silent);
-	$args{"output"} = "overlapA";
+	$args{"output"} = ["overlapA"];
 	$args{"multi"} = 1;
 	$args{"tmpdir"} = $tmpdir;
 	return(\%args);
@@ -736,7 +736,7 @@ sub format_for_bedtools
 	open(IN,$input);
 	open(OUT,">$target");
 	$line = <IN>;
-	seek(IN,0,0) if ($helper->decide_header($line));
+	seek(IN,0,0) if (!($helper->decide_header($line)));
 	while ($line = <IN>)
 	{
 		$line =~ s/\r|\n$//g;
@@ -828,10 +828,10 @@ $scriptname --input fileA fileB [fileC fileD fileE] [OPTIONS]
 			and any additional data columns will be lost. BEDTools must be
 			installed on your system. This implementation is a lot(!) faster
 			at the cost of some data loss.
-  --bedtoolspath		The path to BEDTools, e.g. /usr/share/bedtools/bin.
+  --bedtoolspath	The path to BEDTools, e.g. /usr/share/bedtools/bin.
 			If not provided, a default path is assumed, which might not be
 			appropriate for your system.
-  --outdir|o	Use this option to provide an output directory for all
+  --outdir|o		Use this option to provide an output directory for all
 			output produced by the program. Defaults to "." (current).
   --help|h		Display this help text.
 
@@ -840,7 +840,7 @@ Usage examples:
 perl multisectbed.pl --input A.peaks B.peaks C.peaks --name MyCommonPeaks --export
 
 Package dependecies:
-	intersectbed.pl from hts-tools (optional if BEDTools are installed)
+	Module HTS::Tools (optional if BEDTools are installed)
 	BEDTools (optional if intersectbed.pl is present)
 	At least ONE of the above MUST be present.
 

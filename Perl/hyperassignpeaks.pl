@@ -69,7 +69,6 @@ sub check_inputs
     		   "outformat|o=s{,}" => \@out,
     		   "source|u=s" => \$source,
     		   "splicing|x" => \$splicing,
-    		   "header|d" => \$header,
     		   "silent|s" => \$silent,
     		   "help|h" => \$help);
     # Check if the required arguments are set

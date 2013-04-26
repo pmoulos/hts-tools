@@ -274,8 +274,8 @@ sub run
 	my $pval = $self->get("pvalue");
 	my $source = $self->get("source");
 	my $splicing = $self->get("splicing");
-	my @pcols = $self->get("idmode");
-	my @sbcols = $self->get("idstrand");
+	my @pcols = @{$self->get("idmode")};
+	my @sbcols = @{$self->get("idstrand")};
 	my @span = @{$self->get("span")};
 	my @out = @{$self->get("outformat")};
 	
@@ -308,7 +308,7 @@ sub run
 	tie %hasPeak, "Tie::IxHash::Easy" if (@out ~~ /matrix/);
 	
 	# Initiate a counter in case we have to fetch files
-	my $counter = HTS::Tools::Count->new({"tmpdir" => $self->get("tmpdir"),"silent" => 1});
+	my $counter = HTS::Tools::Count->new({"tmpdir" => $self->get("tmpdir"),"silent" => 1, "input" => "foo", "region" => $region});
 
 	# Suck in significant region file
 	if (! -f $region)
@@ -320,8 +320,8 @@ sub run
 	$helper->disp("Reading region file $region...");
 	$line = <REG>;
 	my $reghead = $helper->decide_header($line);
-	seek(REG,0,0) if ($reghead);
-	while ($line = <SIG>)
+	seek(REG,0,0) if (!$reghead);
+	while ($line = <REG>)
 	{
 		next if ($line =~/^chrM/);
 		next if ($line =~/rand/);
@@ -332,12 +332,14 @@ sub run
 		$end = $all[2];
 		$id = $all[$sbcols[0]];
 		$strand = $all[$sbcols[1]];
-		if ($strand == 1 || $strand eq "+" || $strand eq "F")
+		#if ($strand == 1 || $strand eq "+" || $strand eq "F")
+		if ($strand =~ m/^[+1F]$/)
 		{
 			push(@{$sigStart{$chr}},$start);
 			push(@{$sigEnd{$chr}},$end);
 		}
-		elsif ($strand == -1 || $strand eq "-" || $strand eq "R")
+		#elsif ($strand == -1 || $strand eq "-" || $strand eq "R")
+		elsif ($strand =~ m/^(-1)|[-R]$/)
 		{
 			push(@{$sigStart{$chr}},$end);
 			push(@{$sigEnd{$chr}},$start);
@@ -373,7 +375,7 @@ sub run
 		$helper->disp("Reading background file $background...");
 		$line = <BACK>;
 		my $backhead = $helper->decide_header($line);
-		seek(BACK,0,0) if ($backhead);
+		seek(BACK,0,0) if (!$backhead);
 		while ($line = <BACK>)
 		{
 			next if ($line =~/^chrM/);
@@ -429,7 +431,7 @@ sub run
 		open(INPUT,$input[$i]) or croak "\nThe file $input[$i] does not exist!\n";
 		$line = <INPUT>;
 		$phead = $helper->decide_header($line);
-		seek(INPUT,0,0) if ($phead);
+		seek(INPUT,0,0) if (!$phead);
 		while ($line = <INPUT>)
 		{
 			$line =~ s/\r|\n$//g;
@@ -780,7 +782,7 @@ sub run
 				my $outfile = $self->create_output_file($input[$i],$opt);
 				$helper->disp("Writing output in $outfile...");
 				open(OUTPUT,">$outfile");
-				print OUTPUT "$reghead" if ($reghead);
+				print OUTPUT "$phead\n" if ($phead);
 				my @fkeys = keys(%finalPeaks);
 				foreach $currpeak (@fkeys)
 				{
@@ -1109,7 +1111,7 @@ sub change_params
 
 HTS::Tools::Assign object getter
 
-	my $param_value = $counter->get("param_name")
+	my $param_value = $assigner->get("param_name")
 =cut
 
 sub get
@@ -1122,7 +1124,7 @@ sub get
 
 HTS::Tools::Assign object setter
 
-	$counter->set("param_name","param_value")
+	$assigner->set("param_name","param_value")
 	
 =cut
 

@@ -85,7 +85,7 @@ can be "human" (default) or "machine"
 sub now
 {
 	my ($self,$format) = @_;
-	#$format = "human" if (!$format);
+	$format = "human" if (!$format);
 	my ($sec,$min,$hour,$day,$month,$year) = localtime(time);
 	$year += 1900;
 	$month++;
