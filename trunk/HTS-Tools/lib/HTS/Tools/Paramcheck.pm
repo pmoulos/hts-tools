@@ -394,7 +394,7 @@ sub validate_count
     if ($stop)
     {
 		$helper->disp("$stop\n");
-		croak "Type perldoc $modname for help in usage.\n\n";
+		$helper->disp("Type perldoc $modname for help in usage.\n\n");
 		exit;
     }
 
@@ -536,7 +536,7 @@ sub validate_fetch
 	# Check required packages
 	$helper->try_module("Tie::IxHash::Easy");
 
-	my @accept = ("silent","tmpdir");
+	my @accept = ("silent","tmpdir","output");
 	
 	# Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
@@ -596,7 +596,7 @@ sub validate_intersect
     }
 
 	# At least the "any" parameter must be explicitly specified...
-	$self->{"params"}->{"any"} = 1 if (!$self->{"params"}->{"any"} && !$self->{"params"}->{"percent"});
+	$self->{"params"}->{"any"} = 1 if (!defined($self->{"params"}->{"any"}) && !@{$self->{"params"}->{"percent"}});
     # Check gap
     disp("The gap parameter should be >=0! Using default (10000)...") if ($self->{"params"}->{"gap"} && $self->{"params"}->{"gap"} < 0);
 	# Mode

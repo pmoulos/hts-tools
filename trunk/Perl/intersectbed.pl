@@ -243,7 +243,7 @@ $scriptname --inputA fileA --inputB fileB [OPTIONS]
 			machine. If the module is not present, the --keeporder
 			option is deactivated. Keep in mind that maintaining
 			the order requires slighlty more memory during runtime.
-  --reportonce|u		Use this option to report only once regions
+  --reportonce|u	Use this option to report only once regions
 			from one file that may overlap multiple times from
 			regions in the other file (this happens for example
 			with BEDTools). Such situations may arise when for

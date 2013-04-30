@@ -817,7 +817,7 @@ sub count_reads_multi
 	$helper->disp("Reading and processing file $originfile...");
 
 	$filename = basename($originfile);
-	open(BEDFILE,$infile);
+	open(BEDFILE,$infile) or croak "Can't open $infile! Does it exist?\n";
 
 	while (<BEDFILE>)
 	{
