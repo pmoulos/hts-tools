@@ -293,7 +293,6 @@ constructor.
 	
 =cut
 
-# FIXME: --overpairs does not calculate distances... :(
 sub run
 {
 	my $self = shift @_;
@@ -423,6 +422,7 @@ sub run
 									if ($op)
 									{
 										@ds = $self->dists_center($_[0]->{"interval"},$result->[$j],$mode,@extend);
+										#push(@overpairs,$self->node2text($_[0]->{"interval"})."\t".$result->[$j]."\t".$ds[1]);
 										push(@overpairs,$ds[1]);
 									}
 								}
@@ -944,7 +944,7 @@ sub run
 						if ($op)
 						{
 							@ds = $self->dists_center($cit,$result->[$j],$mode,@extend);
-							push(@overpairs,$ds[1]);
+							push(@overpairs,$chr."\t".$self->node2text($cit)."\t".$chr."\t".$self->node2text($result->[$j])."\t".$ds[1]);
 						}
 					}
 
@@ -1080,7 +1080,7 @@ sub run
 					if ($op)
 					{
 						@ds = $self->dists_every($cit,$result->[$j],$mode);
-						push(@overpairs,$ds[1]);
+						push(@overpairs,$chr."\t".$self->node2text($cit)."\t".$chr."\t".$self->node2text($result->[$j])."\t".$ds[1]);
 					}
 				}
 
@@ -1178,9 +1178,9 @@ sub run
 		# B only elements
 		$self->print_itree_output($ofileA,$ofileB,"ONLY_$bB",\%onlyB,$headerB) if ($oB);
 		# Distances of overlaping
-		$self->print_array($ofileA,$ofileB,"OVERDIST",@overpairs) if ($op);
+		$self->print_array($ofileA,$ofileB,"OVERDIST",$headerA,$headerB,@overpairs) if ($op);
 		# Distances of non-overlaping
-		$self->print_array($ofileA,$ofileB,"NONDIST",@nonpairs) if ($np);
+		$self->print_array($ofileA,$ofileB,"NONDIST",$headerA,$headerB,@nonpairs) if ($np);
 	}
 
 	# Display stats
@@ -1192,7 +1192,7 @@ sub run
 		$lB = $helper->count_lines($fileB);
 		$lA-- if ($headerA);
 		$lB-- if ($headerB);
-		if ($ovA)
+		if ($ovA || $op)
 		{
 			my $covA = $self->chrom_itree_size(\%overlapA);
 			$helper->disp("$covA out of $lA regions from ".basename($ofileA)." overlap with regions from ".basename($ofileB));
@@ -1325,7 +1325,7 @@ sub print_itree_output
 	my %seen;
 	my $outfilename = $self->create_output_file($infileA,$infileB,$otype);
 	open(OUTPUT,">$outfilename");
-	print OUTPUT "$he" if ($he);
+	print OUTPUT "$he\n" if ($he);
 	if ($self->get("reportonce"))
 	{
 		while(($chr,$tree) = each(%$chromhash))
@@ -1359,9 +1359,10 @@ Module specific output printing function. Internal use.
 
 sub print_array
 {
-	my ($self,$infileA,$infileB,$otype,@inarr) = @_;
+	my ($self,$infileA,$infileB,$otype,$hA,$hB,@inarr) = @_;
 	my $outfilename = $self->create_output_file($infileA,$infileB,$otype);
 	open(OUTPUT,">$outfilename");
+	print OUTPUT $hA."\t".$hB."\tdistance\n" if ($hA && $hB);
 	print OUTPUT join("\n",@inarr);
 	close(OUTPUT);
 }
