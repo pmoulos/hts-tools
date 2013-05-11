@@ -37,11 +37,11 @@ our $backfile;	          # A possible background regions file to choose from
 our @cntfile;		      # Original peak files, containing the centers in case of peak ids in fasta
 our @cntcol;		      # Columns with peak IDs and peak centers in cntfile
 our @range;		  	      # Range of cutoffs to use with p53Scan
-our $scanner = "p53scan"; # Which scanner to use
+our $scanner = "pwmscan"; # Which scanner to use
 our $fpr = 0.05; 	   	  # Allowed false positive rate to be used with p53Scan
 our $times = 10;	   	  # How many times larger background?
 our $length = 400;	      # Length for background sequences
-our @spacer;		      # Spacer length for motif
+#our @spacer;		      # Spacer length for motif
 our $besthit = 1;      	  # How many best matches to return (default 1)
 our @output;		      # gff? bed? stats? report?
 our $unistats = 0;        # In stats files, return unique numbers?
@@ -110,22 +110,22 @@ my @stats; # Stats array in case
 # Parse the motifs file, split it into different files
 my @mfiles = &parseMotifs($motfile,$scanner);
 
-# Check what is going on with spacers if scanner is p53scan
-if ($scanner eq "p53scan")
-{
-	if (@spacer)
-	{
-		my $nmf = @mfiles;
-		die "\nNumber of spacer lengths is different from number of given motifs! Exiting...\n" if ($nmf != @spacer);
-	}
-	else # Generate spacers vector if not given (0-length spacers)
-	{
-		for ($i=0; $i<@mfiles; $i++)
-		{
-			push(@spacer,0);
-		}
-	}
-}
+## Check what is going on with spacers if scanner is pwmscan
+#if ($scanner eq "pwmscan")
+#{
+	#if (@spacer)
+	#{
+		#my $nmf = @mfiles;
+		#die "\nNumber of spacer lengths is different from number of given motifs! Exiting...\n" if ($nmf != @spacer);
+	#}
+	#else # Generate spacers vector if not given (0-length spacers)
+	#{
+		#for ($i=0; $i<@mfiles; $i++)
+		#{
+			#push(@spacer,0);
+		#}
+	#}
+#}
 
 # If running the full process, not just scanning given only one threshold
 if (!$justscan)
@@ -200,18 +200,19 @@ if (!$justscan)
 		# For each motif, calculate threshold and scan according to selected scanner
 		switch($scanner)
 		{
-			case /p53scan/i
+			case /pwmscan/i
 			{
 				my ($sl,$cutoff);
 				for ($j=0; $j<@mfiles; $j++)
 				{
-					disp("Calculating score cutoff based on sequences in $bfile for motif $mfiles[$j] using p53scan...");
+					disp("Calculating score cutoff based on sequences in $bfile for motif $mfiles[$j] using pwmscan...");
 					disp("Output will be written in bgcut.gff.\n");
 					# Use range vector
 					for  ($k=0; $k<@range; $k++)
 					{
 						disp("Now testing threshold $range[$k]...\n");
-						`python p53scan.py -i $bfile -c $range[$k] -s $spacer[$j] -p $mfiles[$j] -n $besthit > bgcut.gff `;
+						#`python pwmscan.py -i $bfile -c $range[$k] -s $spacer[$j] -p $mfiles[$j] -n $besthit > bgcut.gff `;\
+						`pwmscan.py -i $bfile -c $range[$k] -p $mfiles[$j] -n $besthit > bgcut.gff `;
 						if ($besthit > 1) 
 						{
 							($unistats) ? ($sl = &countUniLines("bgcut.gff")) : ($sl = &countLines("bgcut.gff"));
@@ -237,10 +238,11 @@ if (!$justscan)
 						disp("Cutoff for FPR $fpr determined at $cutoff.");
 						disp("$sl matches out of $n sequences remain in background.\n");
 					}
-					disp("Scanning $seqfile[$i] for motif $mfiles[$j] using p53scan... Cutoff: $cutoff.\n");
+					disp("Scanning $seqfile[$i] for motif $mfiles[$j] using pwmscan... Cutoff: $cutoff.\n");
 					my $mbase = fileparse($mfiles[$j],'\..*?');
 					my $currout = &createOutputFile($seqfile[$i],"output",$mbase);
-					`python p53scan.py -i $seqfile[$i] -c $cutoff -s $spacer[$j] -p $mfiles[$j] -n $besthit > $currout `;
+					#`python pwmscan.py -i $seqfile[$i] -c $cutoff -s $spacer[$j] -p $mfiles[$j] -n $besthit > $currout `;
+					`pwmscan.py -i $seqfile[$i] -c $cutoff -p $mfiles[$j] -n $besthit > $currout `;
 					&convert2bed($currout,%cnthash) if ($obed);
 					my $nmatch;
 					if ($besthit > 1) 
@@ -331,14 +333,15 @@ else # Just scan the sequence files using one defined threshold
 		# For each motif, calculate threshold and scan according to selected scanner
 		switch($scanner)
 		{
-			case /p53scan/i
+			case /pwmscan/i
 			{
 				for ($j=0; $j<@mfiles; $j++)
 				{
-					disp("Scanning $seqfile[$i] for motif $mfiles[$j] using p53scan... Cutoff: $justscan.\n");
+					disp("Scanning $seqfile[$i] for motif $mfiles[$j] using pwmscan... Cutoff: $justscan.\n");
 					my $mbase = fileparse($mfiles[$j],'\..*?');
 					my $currout = &createOutputFile($seqfile[$i],"output",$mbase);
-					`python p53scan.py -i $seqfile[$i] -c $justscan -s $spacer[$j] -p $mfiles[$j] -n $besthit > $currout `;
+					#`python pwmscan.py -i $seqfile[$i] -c $justscan -s $spacer[$j] -p $mfiles[$j] -n $besthit > $currout `;
+					`pwmscan.py -i $seqfile[$i] -c $justscan -p $mfiles[$j] -n $besthit > $currout `;
 					&convert2bed($currout,%cnthash) if ($obed);
 					my $nmatch;
 					if ($besthit > 1) 
@@ -425,7 +428,7 @@ sub checkInputs
     		   "fpr|p=f" => \$fpr,
     		   "times|n=i" => \$times,
     		   "length|l=i" => \$length,
-			   "spacer|r=i{,}" => \@spacer,
+			   #"spacer|r=i{,}" => \@spacer,
 			   "besthit|e=i" => \$besthit,
     		   "output|o=s{,}" => \@output,
     		   "uniquestats|u" => \$unistats,
@@ -450,10 +453,10 @@ sub checkInputs
             exit;
     }
     # Check the scanner
-    if ($scanner !~ /p53scan/i && $scanner !~ /MotifScanner/i)
+    if ($scanner !~ /pwmscan/i && $scanner !~ /MotifScanner/i)
     {
-    	disp("The scanner should be one of \"p53scan\" or \"MotifScanner\". Using default (p53scan)...");
-    	$scanner = "p53scan";
+    	disp("The scanner should be one of \"pwmscan\" or \"MotifScanner\". Using default (pwmscan)...");
+    	$scanner = "pwmscan";
 	}
 	# Check range - increase per real number, very simple expression, use with caution
 	if (@range)
@@ -468,12 +471,12 @@ sub checkInputs
 			}
 			else { @range = &rangeVector($s,$e,$inc); }
 		}
-		elsif (@range == 1 && $range[0] =~ /\d+\:\d+/) # Increase per 1 if p53scan or per 0.1 if MotifScanner
+		elsif (@range == 1 && $range[0] =~ /\d+\:\d+/) # Increase per 1 if pwmscan or per 0.1 if MotifScanner
 		{
 			my ($s,$e) = split(":",$range[0]);
 			switch($scanner)
 			{
-				case /p53scan/i
+				case /pwmscan/i
 				{
 					@range = ($s..$e);
 				}
@@ -497,7 +500,7 @@ sub checkInputs
 			@range = (8..13);
 		} else { $range[0] = $justscan; }
 	}
-	disp("Spacer(s) not given. Default spacing (0) will be used for all motifs...") if (!@spacer && $scanner =~ /p53scan/i);
+	#disp("Spacer(s) not given. Default spacing (0) will be used for all motifs...") if (!@spacer && $scanner =~ /pwmscan/i);
 	# Check fpr
 	$stop .= "--- False Positive Rate should be a value between 0 and 1 ---\n" if ($fpr<0 || $fpr>1);
 	if (@output)
@@ -682,27 +685,30 @@ sub parseMotifs
 	
 	switch($scn)
 	{
-		case /p53scan/i
+		case /pwmscan/i
 		{
-			$line = <MOTIF>;
-			if ($line =~ /^#/) # Case of known motif names
-			{
-				$c = 0; # Reset counter
+			#$line = <MOTIF>;
+			#if ($line =~ /^#/) # Case of known motif names
+			#{
+				#$c = 0; # Reset counter
 				$line = <MOTIF>;
-				die "\nMotif file (p53scan) does not appear to have the correct syntax!\n" if ($line !~ /^>/);
+				die "\nMotif file (pwmscan) does not appear to have the correct syntax!\n" if ($line !~ /^>/);
 				seek(MOTIF,0,0);
 				while ($line = <MOTIF>)
 				{
-					if ($line =~ /^#/) # Signal to open new file
+					#if ($line =~ /^#/) # Signal to open new file
+					if ($line =~ /^>/) # Signal to open new file
 					{
 						$line =~ s/\r|\n$//g;
-						$line =~ s/^#//g;
+						my $bline = $line;
+						$line =~ s/^>//g;
 						$om = &createOutputFile($infile,$line);
 						push(@outnames,$om);
 						local *PWM;
 						open(PWM,">$om");
 						$fhs[$c] = *PWM;
 						$c++;
+						print PWM $bline."\n";
 					}
 					else 
 					{ 
@@ -712,42 +718,42 @@ sub parseMotifs
 				}
 				# Close the split motifs
 				foreach my $fh (@fhs) { close($fh); }
-			}
-			elsif ($line =~ /^>/) # Case of unknown motif names
-			{
-				$c = 0; # Reset file counter
-				my $inc = 0; # > counter
-				seek(MOTIF,0,0);
-				while($line = <MOTIF>)
-				{
-					if ($line =~ /^>/ && $inc%2 == 0) # Signal to open new file
-					{
-						$om = &createOutputFile($infile,"Motif_$c"."_");
-						push(@outnames,$om);
-						local *PWM;
-						open(PWM,">$om");
-						$fhs[$c] = *PWM;
-						$f = $fhs[$c];
-						print $f $line;
-						$inc++;
-						$c++;
-					}
-					elsif  ($line =~ /^>/ && $inc%2 != 0)
-					{
-						$f = $fhs[$c-1];
-						print $f $line;
-						$inc++;
-					}
-					else
-					{ 
-						$f = $fhs[$c-1];
-						print $f $line;
-					}	
-				}
-				# Close the split motifs
-				foreach my $fh (@fhs) { close($fh); }
-			}
-			else { die "\nMotif file does not appear to have the correct syntax!\n"; }
+			#}
+			#elsif ($line =~ /^>/) # Case of unknown motif names
+			#{
+				#$c = 0; # Reset file counter
+				#my $inc = 0; # > counter
+				#seek(MOTIF,0,0);
+				#while($line = <MOTIF>)
+				#{
+					#if ($line =~ /^>/ && $inc%2 == 0) # Signal to open new file
+					#{
+						#$om = &createOutputFile($infile,"Motif_$c"."_");
+						#push(@outnames,$om);
+						#local *PWM;
+						#open(PWM,">$om");
+						#$fhs[$c] = *PWM;
+						#$f = $fhs[$c];
+						#print $f $line;
+						#$inc++;
+						#$c++;
+					#}
+					#elsif  ($line =~ /^>/ && $inc%2 != 0)
+					#{
+						#$f = $fhs[$c-1];
+						#print $f $line;
+						#$inc++;
+					#}
+					#else
+					#{ 
+						#$f = $fhs[$c-1];
+						#print $f $line;
+					#}	
+				#}
+				## Close the split motifs
+				#foreach my $fh (@fhs) { close($fh); }
+			#}
+			#else { die "\nMotif file does not appear to have the correct syntax!\n"; }
 		}
 		case /MotifScanner/i
 		{
@@ -792,7 +798,127 @@ sub parseMotifs
 	return(@outnames);
 }
 
-# Convert the gff output from p53scan to bed format
+#sub parseMotifs
+#{
+	#my $infile = shift @_;
+	#my $scn = shift @_;
+	#my ($base,$dir) = fileparse($infile,'\..*?');
+	#my ($c,$line,$om,$f,@fhs,@outnames);
+	#open(MOTIF,"$infile");
+	
+	#switch($scn)
+	#{
+		#case /pwmscan/i
+		#{
+			#$line = <MOTIF>;
+			#if ($line =~ /^#/) # Case of known motif names
+			#{
+				#$c = 0; # Reset counter
+				#$line = <MOTIF>;
+				#die "\nMotif file (pwmscan) does not appear to have the correct syntax!\n" if ($line !~ /^>/);
+				#seek(MOTIF,0,0);
+				#while ($line = <MOTIF>)
+				#{
+					#if ($line =~ /^#/) # Signal to open new file
+					#{
+						#$line =~ s/\r|\n$//g;
+						#$line =~ s/^#//g;
+						#$om = &createOutputFile($infile,$line);
+						#push(@outnames,$om);
+						#local *PWM;
+						#open(PWM,">$om");
+						#$fhs[$c] = *PWM;
+						#$c++;
+					#}
+					#else 
+					#{ 
+						#$f = $fhs[$c-1];
+						#print $f $line;
+					#}
+				#}
+				## Close the split motifs
+				#foreach my $fh (@fhs) { close($fh); }
+			#}
+			#elsif ($line =~ /^>/) # Case of unknown motif names
+			#{
+				#$c = 0; # Reset file counter
+				#my $inc = 0; # > counter
+				#seek(MOTIF,0,0);
+				#while($line = <MOTIF>)
+				#{
+					#if ($line =~ /^>/ && $inc%2 == 0) # Signal to open new file
+					#{
+						#$om = &createOutputFile($infile,"Motif_$c"."_");
+						#push(@outnames,$om);
+						#local *PWM;
+						#open(PWM,">$om");
+						#$fhs[$c] = *PWM;
+						#$f = $fhs[$c];
+						#print $f $line;
+						#$inc++;
+						#$c++;
+					#}
+					#elsif  ($line =~ /^>/ && $inc%2 != 0)
+					#{
+						#$f = $fhs[$c-1];
+						#print $f $line;
+						#$inc++;
+					#}
+					#else
+					#{ 
+						#$f = $fhs[$c-1];
+						#print $f $line;
+					#}	
+				#}
+				## Close the split motifs
+				#foreach my $fh (@fhs) { close($fh); }
+			#}
+			#else { die "\nMotif file does not appear to have the correct syntax!\n"; }
+		#}
+		#case /MotifScanner/i
+		#{
+			## Some checking
+			#my $fline = <MOTIF>;
+			#$fline =~ s/\r|\n$//g;
+			#die "\nMotif file (MotifScanner) does not appear to have the correct syntax (line 1)!\n" if ($fline !~ /^#INCLUSive/i);
+			#$c = 0; # Reset counter
+			#my %motifs;
+			#while ($line = <MOTIF>)
+			#{
+				#$line =~ s/\r|\n$//g;
+				#if ($line =~ /^#ID/) # Signal to open new file
+				#{ 
+					#my @sep = split("=",$line);
+					#$sep[1] =~ s/^\s+|\s+$//g;
+					#my $name = $sep[1];
+					#$om = &createOutputFile($infile,$name);
+					#push(@outnames,$om);
+					#local *PWM;
+					#open(PWM,">$om");
+					#$fhs[$c] = *PWM;
+					#push(@{$motifs{$c}},$fline);
+					#$c++;
+				#}
+				#next if ($line =~ /^#W/); # Skip, we will create afterwards...
+				#push(@{$motifs{$c-1}},$line);		
+			#}
+			#foreach my $k (sort { $a <=> $b } keys(%motifs))
+			#{
+				#my @fileconts = @{$motifs{$k}};
+				#my $mw = $#fileconts - 1;
+				#splice(@fileconts,2,0,"#W = $mw");
+				#$f = $fhs[$k];
+				#print $f join("\n",@fileconts);
+				#print $f "\n";
+				#close($f)
+			#}
+		#}
+	#}
+	
+	#return(@outnames);
+#}
+
+# Convert the gff output from pwmscan to bed format
 # The first column of the gff (that is the peak/region ID) MUST contain coordinates
 # information in the form chr:start-end (track2fasta) or chr:start:end (format I used).
 # WARNING! If the fasta files used for scanning have been generated with a program like
@@ -1163,7 +1289,7 @@ END
 #--input : as many fasta files as you want to scan
 #--motif : the input motifs file
 #--background : a background sequences file formatted in TABULAR format
-#--range : range of cutoffs for p53scan (for example if range=5:0.1:15 then it will perform searches for cutoffs 5 to 15 raised each time by 0.1)
+#--range : range of cutoffs for pwmscan (for example if range=5:0.1:15 then it will perform searches for cutoffs 5 to 15 raised each time by 0.1)
 #--fpr : The false positive rate (0.05)
 #--times : how many times should be the background larger
 #--length : length of sequences to select from background
