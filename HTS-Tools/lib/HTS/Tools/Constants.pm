@@ -154,8 +154,10 @@ sub load_default_constants
 		"MAX_CORES" => 12,
 		"MACS_HOME" => "/usr/bin/macs14",
 		"MACS2_HOME" => "/usr/local/bin/macs2",
-		"SICER_HOME" => "/opt/NGSTools/",
+		"SICER_HOME" => "/opt/NGSTools/SICER",
 		"RSEG_HOME" => "/opt/NGSTools/rseg",
+		"GIMMEMOTIFS_HOME" => "/usr/bin",
+		"MOTIFSCANNER_HOME" => "",
 		"LOCAL_GENOMES" => "/opt/genomes"
 	}
 }

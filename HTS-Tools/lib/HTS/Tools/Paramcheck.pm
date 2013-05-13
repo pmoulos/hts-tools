@@ -596,7 +596,13 @@ sub validate_intersect
     }
 
 	# At least the "any" parameter must be explicitly specified...
-	$self->{"params"}->{"any"} = 1 if (!defined($self->{"params"}->{"any"}) && !@{$self->{"params"}->{"percent"}});
+	if (!defined($self->{"params"}->{"any"}) || !$self->{"params"}->{"any"})
+	{
+		if (!defined($self->{"params"}->{"percent"}) || !@{$self->{"params"}->{"percent"}})
+		{
+			$self->{"params"}->{"any"} = 1;
+		}
+	}
     # Check gap
     disp("The gap parameter should be >=0! Using default (10000)...") if ($self->{"params"}->{"gap"} && $self->{"params"}->{"gap"} < 0);
 	# Mode
