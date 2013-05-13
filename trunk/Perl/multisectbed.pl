@@ -210,7 +210,8 @@ sub export_areas
 {
 	use Archive::Tar;
 	my ($areas,$alias,@filelist) = @_;
-
+	@filelist = () if (!@filelist);
+	
 	# Create the file list with all areas
 	use Switch;
 	switch(scalar @input)
@@ -697,18 +698,30 @@ sub check_header
 sub construct_optargs
 {
 	my %args = ("inputA" => "foo", "inputB" => "bar"); # So as the validator does not complain
-	$args{"sort"} = $sort if ($sort);
-	$args{"percent"} = \@percent if (@percent);
-	$args{"any"} = $any if ($any);
-	$args{"extend"} = \@extend if (@extend);
-	$args{"mode"} = $mode if ($mode);
-	$args{"autoextend"} = $autoxtend if ($autoxtend);
-	$args{"both"} = $both if ($both);
-	$args{"exact"} = $exact if ($exact);
-	$args{"reportonce"} = $reportonce if ($reportonce);
-	$args{"gap"} = $agap if ($agap);
-	$args{"keeporder"} = $keeporder if ($keeporder);
-	$args{"silent"} = $silent if ($silent);
+	#$args{"sort"} = $sort if ($sort);
+	#$args{"percent"} = \@percent if (@percent);
+	#$args{"any"} = $any if ($any);
+	#$args{"extend"} = \@extend if (@extend);
+	#$args{"mode"} = $mode if ($mode);
+	#$args{"autoextend"} = $autoxtend if ($autoxtend);
+	#$args{"both"} = $both if ($both);
+	#$args{"exact"} = $exact if ($exact);
+	#$args{"reportonce"} = $reportonce if ($reportonce);
+	#$args{"gap"} = $agap if ($agap);
+	#$args{"keeporder"} = $keeporder if ($keeporder);
+	#$args{"silent"} = $silent if ($silent);
+	$args{"sort"} = $sort;
+	$args{"percent"} = \@percent;
+	$args{"any"} = $any;
+	$args{"extend"} = \@extend;
+	$args{"mode"} = $mode;
+	$args{"autoextend"} = $autoxtend;
+	$args{"both"} = $both;
+	$args{"exact"} = $exact;
+	$args{"reportonce"} = $reportonce;
+	$args{"gap"} = $agap;
+	$args{"keeporder"} = $keeporder;
+	$args{"silent"} = $silent;
 	$args{"output"} = ["overlapA"];
 	$args{"multi"} = 1;
 	$args{"tmpdir"} = $tmpdir;

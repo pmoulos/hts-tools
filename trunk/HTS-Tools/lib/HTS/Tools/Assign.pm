@@ -36,8 +36,8 @@ peak-gene distances with a set of very nice and informative outputs.
 		'idmode' => [4 5],
 		'outformat' => ['pretty-peak','gff-gene','gene-peak-presence','gene-peak-number']
 	)
-    my $assign = HTS::Tools::Assign->new(\%params);
-    $assign->run;
+    my $assigner = HTS::Tools::Assign->new(\%params);
+    $assigner->run;
 
 The acceptable parameters are as follows:
 

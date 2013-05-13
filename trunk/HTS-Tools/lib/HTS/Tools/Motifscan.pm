@@ -8,18 +8,77 @@ Version 0.01
 
 =head1 SYNOPSIS
 
-Quick summary of what the module does.
+This module is a wrapper and significance threshold optimizer for several sequence motif scanners. At the
+present point, the scanners supported are pwmscan from the GimmeMotifs suite (van Heeringen and Veenstra, 2010)
+and MotifScanner (Thijs et al., 2001). Thus, the installation of these 3rd party tools in the system that
+uses HTS::Tools::Motifscan is necessary (or at least of one of them). Then, the module runs a workflow which
+which massively scan the input fasta files (e.g. a set of sequences corresponding to ChIP-Seq peaks) for
+the motifs given in the motif file in the form of positional weight matrices (e.g. motifs that have been
+characterized as significant during a de novo motif search in the same set of peaks). This workflow determines
+an optimal significance threshold based on a set of random background sequences selected from the background
+fasta file provided and on the false postive rate (fpr) provided. The module provides three basic outputs:
+a simple file with the number of hits of each motif in each input file, gff files with the hits and bed
+files with the hits, including also a significance score of the scan hit in the 5th column of the bed file.
 
-Perhaps a little code snippet.
+	use HTS::Tools::Motifscan;
+	my %params = (
+		'input' => ['normal_nfkb_peaks.fa','cancer_nfkb_peaks.fa','mock_peaks.fa']
+		'motif' => 'my_motif_matrices.pwm',
+		'scanner' => 'pwmscan',
+		'background' => 'background_sequences.tab',
+		'range' => 5:0.1:15,
+		'fpr' => 0.05,
+		'times' => 10,
+		'length' => 400,
+		'output' => ['gff','bed','stats']
+	)
+    my $motifscanner = HTS::Tools::Motifscan->new(\%params);
+    $motifscanner->run;
 
-    use HTS::Tools::Motifscan;
+The acceptable parameters are as follows:
 
-    my $motifscanner = HTS::Tools::Motifscan->new();
+=over 4
 
-=head1 EXPORT
+=item I<input> B<(required)>
 
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
+A set of input BED-like file(s) to be used as query regions. Each should containing a column with a UNIQUE 
+region ID and a column with the region mode (e.g. peak summit, the point with the highest tag pile-up) or 
+a location that the user thinks as the point of the region from which the distance to the genes will be 
+calculated. If there is no such point, the center of the region may be used (see I<idmode>) parameter below
+
+=item I<motif> B<(required)>
+
+=item I<background> B<(optional)>
+
+=item I<scanner> B<(optional)>
+
+=item I<range> B<(optional)>
+
+=item I<fpr> B<(optional)>
+
+=item  I<times> B<(optional)>
+
+=item I<length> B<(optional)>
+
+=item I<output> B<(optional)>
+
+=item  I<besthit> B<(optional)>
+
+=item I<uniquestats> B<(optional)>
+
+=item I<justscan> B<(optional)>
+
+=item I<center> B<(optional)>
+
+=item I<colext> B<(optional)>
+
+=item  I<silent> B<(optional)>
+
+=item I<silent> B<(optional)>
+
+Use this parameter if you want to turn informative messages off.
+
+=head1 OUTPUT
 
 =head1 SUBROUTINES/METHODS
 
@@ -32,6 +91,7 @@ use strict;
 use warnings FATAL => 'all';
 
 use Carp;
+use Cwd;
 use File::Basename;
 use File::Temp;
 use File::Spec;
@@ -73,6 +133,151 @@ sub init
 {
 }
 
+=head2 get_random_seq
+
+Get a random sequence from a set of background sequences.
+
+	$motifscanner->get_random_seq($thefile,$itsindex,$howmany,$length,$num);
+
+=cut
+
+sub get_random_seq
+{
+	my ($self,$tabfasta,$itsindex,$itslen,$length,$num) = @_;
+	my ($line,$id,$seq,$currlen,$start,$end);
+	my $count = my $safeswitch = 0;
+	my $BIG = 1e+6;
+	srand;
+	my $outfile = &createOutputFile(" ","sequence");
+	open(RANDSEQ,">$outfile");
+	open(FASTA,"<$tabfasta");
+	open(INDEX,"$itsindex");
+	while ($count < $num && $safeswitch < $BIG)
+	{
+		# Safeswitch in case too many sequences have small lengths, process shouldn't
+		# take forever to complete...
+		$safeswitch++;
+		$line = getIndexedLine(*FASTA,*INDEX,int(rand($itslen)));
+		($id,$seq) = split(/\t/,$line);
+		$currlen = length($seq);
+		next if ($currlen < $length);
+		if ($currlen == $length)
+		{
+			($start,$end) = (1,$length);
+			$id .= "_".$start."-".$end;
+			&writeSeq(*RANDSEQ,$id,$seq);
+			$count++;
+		}
+		if ($currlen > $length)
+		{
+			# Restrict the random index generation so that we don't go beyond the sequence end
+			$start = int(rand($currlen - $length));
+			$end = $start + $length;
+			$id .= "_".$start."-".$end;
+			&writeSeq(*RANDSEQ,$id,substr($seq,$start,$length));
+			$count++;
+		}
+	}
+	close(RANDSEQ);
+	close(FASTA);
+	close(INDEX);
+	if ($safeswitch >= $BIG)
+	{
+		$helper->disp("Sequence fetching discontinued... $count sequences fetched in total in $outfile...");
+		$helper->disp("Probably the FASTA file you supplied to get random sequences from contains too many short sequences.");
+		$helper->disp("Try again with larger sequences or smaller length.");
+	}
+	return($outfile);
+}
+
+=head2 convert2bed
+
+Converts the gff output from pwmscan to bed format. The first column of the gff (that is the peak/region ID) 
+MUST contain coordinates information in the form chr:start-end (track2fasta) or chr:start:end.
+WARNING! If the fasta files used for scanning have been generated with a program like track2fasta from
+the GimmeMotifs suite, then the bed co-ordinates for each occurence can be correctly generated. If the 
+sequence ids in the fasta files correspond to peak ids rather than exact sequence locations, another file 
+with peak ids and peak centers must be provided. The function converts to 6 column bed files. It also
+converts the motif score in gff file to the 0-1000 scale of UCSC genome browser so that motif strength can 
+be visualized by color. This is done by linear conversion of the form new_value = a*old_value + b and 
+by solving the special case of a 2x2 linear system (since we know several of the values):
+min(score)*a + b = 0
+max(score)*a + b = 1000
+
+	$motifscanner->convert2bed($file_to_convert);
+
+=cut
+
+sub convert2bed
+{
+	my $f2c = shift @_;
+	my %ch = @_;
+	my ($base,$dir) = fileparse($f2c,'\..*?');
+	my ($line,@lines,@scores,@content,@locs,@newcoord);
+	my $bedout = $dir.$base.".bed";
+	# In order to determine the coefficients of linear conversion we have to suck in all
+	# gff file, the hard way...
+	open(F2C,$f2c);
+	while ($line = <F2C>)
+	{
+		$line =~ s/\r|\n$//g;
+		push(@lines,$line);
+		@content = split(/\t/,$line);
+		push(@scores,$content[5]);
+	}
+	close(F2C);
+	# If the scanner was MotifScanner/MotifLocator, there is one xtra line...
+	my $tort = shift @scores if (!$scores[0]);
+	# Get min, max score
+	my ($min,$max) = &minmax(@scores);
+	# Get coefficients
+	my ($a,$b) = &naiveSolveTwo($min,$max);
+	open(BED,">$bedout");
+	if (%ch)
+	{
+		foreach $line (@lines)
+		{
+			@content = split(/\t/,$line);
+			@locs = split(":",$content[0]);
+			if ($#locs == 1) # track2fasta format
+			{
+				my $joined = pop(@locs);
+				my @splitted = split("-",$joined);
+				push(@locs,@splitted);
+			}
+			# Shift coordinates to motif occurence
+			my $strand = "+";
+			$strand = "-" if ($content[6] == -1 || $content[6] eq "R");
+			@newcoord = ($locs[0],
+						 $ch{$content[0]} - $cntcol[2] + $content[3],
+						 $ch{$content[0]} - $cntcol[2] + $content[4],
+						 $content[0],$a*$content[5] + $b,$strand);
+			print BED join("\t",@newcoord),"\n";
+		}
+	}
+	else
+	{
+		foreach $line (@lines)
+		{
+			@content = split(/\t/,$line);
+			@locs = split(":",$content[0]);
+			if ($#locs == 1) # track2fasta format
+			{
+				my $joined = pop(@locs);
+				my @splitted = split("-",$joined);
+				push(@locs,@splitted);
+			}
+			# Shift coordinates to motif occurence
+			my $strand = "+";
+			$strand = "-" if ($content[6] == -1 || $content[6] eq "R");
+			@newcoord = ($locs[0],$locs[1] + $content[3],$locs[1] + $content[4],
+						 $content[0],$a*$content[5] + $b,$strand);
+			print BED join("\t",@newcoord),"\n";
+		}
+	}
+	close(BED);
+}
+
 =head1 AUTHOR
 
 Panagiotis Moulos, C<< <moulos at fleming.gr> >>
@@ -111,9 +316,7 @@ L<http://search.cpan.org/dist/HTS-Tools/>
 
 =back
 
-
 =head1 ACKNOWLEDGEMENTS
-
 
 =head1 LICENSE AND COPYRIGHT
 
