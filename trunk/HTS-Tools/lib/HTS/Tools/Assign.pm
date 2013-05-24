@@ -112,6 +112,12 @@ The columns in both the subject and the background (if used) file(s) where their
 You should provide an array of two values (e.g. [4,5]) where the first denotes the unique ID column and the 
 second the strand column. It defaults to [4,5].
 
+=item I<expression> B<(optional)>
+
+The columns in the subject file where there are optional expression values, for example if the subject file is
+a set of expressed genes. You should provide an array of values (e.g. [7,8,9]) that denote the column number where
+the expression values are stored.
+
 =item I<idmode> B<(optional)>
 
 The columns in the query files where their unique IDs and possibly modes are. You should provide two values (e.g
@@ -276,6 +282,7 @@ sub run
 	my $splicing = $self->get("splicing");
 	my @pcols = @{$self->get("idmode")};
 	my @sbcols = @{$self->get("idstrand")};
+	my @expcols = @{$self->get("expression")};
 	my @span = @{$self->get("span")};
 	my @out = @{$self->get("outformat")};
 	
@@ -293,18 +300,18 @@ sub run
 	foreach my $o (@out)
 	{
 		$gffreq = 1 if ($o =~ /gff/);
-		$pdataout = 1 if ($o =~ /peakdata/);
+		$pdataout = 1 if ($o =~ /peakdata|bed/);
 	}
 	
 	# Some intialization
 	my (%sigID,%sigStart,%sigEnd);
 	my (%backID,%backStart,%backEnd);
-	my (@all,$chr,$start,$end,$id,$strand,$line);
+	my (@all,$chr,$start,$end,$id,$strand,$expr,$line);
 	my $lensig = my $lenback = 0;
 	my @lenpeak;
 
 	# Variable for matrix generation
-	my %hasPeak;
+	my (%hasPeak,%hasExpression);
 	tie %hasPeak, "Tie::IxHash::Easy" if (@out ~~ /matrix/);
 	
 	# Initiate a counter in case we have to fetch files
@@ -320,7 +327,18 @@ sub run
 	$helper->disp("Reading region file $region...");
 	$line = <REG>;
 	my $reghead = $helper->decide_header($line);
-	seek(REG,0,0) if (!$reghead);
+	if (!$reghead)
+	{
+		seek(REG,0,0);
+	}
+	else
+	{
+		if (@expcols)
+		{
+			my @ht = split("\t",$reghead);
+			$hasExpression{"header"} = join("\t",@ht[@expcols]);
+		}
+	}
 	while ($line = <REG>)
 	{
 		next if ($line =~/^chrM/);
@@ -332,6 +350,7 @@ sub run
 		$end = $all[2];
 		$id = $all[$sbcols[0]];
 		$strand = $all[$sbcols[1]];
+		$expr = join("\t",@all[@expcols]) if (@expcols);
 		#if ($strand == 1 || $strand eq "+" || $strand eq "F")
 		if ($strand =~ m/^[+1F]$/)
 		{
@@ -359,6 +378,7 @@ sub run
 			{
 				$hasPeak{$id}{basename($input[$i])} = ();
 			}
+			$hasExpression{"data"}{$id} = $expr;
 		}
 	}
 	close(REG);
@@ -787,16 +807,30 @@ sub run
 				foreach $currpeak (@fkeys)
 				{
 					print OUTPUT "$allPeakData{$currpeak}\n";
-				} 
-			}	
+				}
+				close(OUTPUT);
+			}
+			if ($opt eq "bed")
+			{
+				my $outfile = $self->create_output_file($input[$i],$opt);
+				$helper->disp("Writing output in $outfile...");
+				open(OUTPUT,">$outfile");
+				my @fkeys = keys(%finalPeaks);
+				foreach $currpeak (@fkeys)
+				{
+					my @spl = split(/\t/,$allPeakData{$currpeak});
+					print OUTPUT $spl[0]."\t".$spl[1]."\t".$spl[2]."\t".$spl[$pcols[0]]."\t".$spl[$pcols[1]]."\t.\n";
+				}
+				close(OUTPUT);
+			}
 			$self->print_gene_or_peak($input[$i],"all-peak",%peaksGenesSig) if ($opt eq "all-peak");
 			$self->print_gene_or_peak($input[$i],"all-gene",%genePeaksSig) if ($opt eq "all-gene");
 		}
 	}
 
-	$self->print_matrix(\%hasPeak,"matrix-number") if (@out ~~ /matrix-number/);
-	$self->print_matrix(\%hasPeak,"matrix-presence") if (@out ~~ /matrix-presence/);
-	$self->print_matrix(\%hasPeak,"matrix-peaks") if (@out ~~ /matrix-peaks/);
+	$self->print_matrix(\%hasPeak,"matrix-number",\%hasExpression) if (@out ~~ /matrix-number/);
+	$self->print_matrix(\%hasPeak,"matrix-presence",\%hasExpression) if (@out ~~ /matrix-presence/);
+	$self->print_matrix(\%hasPeak,"matrix-peaks",\%hasExpression) if (@out ~~ /matrix-peaks/);
 
 	$date = $helper->now;
 	$helper->disp("$date - Finished!\n\n");
@@ -978,7 +1012,7 @@ Internal output printing function
 
 sub print_matrix
 {
-	my ($self,$inhash,$type) = @_;
+	my ($self,$inhash,$type,$exprhash) = @_;
 	my ($row,$column,$colhash);
 	my $outfilename = $self->create_output_file(${$self->get("input")}[0],$type);
 	$helper->disp("Writing output in $outfilename...");
@@ -986,7 +1020,8 @@ sub print_matrix
 	open(OUTPUT,">$outfilename");
 	my $headhash = $inhash->{$rows[0]};
 	my @headers = keys(%$headhash);
-	print OUTPUT "GeneID\t",join("\t",@headers),"\n";
+	(!defined($exprhash->{"header"})) ? (print OUTPUT "GeneID\t",join("\t",@headers),"\n") :
+	(print OUTPUT "GeneID\t",join("\t",@headers),"\t",$exprhash->{"header"},"\n");
 	if ($type =~ m/number/i)
 	{
 		foreach $row (@rows)
@@ -1000,7 +1035,8 @@ sub print_matrix
 				(push(@v,scalar(@{$colhash->{$column}}))) :
 				(push(@v,0));
 			}
-			print OUTPUT "$row\t",join("\t",@v),"\n";
+			(!$exprhash->{"data"}->{$row}) ? (print OUTPUT "$row\t",join("\t",@v),"\n") :
+			(print OUTPUT "$row\t",join("\t",@v),"\t",$exprhash->{"data"}->{$row},"\n");
 		}
 	}
 	elsif ($type =~ m/presence/i)
@@ -1014,7 +1050,8 @@ sub print_matrix
 			{
 				(defined($colhash->{$column})) ? (push(@v,"+")) : (push(@v,"-"));
 			}
-			print OUTPUT "$row\t",join("\t",@v),"\n";
+			(!$exprhash->{"data"}->{$row}) ? (print OUTPUT "$row\t",join("\t",@v),"\n") :
+			(print OUTPUT "$row\t",join("\t",@v),"\t",$exprhash->{"data"}->{$row},"\n");
 		}
 	}
 	elsif ($type =~ m/peaks/i)
@@ -1030,7 +1067,8 @@ sub print_matrix
 				(push(@v,join("; ",@{$colhash->{$column}}))) :
 				(push(@v,"NP"));
 			}
-			print OUTPUT "$row\t",join("\t",@v),"\n";
+			(!$exprhash->{"data"}->{$row}) ? (print OUTPUT "$row\t",join("\t",@v),"\n") :
+			(print OUTPUT "$row\t",join("\t",@v),"\t",$exprhash->{"data"}->{$row},"\n");
 		}
 	}
 	close(OUTPUT);
@@ -1053,10 +1091,15 @@ sub create_output_file
 	{
 		($type =~/db/) ? ($ext = ".txt") : ($ext = ".gff");
 	}
+	elsif ($type =~/bed/) { $ext = ".bed" }
 	else { $ext = ".txt" }
 	if ($type =~ /matrix/)
 	{
 		return($dir."gene-peak-$type.txt");
+	}
+	if ($type =~ /bed/)
+	{
+		return($dir.$base."_ASSIGNED".$ext);
 	}
 	else
 	{
