@@ -171,7 +171,7 @@ sub validate_assign
 	my $status;
 	
 	my @accept = ("input","region","background","span","idstrand","idmode","test","pvalue","outformat",
-		"source","splicing","silent","tmpdir");
+		"source","splicing","expression","silent","tmpdir");
 	
 	# Check fatal
 	my $stop;
@@ -267,17 +267,26 @@ sub validate_assign
 			${$self->{"params"}->{"idmode"}}[1]--;
 		}
 	}
+	# Check if expression column is given in genes file and set proper Perl indexing
+    if (defined($self->{"params"}->{"expression"}) && @{$self->{"params"}->{"expression"}})
+    {
+		my $l = scalar @{$self->{"params"}->{"expression"}};
+    	for (my $i=0; $i<$l; $i++)
+    	{
+			 ${$self->{"params"}->{"expression"}}[$i]--;
+		}
+	}
 	# Check proper output format
 	if (@{$self->{"params"}->{"outformat"}})
 	{
 		foreach my $c (@{$self->{"params"}->{"outformat"}})
 		{
-			if ($c ne "stats" && $c ne "gff-peak" && $c ne "gff-gene" && $c ne "peak" &&  
+			if ($c ne "bed" && $c ne "stats" && $c ne "gff-peak" && $c ne "gff-gene" && $c ne "peak" &&  
 				$c ne "gene" && $c ne "all-peak" && $c ne "all-gene" && $c ne "pretty-peak" && 
 				$c ne "pretty-gene" && $c ne "gff-peak-db" && $c ne "gff-gene-db" && $c ne "peakdata"
 				&& $c ne "matrix-number" && $c ne "matrix-presence" && $c ne "matrix-peaks")
 			{
-				my $msg = "WARNING! outformat parameter options should be one or more of \"gff-peak\", \"gff-gene\",\n".
+				my $msg = "WARNING! outformat parameter options should be one or more of \"bed\", \"gff-peak\", \"gff-gene\",\n".
 						  "\"peak\", \"gene\", \"all-peak\", \"all-gene\", \"pretty-peak\", \"pretty-gene\",\n".
 						  "\"gff-peak-db\", \"gff-gene-db\", \"peakdata\", \"stats\", \"matrix-number\", \"matrix-presence\"".
 						  "or \"matrix-peaks\"! \nUsing default (\"gff-peak\")...";
@@ -572,7 +581,7 @@ sub validate_intersect
 	my $stop;
     $stop .= "--- Please specify input file(s) ---\n" if (!$self->{"params"}->{"inputA"} || !$self->{"params"}->{"inputB"});
 
-    if ($self->{"params"}->{"percent"} && @{$self->{"params"}->{"percent"}})
+    if (defined($self->{"params"}->{"percent"}) && @{$self->{"params"}->{"percent"}})
     {
 		if (${$self->{"params"}->{"percent"}}[0] =~ /\d\:\d+/) 
 		{

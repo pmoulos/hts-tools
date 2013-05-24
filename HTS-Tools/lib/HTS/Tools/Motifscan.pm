@@ -210,7 +210,7 @@ max(score)*a + b = 1000
 
 sub convert2bed
 {
-	my $f2c = shift @_;
+	my ($self,$f2c,@cntcol) = @_;
 	my %ch = @_;
 	my ($base,$dir) = fileparse($f2c,'\..*?');
 	my ($line,@lines,@scores,@content,@locs,@newcoord);

@@ -94,7 +94,7 @@ sub check_inputs
     		   "autoextend|x" => \$autoxtend,
     		   "both|t" => \$both,
     		   "exact|c" => \$exact,
-    		   "reportonce|u=i" => \$reportonce,
+    		   "reportonce|u" => \$reportonce,
     		   "gap|g=i" => \$agap,
     		   "keeporder|d" => \$keeporder,
     		   "silent|s" => \$silent,
@@ -156,14 +156,17 @@ sub run_intersections
 		if ($usebedtools)
 		{
 			#$cmd = File::Spec->catfile($bedtoolspath,"intersectBed")." -a $a -b $b -wa > ".File::Spec->catfile($tmpdir,"${$pairs->{$k}}[0]"."${$pairs->{$k}}[1]");
-			$cmd = File::Spec->catfile($bedtoolspath,"intersectBed")." -a $a -b $b > ".File::Spec->catfile($tmpdir,"${$pairs->{$k}}[0]"."${$pairs->{$k}}[1]");
+			($reportonce) ?
+			($cmd = File::Spec->catfile($bedtoolspath,"intersectBed")." -a $a -b $b | sort -k1,1 -k2g,2 -u > ".File::Spec->catfile($tmpdir,"${$pairs->{$k}}[0]"."${$pairs->{$k}}[1]")) :
+			($cmd = File::Spec->catfile($bedtoolspath,"intersectBed")." -a $a -b $b > ".File::Spec->catfile($tmpdir,"${$pairs->{$k}}[0]"."${$pairs->{$k}}[1]"));
 			$helper->disp("The command is:");
 			$helper->disp($cmd);
 			system($cmd);
 		}
 		else
 		{
-			$intersecter->change_params({"inputA" => $a,"inputB" => $b});
+			$intersecter->set("inputA",$a);
+			$intersecter->set("inputB",$b);
 			$intersecter->run;
 		}
 	}
@@ -210,7 +213,12 @@ sub export_areas
 {
 	use Archive::Tar;
 	my ($areas,$alias,@filelist) = @_;
-	@filelist = () if (!@filelist);
+	my $start;
+	if (!defined($filelist[0]))
+	{
+		@filelist = ();
+		$start = 0;
+	} else { $start = 2; }
 	
 	# Create the file list with all areas
 	use Switch;
@@ -293,15 +301,34 @@ sub export_areas
 	# Create a README map file
 	my @short = ("A","B","C","D","E");
 	my @letters = sort keys(%$alias);
-	my $readme = "This file contains the association between the input files and the letters ".join(", ",@short[0..$#input])."\n\n";
+	my $readme = "Association between the input files and the letters ".join(", ",@short[0..$#input]).":\n\n";
 	foreach my $letter (@letters[0..$#input])
 	{
 		$readme.= basename($letter).": ".basename($alias->{$letter})."\n";
 	}
+	$readme.= "\nNumber of hits in each output file:\n";
+	foreach my $c (@filelist[$start..$#filelist])
+	{
+		my $cl = $helper->count_lines($c);
+		$cl-- if (&check_header($c));
+		$readme.= basename($c)."\t".$cl."\n";
+	}
 	$readme.= "\n";
 	my $r = File::Spec->catfile($tmpdir,"README.txt");
+	my $m = File::Spec->catfile($tmpdir,$name.".txt");
 	open(R,">$r");
 	print R $readme;
+	if (-f $m)
+	{
+		print R "Number of hits in each cell of the Venn diagram:\n";
+		print R join("",@short[0..$#input]), "\t";
+		open(M,$m);
+		while(<M>)
+		{
+			print R $_;
+		}
+		close(M);
+	}
 	close(R);
 	push(@filelist,$r);
 
@@ -342,7 +369,18 @@ sub create_venn
 				"\tcat.cex=2,\n".
 				"\tcat.col=c(\"red\",\"green\"),\n".
 				"\tcat.fontfamily=rep(\"Bookman\",2)\n".
-			")\n";
+			")\n".
+			"grid.p <- apply(as.matrix(expand.grid(rep(list(c(\"-\",\"+\")),2))),1,function(x) paste(x,collapse=\"\"))\n".
+			"grid.p <- grid.p[2:length(grid.p)]\n".
+			"grid.n <- numeric(length(grid.p))\n".
+			"map <- c(1,2,3) + 4\n".
+			"names(grid.n) <- names(map) <- grid.p\n".
+			"for (n in grid.p) {\n".	
+			"\tgrid.n[n] <- as.numeric(v[[map[n]]]\$label)\n".
+			"}\n".
+			"grid.n <- as.matrix(grid.n)\n".
+			"colnames(grid.n) <- \"number\"\n".
+			"write.table(grid.n,file=\"".File::Spec->catfile($tmpdir,$name.".txt")."\",row.names=TRUE,sep=\"\t\",quote=FALSE)\n";
 		}
 		case 3 {
 			$script.=
@@ -362,7 +400,18 @@ sub create_venn
 				"\tcat.cex=2,\n".
 				"\tcat.col=c(\"red\",\"green\",\"blue\"),\n".
 				"\tcat.fontfamily=rep(\"Bookman\",3)\n".
-				")\n";
+				")\n".
+			"grid.p <- apply(as.matrix(expand.grid(rep(list(c(\"-\",\"+\")),3))),1,function(x) paste(x,collapse=\"\"))\n".
+			"grid.p <- grid.p[2:length(grid.p)]\n".
+			"grid.n <- numeric(length(grid.p))\n".
+			"map <- c(1,3,2,7,4,6,5) + 6\n".
+			"names(grid.n) <- names(map) <- grid.p\n".
+			"for (n in grid.p) {\n".	
+			"\tgrid.n[n] <- as.numeric(v[[map[n]]]\$label)\n".
+			"}\n".
+			"grid.n <- as.matrix(grid.n)\n".
+			"colnames(grid.n) <- \"number\"\n".
+			"write.table(grid.n,file=\"".File::Spec->catfile($tmpdir,$name.".txt")."\",row.names=TRUE,sep=\"\t\",quote=FALSE)\n";
 		}
 		case 4 {
 			$script.=
@@ -389,7 +438,18 @@ sub create_venn
 				"\tcat.cex=2,\n".
 				"\tcat.col=c(\"red\",\"green\",\"blue\",\"orange\"),\n".
 				"\tcat.fontfamily=rep(\"Bookman\",4)\n".
-			")\n";
+			")\n".
+			"grid.p <- apply(as.matrix(expand.grid(rep(list(c(\"-\",\"+\")),4))),1,function(x) paste(x,collapse=\"\"))\n".
+			"grid.p <- grid.p[2:length(grid.p)]\n".
+			"grid.n <- numeric(length(grid.p))\n".
+			"map <- c(9,14,15,1,4,13,12,3,10,8,11,2,5,7,6) + 8\n".
+			"names(grid.n) <- names(map) <- grid.p\n".
+			"for (n in grid.p) {\n".	
+			"\tgrid.n[n] <- as.numeric(v[[map[n]]]\$label)\n".
+			"}\n".
+			"grid.n <- as.matrix(grid.n)\n".
+			"colnames(grid.n) <- \"number\"\n".
+			"write.table(grid.n,file=\"".File::Spec->catfile($tmpdir,$name.".txt")."\",row.names=TRUE,sep=\"\t\",quote=FALSE)\n";
 		}
 		case 5 {
 			$script.=

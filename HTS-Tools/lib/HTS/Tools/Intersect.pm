@@ -2047,7 +2047,8 @@ sub change_params
 
 HTS::Tools::Intersect object getter
 
-	my $param_value = $count->get('param_name')
+	my $param_value = $count->get('param_name');
+
 =cut
 
 sub get

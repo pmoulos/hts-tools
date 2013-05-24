@@ -23,6 +23,7 @@ our $backfile; # Background regions to be assigned to peaks (BED format)
 our @span; # Upstream and downstream  (default +/-100k from TSS)
 our @sbcols; # Columns containing unique sig/back region ID and strand (default (4,5))
 our @pcols; # Columns containing unique peak region ID and mode (default (4,5))
+our @expcols; # Columns containing gene expression
 our @out; # Output filetype
 our $source; # Source for automatic templates
 our $splicing; # Splicing for automatic templates
@@ -44,6 +45,7 @@ my $tool = HTS::Tools->new({
 			"span" => \@span,
 			"idstrand" => \@sbcols,
 			"idmode" => \@pcols,
+			"expression" => \@expcols,
 			"outformat" => \@out,
 			"test" => $test,
 			"pvalue" => $pval,
@@ -64,6 +66,7 @@ sub check_inputs
     		   "span|n=i{,}" => \@span,
     		   "idstrand|c=i{,}" => \@sbcols,
     		   "idmode|m=i{,}" => \@pcols,
+    		   "expression|e=i{,}" => \@expcols,
     		   "test|t=s" => \$test,
     		   "pvalue|p=f" => \$pval,
     		   "outformat|o=s{,}" => \@out,
