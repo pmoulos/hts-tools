@@ -42,6 +42,7 @@ use Carp;
 use File::Spec;
 use File::Basename;
 
+#use lib 'D:/Software/hts-tools/HTS-Tools/lib';
 use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools::Utils;
 
@@ -70,7 +71,8 @@ sub new
 	# Pass global variables to the helper
 	(defined($args->{"params"}->{"silent"})) ? ($helper->set("silent",$args->{"params"}->{"silent"})) :
 		($helper->set("silent",0));
-		
+	$helper->set_logger($args->{"params"}->{"log"}) if (defined($args->{"params"}->{"log"}));
+
 	bless($self,$class);
 	$self->init($args);
 	return($self);
@@ -730,12 +732,170 @@ sub validate_motifscan
 	my $self = shift @_;
 	my $modname = "HTS::Tools::Motifscan";
 	
-	my @accept = ();
+	my @accept = ("input","motif","background","scanner","center","colext","range","fpr","times","length",
+			"besthit","output","uniquestats","justscan","log","silent","tmpdir");
 	
 	# Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
     {
 		$helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+	}
+	
+	# Check fatal
+	my $stop;
+	$stop .= "--- Please specify input sequence file(s) ---\n" if (!$self->{"params"}->{"input"} && !@{$self->{"params"}->{"input"}});
+	$stop .= "--- Please specify motifs file ---\n" if (!$self->{"params"}->{"motif"});
+	$stop .= "--- Please specify background sequences file ---\n" if (!$self->{"params"}->{"background"} && !$self->{"params"}->{"justscan"});
+
+	if ($stop)
+	{
+		$helper->disp("$stop\n");
+		croak "Type perldoc $modname for help in usage.\n\n";
+		exit;
+	}
+	
+	# Check the scanner
+    if (defined($self->{"params"}->{"scanner"}) && $self->{"params"}->{"scanner"} !~ /pwmscan/i && $self->{"params"}->{"scanner"} !~ /MotifScanner/i)
+    {
+    	$helper->disp("The scanner should be one of \"pwmscan\" or \"MotifScanner\". Using default (pwmscan)...");
+    	$self->{"params"}->{"scanner"} = "pwmscan";
+	}
+	else
+	{
+		$helper->disp("Motif canner not set! Using default (pwmscan)...");
+    	$self->{"params"}->{"scanner"} = "pwmscan";
+	}
+	# Check range - increase per real number, very simple expression, use with caution
+	if (defined($self->{"params"}->{"range"}) && @{$self->{"params"}->{"range"}})
+	{
+		my @range = @{$self->{"params"}->{"range"}};
+		if (@range == 1 && $range[0] =~ /\d+\:\d+(\.\d*)?\:\d+/)
+		{
+			my ($s,$inc,$e) = split(":",$range[0]);
+			if (($s > 1 || $inc > 1 || $e > 1) && $self->{"params"}->{"scanner"} =~ /MotifScanner/i)
+			{
+				disp("Range for MotifScanner should be <1. Using default (0.2:0.01:0.7)...");
+				@range = $helper->range_vector(0.2,0.7,0.01);
+			}
+			else 
+			{ 
+				@range = $helper->range_vector($s,$e,$inc); 
+			}
+			$self->{"params"}->{"range"} = \@range;
+		}
+		elsif (@range == 1 && $range[0] =~ /\d+\:\d+/) # Increase per 1 if pwmscan or per 0.1 if MotifScanner
+		{
+			my ($s,$e) = split(":",$range[0]);
+			use v5.10;
+			given($self->{"params"}->{"scanner"})
+			{
+				when(/pwmscan/i)
+				{
+					@range = ($s..$e);
+				}
+				when(/MotifScanner/i)
+				{
+					if ($s > 1 || $e > 1)
+					{
+						$helper->disp("Range for MotifScanner should be <1. Using default (0.2:0.1:0.7)...");
+						@range = $helper->range_vector(0.5,0.01,0.01);
+					}
+					else 
+					{ 
+						@range = $helper->range_vector($s,$e,0.1); 
+					}
+				}
+			}
+			$self->{"params"}->{"range"} = \@range;
+		}
+	}
+	else
+	{
+		my @range;
+		if (!defined($self->{"params"}->{"justscan"}) || !$self->{"params"}->{"justscan"})
+		{
+			$helper->disp("Cutoff range not given. Using default (0..1)...");
+			@range = $helper->range_vector(0,1,0.1);
+		} 
+		else 
+		{ 
+			$range[0] = $self->{"params"}->{"justscan"}; 
+		}
+		$self->{"params"}->{"range"} = \@range;
+	}
+	# Check fpr
+	if ((!defined($self->{"params"}->{"fpr"}) || !$self->{"params"}->{"fpr"}) && !$self->{"params"}->{"justscan"})
+	{
+		$helper->disp("FPR not defined! Using default (0.05)...");
+		$self->{"params"}->{"fpr"} = 0.05;
+	}
+	elsif (defined($self->{"params"}->{"fpr"}) && ($self->{"params"}->{"fpr"} < 0 || $self->{"params"}->{"fpr"} > 1)
+		&& !$self->{"params"}->{"justscan"})
+	{
+		$helper->disp("FPR should be a number between 0 and 1! Using default (0.05)...");
+		$self->{"params"}->{"fpr"} = 0.05;
+	}
+	if (defined($self->{"params"}->{"output"}) && @{$self->{"params"}->{"output"}})
+    {
+		foreach my $c (@{$self->{"params"}->{"output"}})
+		{
+			if ($c ne "gff" && $c ne "bed" && $c ne "stats" && $c ne "log")
+			{
+				my $msg = "WARNING! --output options should be one or more of \"gff\", \"bed\", \"stats\" or \"log\"\n".
+						  "Using default (\"gff\")...";
+				$helper->disp($msg);
+				$self->{"params"}->{"output"} = ["gff"];
+			}
+		}
+	}
+	else
+	{
+		$helper->disp("Output file type(s) not defined! Using default (\"gff\")...");
+		$self->{"params"}->{"output"} = ["gff"];
+	}
+	if (defined($self->{"params"}->{"colext"}) && @{$self->{"params"}->{"colext"}})
+    {
+    	my @cntcol = @{$self->{"params"}->{"colext"}};
+    	my $l = @cntcol;
+    	if ($l != 3)
+    	{
+    		$helper->disp("ID, center columns and downstream extension not given properly... Using defaults (1,2,200)...");
+    		@cntcol = (0,1,200);
+		}
+		else
+		{
+    		$cntcol[0]--;
+    		$cntcol[1]--;
+		}
+		$self->{"params"}->{"colext"} = \@cntcol;
+    }
+    if (defined($self->{"params"}->{"besthit"}) && $self->{"params"}->{"besthit"} < 0)
+	{
+		$helper->disp("The number of best hits should be a positive integer! Using default (1)...");
+		$self->{"params"}->{"besthit"} = 1;
+	}
+	else
+	{
+		$helper->disp("Number of best hits not defined! Using default (1)...");
+		$self->{"params"}->{"besthit"} = 1;
+	}
+	if (defined($self->{"params"}->{"times"}) && $self->{"params"}->{"times"} < 0)
+	{
+		$helper->disp("The times parameter must be a positive integer! Using default (10)...");
+		$self->{"params"}->{"times"} = 10;
+	}
+	else
+	{
+		$helper->disp("times parameter not defined! Using default (10)...");
+		$self->{"params"}->{"times"} = 10;
+	}
+	if (!defined($self->{"params"}->{"uniquestats"}))
+	{
+		$self->{"params"}->{"uniquestats"} = 0;
+	}
+	if (!defined($self->{"params"}->{"justscan"}))
+	{
+		$self->{"params"}->{"justscan"} = 0;
 	}
 	
 	return($self->{"params"});

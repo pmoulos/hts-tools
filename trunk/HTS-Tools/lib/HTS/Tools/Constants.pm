@@ -43,6 +43,20 @@ our $AUTHOR = "Panagiotis Moulos";
 our $EMAIL = "moulos\@fleming.gr";
 our $DESC = "Several constants for module HTS::Tools.";
 
+#use lib 'D:/Software/hts-tools/HTS-Tools/lib';
+use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
+use HTS::Tools::Paramcheck;
+use HTS::Tools::Utils;
+
+use vars qw($helper);
+
+BEGIN {
+	$helper = HTS::Tools::Utils->new();
+	select(STDOUT);
+	$|=1;
+	$SIG{INT} = sub { $helper->catch_cleanup; }
+}
+
 =head2 new
 
 Constructor for HTS::Tools::Constants
@@ -67,24 +81,23 @@ HTS::Tools::Constants object initialization method. NEVER use this directly, use
 sub init
 {
 	my ($self,$params) = @_;
-	my ($constants,$loaded,$checker);
+	my ($constants,$userdef,$loaded,$checker);
 	
+	# First load the defaults as the external file might not be full
+	$constants = $self->load_default_constants;
+	# Then check the YAML file and validate
 	if (defined($params->{"file"}))
 	{
-		($constants,$loaded) = $self->load_constants($params->{"file"});
+		($userdef,$loaded) = $self->load_user_constants($params->{"file"});
 		# In the case that an external file has succesfully loaded, we have to validate, else, no need
 		# as the defaults are loaded, which are error-free of course! 
 		if ($loaded)
 		{
-			$checker = HTS::Tools::Paramcheck->new({"tool" => "constants","params" => $constants});
-			$constants = $checker->validate;
+			$checker = HTS::Tools::Paramcheck->new({"tool" => "constants","params" => $external});
+			$userdef = $checker->validate;
+			$self->change_constants($external,"skip");
 		}
 	}
-	else
-	{
-		$constants = $self->load_default_constants;
-	}
-	$self->change_constants($constants,"skip");
 	
 	return($self);
 }
@@ -97,33 +110,23 @@ Load constants from an external YAML file.
 
 =cut
 
-sub load_constants
+sub load_user_constants
 {
 	my ($self,$file) = @_;
-	my ($pfh,$phref,$status,$hasloaded);
-	
-	$status = eval { $helper->try_module("YAML") };
-	if ($status)
+	my ($pfh,$phref,$hasloaded);
+	use YAML qw(LoadFile Dump);
+	eval
 	{
-		$helper->disp("Module YAML is required to read an external constants file! Will try with the defaults...");
-		$self->load_default_constants;
-	}
-	else
+		open($pfh,"<",$file);
+		$phref = LoadFile($pfh);
+		close($pfh);
+		$hasloaded = 1;
+	};
+	if ($@)
 	{
-		use YAML qw(LoadFile Dump);
-		eval
-		{
-			open($pfh,"<",$file);
-			$phref = LoadFile($pfh);
-			close($pfh);
-			$hasloaded = 1;
-		};
-		if ($@)
-		{
-			$helper->disp("Bad constants file! Will try to load defaults...");
-			$phref = $self->load_default_constants;
-			$hasloaded = 0;
-		}
+		$helper->disp("Bad constants file! Ignoring...");
+		$phref = $self->load_default_constants;
+		$hasloaded = 0;
 	}
 	return($phref,$hasloaded);
 }
@@ -140,7 +143,43 @@ sub load_default_constants
 {	
 	my $self = shift @_;
 	
-	# Will add more
+	my ($pfh,$phref);
+	use YAML qw(LoadFile Dump);
+	if (-f "../config.yml")
+	{
+		eval
+		{
+			open($pfh,"<","../config.yml");
+			$phref = LoadFile($pfh);
+			close($pfh);
+		};
+		if ($@)
+		{
+			$helper->disp("Error loading constants file! Falling back to minimums...");
+			$phref = $self->load_hard_constants;
+		}
+	}
+	else
+	{
+		$helper->disp("Constants configuration file does not exist! Falling back to minimums...");
+		$phref = $self->load_hard_constants;
+	}
+	
+	return($phref);
+}
+
+=head2 load_hard_constants
+
+Load hard coded constants as a last resort. There must be a default fallback with very basic constants.
+
+	$const->load_hard_constants;
+
+=cut
+
+sub load_hard_constants
+{
+	my $self = shift @_;
+	
 	my $constants = {
 		"LOCAL_HOST" => "localhost",
 		"LOCAL_USER" => "user",
@@ -159,7 +198,9 @@ sub load_default_constants
 		"GIMMEMOTIFS_HOME" => "/usr/bin",
 		"MOTIFSCANNER_HOME" => "",
 		"LOCAL_GENOMES" => "/opt/genomes"
-	}
+	};
+	
+	return($constants);
 }
 
 =head2 change_constants
@@ -191,9 +232,9 @@ sub change_constants
 
 =head2 get
 
-HTS::Tools::Constants object getter
+HTS::Tools::Constants object getter.
 
-	my $param_value = $count->get('param_name')
+	my $param_value = $const->get('param_name')
 
 =cut
 
@@ -205,9 +246,9 @@ sub get
 
 =head2 set
 
-HTS::Tools::Constants object setter
+HTS::Tools::Constants object setter.
 
-	$intersecter->set('param_name','param_value');
+	$const->set('param_name','param_value');
 	
 =cut
 
@@ -305,3 +346,12 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 =cut
 
 1; # End of HTS::Tools::Constants
+
+#$status = eval { $helper->try_module("YAML") };
+#if ($status)
+#{
+#	$helper->disp("Module YAML is required to read an external constants file! Will try with the defaults...");
+#	$self->load_default_constants;
+#}
+#else
+#{ }
