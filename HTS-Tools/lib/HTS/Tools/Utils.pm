@@ -46,6 +46,8 @@ use strict;
 use warnings FATAL => 'all';
 
 use Carp;
+use Log::Log4perl qw(get_logger);
+	
 use File::Spec;
 use File::Path qw(make_path remove_tree);
 use DBI;
@@ -70,6 +72,33 @@ sub new
 	my $self = {};
 	bless($self,$class);
 	return($self);
+}
+
+=head2 set_logger($filename)
+
+Creates a logger object using Log::Log4perl and sends messages to a specific log file defined by the
+calling module. Sets also the logger layout.
+
+	$helper->set_logger("log.txt");
+
+=cut
+
+sub set_logger
+{
+	my ($self,$logfilename) = @_;
+	#croak "\nA log file name MUST be defined if output log file is requested!\n" if (!$logfilename);
+	$logfilename = $self->now("machine").".log" if (!$logfilename);
+	my $logger = get_logger();
+	#$logger->level($INFO);
+	my $appender = Log::Log4perl::Appender->new(
+		"Log::Dispatch::File",
+		filename => $logfilename,
+	);
+	my $layout = Log::Log4perl::Layout::PatternLayout->new(
+		"%d %p> %m%n"
+	);
+	$appender->layout($layout);
+	$logger->add_appender($appender);
 }
 
 =head2 now($format)
@@ -236,6 +265,42 @@ sub check_tabseq
 	$chk = 1 if ($len < 2);
 	close(TCHK);
 	return($chk);
+}
+
+=head2 range_vector
+
+Create an expanded array from the numbers start, increment, end. MATLAB-like expansion.
+
+	my $array = $helper->range_vector($start,$end,$inc);
+
+=cut
+
+sub range_vector
+{
+	my ($self,$s,$e,$inc) = @_;
+	my @rout;
+	my $counter = 0;
+	my $temp = $s;
+	# Create output vector according to order
+	if ($s < $e)
+	{
+		while ($temp <= $e)
+		{
+			$rout[$counter] = $temp;
+			$counter++;
+			$temp += $inc;
+		}
+	}
+	else
+	{
+		while ($temp >= $e)
+		{
+			$rout[$counter] = $temp;
+			$counter++;
+			$temp -= $inc;
+		}
+	}
+	return(@rout);
 }
 
 =head2 round($number)
@@ -422,8 +487,9 @@ prints messages to a log file handle, if requested from a higher level.
 sub disp
 {
 	my $self = shift @_;
+	my $logger = get_logger();
 	print STDERR "\n@_" if (!$self->get("silent"));
-	#print $logfilehandle "\n@_" if (!$silent && $log);
+	$logger->info("\n@_") if ($self->get("log"));
 }
 
 =head2 disp(@array_of_messages)

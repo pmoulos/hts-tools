@@ -3,12 +3,12 @@
 # All documentation moves to HTS::Tools::Assign. This now a wrapper for HTS::Tools::Assign. Use perldoc
 # HTS::Tools::Assign to get instructions.
 #
-# Author      : Panagiotis Moulos (pmoulos@fleming.gr)
+# Author : Panagiotis Moulos (pmoulos@fleming.gr)
 
 use strict;
 use Getopt::Long;
 
-use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
+use lib 'D:/Software/hts-tools/HTS-Tools/lib';
 use HTS::Tools;
 			 
 # Make sure output is unbuffered
@@ -29,6 +29,7 @@ our $source; # Source for automatic templates
 our $splicing; # Splicing for automatic templates
 our $test; # Default hypergeometric test
 our $pval; # Hypergeometric p-value cutoff (default 0.05)
+our $log; # Keep log?
 our $silent; # Display verbose messages
 our $help; # Help?
 
@@ -37,6 +38,7 @@ our $help; # Help?
 
 my $tool = HTS::Tools->new({
 		"tool" => "assign",
+		"log" => $log,
 		"silent" => $silent,
 		"params" => {
 			"input" => \@peakfile,
@@ -50,16 +52,14 @@ my $tool = HTS::Tools->new({
 			"test" => $test,
 			"pvalue" => $pval,
 			"source" => $source,
-			"splicing" => $splicing,
-			"silent" => $silent
-	}
+			"splicing" => $splicing
+		}
 });
 $tool->run;
 
 # Just parse parameters, checking is now performed by the module
 sub check_inputs
 {
-    my $stop;
     GetOptions("input|i=s{,}" => \@peakfile,
     		   "region|r=s" => \$sigfile,
     		   "background|b=s" => \$backfile,
@@ -72,6 +72,7 @@ sub check_inputs
     		   "outformat|o=s{,}" => \@out,
     		   "source|u=s" => \$source,
     		   "splicing|x" => \$splicing,
+    		   "log|l" => \$log,
     		   "silent|s" => \$silent,
     		   "help|h" => \$help);
     # Check if the required arguments are set
@@ -99,7 +100,7 @@ formats. The hypergeometric method is NOT verified and there are other methods
 out there that may perform better. Use at your own risk. The tools works very
 nicely to calculate peak-gene distances with a very nice output.
 
-Author : Panagiotis Moulos (pmoulos\@fleming.gr)
+Author : Panagiotis Moulos (moulos\@fleming.gr)
 
 Main usage
 $scriptname --input peakfile(s) --region regfile --background backfile [OPTIONS]
@@ -209,6 +210,7 @@ $scriptname --input peakfile(s) --region regfile --background backfile [OPTIONS]
 			the case of selecting one of the prefefined region templates
 			with --region. Can be one of "ucsc", "refseq" or "ensembl".
 			Defaults to "ensembl".
+  --log|l		Output a log file.
   --silent|s		Use this option if you want to turn informative 
   			messages off.
   --help|h		Display this help text.

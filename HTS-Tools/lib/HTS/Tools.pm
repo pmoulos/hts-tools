@@ -38,6 +38,7 @@ use warnings FATAL => 'all';
 
 use File::Temp;
 
+#use lib 'D:/Software/hts-tools/HTS-Tools/lib';
 use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools::Assign;
 use HTS::Tools::Convert;
@@ -86,11 +87,14 @@ sub init
 		($self->set("tmpdir",File::Temp->newdir()));
 	(defined($args->{"silent"})) ? ($self->set("silent",$args->{"silent"})) :
 		($self->set("silent",0));
-	
+	(defined($args->{"log"})) ? ($self->set("log",$args->{"log"})) :
+		($self->set("log",0));
+
 	# Pass the above global parameters to the parameter structure for each tool. We do it like this
 	# because each module is supposed to be used also independently of the wrapper.
 	$args->{"params"}->{"tmpdir"} = $self->get("tmpdir");
 	$args->{"params"}->{"silent"} = $self->get("silent");
+	$args->{"params"}->{"log"} = $self->get("log");
 	
 	use v5.14;
 	given($args->{"tool"})

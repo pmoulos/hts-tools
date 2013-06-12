@@ -42,6 +42,7 @@ use Carp;
 use File::Basename;
 use File::Spec;
 
+#use lib 'D:/Software/hts-tools/HTS-Tools/lib';
 use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools::Paramcheck;
 use HTS::Tools::Utils;
@@ -61,6 +62,26 @@ BEGIN {
 
 sub new
 {
+	my ($class,$params) = @_;
+	my $self = {};
+
+	# Pass global variables to the helper
+	(defined($params->{"silent"})) ? ($helper->set("silent",$params->{"silent"})) :
+		($helper->set("silent",0));
+	(defined($params->{"tmpdir"})) ? ($helper->set("tmpdir",$params->{"tmpdir"})) :
+		($helper->set("tmpdir",File::Temp->newdir()));
+	$helper->set_logger($params->{"log"}) if (defined($params->{"log"}));
+	
+	# Validate the input parameters
+	my $checker = HTS::Tools::Paramcheck->new();
+	$checker->set("tool","convert");
+	$checker->set("params",$params);
+	$params = $checker->validate;
+
+	# After validating, bless and initialize
+	bless($self,$class);
+	$self->init($params);
+	return($self);
 }
 
 =head2 init($params)
@@ -71,6 +92,16 @@ HTS::Tools::Convert object initialization method. NEVER use this directly, use n
 
 sub init
 {
+	my ($self,$params) = @_;
+
+	# Basic
+	foreach my $p (keys(%$params)) { $self->set($p,$params->{$p}); }
+
+    # Global
+	$self->set("silent",$helper->get("silent")) unless defined($self->{"silent"});
+	$self->set("tmpdir",$helper->get("tmpdir")) unless defined($self->{"tmpdir"});
+    
+    return($self);
 }
 
 =head2 fasta2tab($fasta_file)
@@ -137,6 +168,62 @@ sub tab2fasta
 			my $olin = substr($seq,0,100,"");
 			print OUTPUT "$olin\n";
 		}
+	}
+	close(INPUT);
+	close(OUTPUT);
+}
+
+=head2 gff2bed6($tab_file)
+
+Convert a GFF file to BED6 (no groups) file format
+
+	my $gff2bed6 = $converter->gff2bed6($gff_file);
+
+=cut
+
+sub gff2bed6
+{
+	my ($self,$infile) = @_;
+	my @conts;
+	open(INPUT,$infile) or croak "\nThe file $infile does not exist!\n";
+	my ($base,$dir) = fileparse($infile,'\.[^.]*');
+	my $outfile = File::Spec->catfile($dir,$base.".bed");
+	my $fetcount = 0;
+	open(OUTPUT,">$outfile");
+	while (my $line = <INPUT>)
+	{
+		$fetcount++;
+		$line =~ s/\r|\n$//g;
+		@conts = split(/\t/,$line);
+		print OUTPUT "$conts[0]\t$conts[4]\t$conts[4]\t$conts[3].$fetcount\t$conts[5]\t$conts[6]\n";
+	}
+	close(INPUT);
+	close(OUTPUT);
+}
+
+=head2 gff2bed6($tab_file)
+
+Convert a GFF file to BED12 file format
+
+	my $gff2bed12 = $converter->gff2bed12($gff_file);
+
+=cut
+
+sub gff2bed12
+{
+	my ($self,$infile) = @_;
+	my @conts;
+	open(INPUT,$infile) or croak "\nThe file $infile does not exist!\n";
+	my ($base,$dir) = fileparse($infile,'\.[^.]*');
+	my $outfile = File::Spec->catfile($dir,$base.".bed");
+	my $fetcount = 0;
+	open(OUTPUT,">$outfile");
+	while (my $line = <INPUT>)
+	{
+		$fetcount++;
+		$line =~ s/\r|\n$//g;
+		@conts = split(/\t/,$line);
+		# This remains to be filled...
 	}
 	close(INPUT);
 	close(OUTPUT);

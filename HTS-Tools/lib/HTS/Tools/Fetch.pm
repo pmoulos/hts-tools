@@ -72,11 +72,13 @@ use File::Temp;
 use HTTP::Request;
 use LWP::UserAgent;
 
+#use lib 'D:/Software/hts-tools/HTS-Tools/lib';
 use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
+use HTS::Tools::Constants;
 use HTS::Tools::Queries;
 use HTS::Tools::Utils;
 
-use vars qw($helper $qobj);
+use vars qw($helper $qobj $const);
 
 use constant BIOMART_PATH => "http://www.biomart.org/biomart/martservice?";
 use constant REMOTE_HOST => "genome-mysql.cse.ucsc.edu";
@@ -85,6 +87,7 @@ use constant REMOTE_USER => "genome";
 BEGIN {
 	$helper = HTS::Tools::Utils->new();
 	$qobj = HTS::Tools::Queries->new();
+	$const = HTS::Tools::Constants->new();
 	select(STDOUT);
 	$|=1;
 	$SIG{INT} = sub { $helper->catch_cleanup; }
@@ -115,6 +118,8 @@ sub new
 		($helper->set("silent",0));
 	(defined($params->{"tmpdir"})) ? ($helper->set("tmpdir",$params->{"tmpdir"})) :
 		($helper->set("tmpdir",File::Temp->newdir()));
+	$helper->set_logger($params->{"log"}) if (defined($params->{"log"}));
+	
 	$helper->advertise($MODNAME,$VERSION,$AUTHOR,$EMAIL,$DESC);
 	
 	# Validate the input parameters
