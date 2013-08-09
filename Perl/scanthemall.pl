@@ -198,7 +198,8 @@ $scriptname --input peak_fasta_file(s) --region regfile --background backfile [O
 			of peak ID and peak summit, and the length of the (possible)
 			extension upstream and downstream of the peak summit. For
 			example --colext 4 5 75.
-  --log|l		Output a log file.
+  --log|l		Output a log file. It can be a file name or empty for
+				auto-generation.
   --silent|s		Use this option if you want to turn informative 
   			messages off.
   --help|h		Display this help text.

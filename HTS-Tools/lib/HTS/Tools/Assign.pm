@@ -120,9 +120,12 @@ the expression values are stored.
 
 =item I<idmode> B<(optional)>
 
-The columns in the query files where their unique IDs and possibly modes are. You should provide two values (e.g
-I<idmode> [4,5]) where the first denotes the unique ID column and the second the mode column. If the second
-value is not provided, the module assumes that the center of each query region is its mode. It defaults to [4]
+The columns in the query files where their unique IDs and possibly modes are. You should provide at least two values 
+(e.g I<idmode> [4,5]) where the first denotes the unique ID column and the second the mode column. If the second
+value is not provided, the module assumes that the center of each query region is its mode. It defaults to [4].
+Optionally, you can provide three values, where the 3rd represents a peak score if available. This will be reported
+when using the "matrix-peak" output. The values must be provided strictly with the following order: id column, mode
+column, score column.
 
 =item I<test> B<(optional)>
 
@@ -438,11 +441,11 @@ sub run
 	{
 		$helper->disp("\nReading file $input[$i]...");
 		
-		my (%peakID,%peakMode,%countSig,%countBack,%allPeakData,%countGenesSig,%countGenesBack);
+		my (%peakID,%peakMode,%peakScore,%countSig,%countBack,%allPeakData,%countGenesSig,%countGenesBack);
 		my ($pstart,$pend,%peakStarts,%peakEnds) if ($gffreq);
-		my (@pall,$pchr,$pmode,$pid,$phead);
+		my (@pall,$pchr,$pmode,$pid,$phead,$pscore);
 		my (@starts,@ends,@modes);
-		my (@peakchrs,@peakids,@geneids);
+		my (@peakchrs,@peakids,@peakscores,@geneids);
 		my (@sigallpeakids,@backallpeakids,@sigassgenes,@backassgenes);
 		my ($currchr,$currdist,$currpeak,$currgene,$currout,@currgenes);
 		my (%genePeaksSig,%peaksGenesSig,%distPeakBased,%distGeneBased,%peakIndex,%geneIndex);
@@ -463,8 +466,10 @@ sub run
 			$pid = $pall[$pcols[0]];
 			($pall[$pcols[1]]) ? ($pmode = $pall[$pcols[1]]) :
 			($pmode = $pstart + $helper->round(($pend - $pstart)/2));
+			$pscore = $pall[$pcols[2]] if ($pcols[2]);
 			push(@{$peakID{$pchr}},$pid);
 			push(@{$peakMode{$pchr}},$pmode);
+			push(@{$peakScore{$pchr}},$pscore) if ($pscore);
 			if ($gffreq) # Starts and ends required in this case for GFF files
 			{
 				push(@{$peakStarts{$pchr}},$pstart);
@@ -497,6 +502,7 @@ sub run
 			
 			@modes = @{$peakMode{$currchr}};
 			@peakids = @{$peakID{$currchr}};
+			@peakscores = @{$peakScore{$currchr}};
 			
 			if ($sigID{$currchr}) # Could not have subjects at a specific chromosome
 			{
@@ -519,7 +525,8 @@ sub run
 							push(@{$geneIndex{$currchr}{$geneids[$j]}},$j);
 							push(@sigallpeakids,$peakids[$k]);
 							push(@sigassgenes,$geneids[$j]);
-							push(@{$hasPeak{$geneids[$j]}{basename($input[$i])}},$peakids[$k]."_".$currdist);
+							(!$pcols[2]) ? (push(@{$hasPeak{$geneids[$j]}{basename($input[$i])}},$peakids[$k]."_".$currdist)) :
+							(push(@{$hasPeak{$geneids[$j]}{basename($input[$i])}},$peakids[$k]."_".$currdist."_".$peakscores[$k]));
 						}
 					}
 				}

@@ -46,7 +46,7 @@ use strict;
 use warnings FATAL => 'all';
 
 use Carp;
-use Log::Log4perl qw(get_logger);
+use Log::Log4perl qw(get_logger :levels);
 	
 use File::Spec;
 use File::Path qw(make_path remove_tree);
@@ -87,9 +87,9 @@ sub set_logger
 {
 	my ($self,$logfilename) = @_;
 	#croak "\nA log file name MUST be defined if output log file is requested!\n" if (!$logfilename);
-	$logfilename = $self->now("machine").".log" if (!$logfilename);
-	my $logger = get_logger();
-	#$logger->level($INFO);
+	$logfilename = $self->now("machine").".log" if (!$logfilename || $logfilename eq "auto");
+	my $logger = get_logger("HTS::Tools::Utils");
+	$logger->level($INFO);
 	my $appender = Log::Log4perl::Appender->new(
 		"Log::Dispatch::File",
 		filename => $logfilename,
@@ -487,9 +487,12 @@ prints messages to a log file handle, if requested from a higher level.
 sub disp
 {
 	my $self = shift @_;
-	my $logger = get_logger();
-	print STDERR "\n@_" if (!$self->get("silent"));
-	$logger->info("\n@_") if ($self->get("log"));
+	my @msg = @_;
+	my $logger = get_logger("HTS::Tools::Utils");
+	#use Data::Dumper;
+	#print "\n",Dumper($logger),"\n";
+	print STDERR "\n@msg" if (!$self->get("silent"));
+	$logger->info("\n@msg") if ($self->get("log"));
 }
 
 =head2 disp(@array_of_messages)
@@ -515,12 +518,12 @@ sub advertise
 	$email = "john.doe\@example.com" unless($email);
 	$adtext = "My extraordinary module" unless($adtext);
 	my $credits = $adtext." Copyright: ".$auth." ".$email;
-	use Term::ANSIColor;
-	print color 'bold yellow on_blue';
+	#use Term::ANSIColor;
+	#print color 'bold yellow on_blue';
 	$self->disp($mod." ".$ver);
-	print color 'bold green';
+	#print color 'bold green';
 	$self->disp($credits."\n");
-	print color 'reset';
+	#print color 'reset';
 }
 
 =head2 count_hoh(%hash_of_hashes)

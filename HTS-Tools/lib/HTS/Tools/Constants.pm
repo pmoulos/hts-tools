@@ -145,11 +145,13 @@ sub load_default_constants
 	
 	my ($pfh,$phref);
 	use YAML qw(LoadFile Dump);
-	if (-f "../config.yml")
+	
+	my ($vol,$dir) = File::Spec->splitpath($INC{'HTS/Tools.pm'});
+	if (-f File::Spec->catfile($vol,$dir,"config.yml"))
 	{
 		eval
 		{
-			open($pfh,"<","../config.yml");
+			open($pfh,"<",File::Spec->catfile($vol,$dir,"config.yml"));
 			$phref = LoadFile($pfh);
 			close($pfh);
 		};

@@ -149,7 +149,7 @@ sub run
 
 HTS::Tools::Tools object getter
 
-	my $param_value = $helper->get("param_name")
+	my $param_value = $tool->get("param_name")
 =cut
 
 sub get
@@ -162,7 +162,7 @@ sub get
 
 HTS::Tools::Tools object setter
 
-	$helper->set("param_name","param_value")
+	$tool->set("param_name","param_value")
 	
 =cut
 

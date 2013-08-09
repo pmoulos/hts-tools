@@ -173,7 +173,7 @@ sub validate_assign
 	my $status;
 	
 	my @accept = ("input","region","background","span","idstrand","idmode","test","pvalue","outformat",
-		"source","splicing","expression","silent","tmpdir");
+		"source","splicing","expression","log","silent","tmpdir");
 	
 	# Check fatal
 	my $stop;
@@ -210,7 +210,7 @@ sub validate_assign
 		}
 		else { use Math::Cephes; }
 	}
-	if (@{$self->{"params"}->{"outformat"}} && @{$self->{"params"}->{"outformat"}} ~~ /matrix/)
+	if (defined($self->{"params"}->{"outformat"}) && @{$self->{"params"}->{"outformat"}} && @{$self->{"params"}->{"outformat"}} ~~ /matrix/)
 	{
 		$status = eval { $helper->try_module("Tie::IxHash::Easy") };
 		if ($status)
@@ -234,13 +234,13 @@ sub validate_assign
 		$self->{"params"}->{"test"} = "none";
 	}
     # Check if span given
-    if (!@{$self->{"params"}->{"span"}})
+    if ((defined($self->{"params"}->{"span"}) && !@{$self->{"params"}->{"span"}}) || !defined($self->{"params"}->{"span"}))
     {
     	$helper->disp("Search range from region start points (e.g. TSS) not given! Using defaults (-10kbp,10kbp)");
     	@{$self->{"params"}->{"span"}} = (-10000,10000);
 	}
 	# Check if id and strand columns given for sig/back files
-    if (!@{$self->{"params"}->{"idstrand"}})
+    if ((defined($self->{"params"}->{"idstrand"}) && !@{$self->{"params"}->{"idstrand"}}) || !defined($self->{"params"}->{"idstrand"}))
     {
     	$helper->disp("Unique ID and strand columns for region and background files not given! Using defaults as from BED format (4,6)...");
     	@{$self->{"params"}->{"idstrand"}} = (3,5);
@@ -251,7 +251,7 @@ sub validate_assign
 		${$self->{"params"}->{"idstrand"}}[1]--;
 	}
 	# Check if id and mode columns given for peak files
-    if (!@{$self->{"params"}->{"idmode"}})
+    if ((defined($self->{"params"}->{"idmode"}) && !@{$self->{"params"}->{"idmode"}}) || !defined($self->{"params"}->{"idmode"}))
     {
     	$helper->disp("Unique ID and mode columns for query region files not given! Using default ID as from BED format (4) and");
     	$helper->disp("query modes will be assumed to be the centers of the input regions...");
@@ -267,6 +267,14 @@ sub validate_assign
 		else
 		{
 			${$self->{"params"}->{"idmode"}}[1]--;
+		}
+		if (!${$self->{"params"}->{"idmode"}}[2])
+		{
+			$helper->disp("Additional query regions scores not given! They will not be reported...");
+		}
+		else
+		{
+			${$self->{"params"}->{"idmode"}}[2]--;
 		}
 	}
 	# Check if expression column is given in genes file and set proper Perl indexing
@@ -393,7 +401,7 @@ sub validate_count
 	my $status;
 
 	my @accept = ("input","region","sort","percent","lscore","escore","constant","small","split","nbins",
-		"stats","output","ncore","source","splicing","keeporder","silent","tmpdir");
+		"stats","output","ncore","source","splicing","keeporder","log","silent","tmpdir");
 
 	# Check fatal
 	my $stop;
@@ -492,28 +500,31 @@ sub validate_count
 		}
 		if ($splicing)
 		{
-			$splicing = lc($splicing);			
-			if (grep {$_ eq $splicing} ("canonical","alternative"))
+			$splicing = lc($splicing);
+			if ($self->{"params"}->{"source"} eq "ensembl")
 			{
-				$helper->disp("Selected splicing for template regions source: ",$splicing);
+				$helper->disp("Splicing is not supported for Ensembl!");
+				delete $self->{"params"}->{"splicing"};
 			}
 			else
 			{
-				$helper->disp("Splicing for template region files is not well-defined! Using default (canonical)...");
-				$self->{"params"}->{"splicing"} = "canonical";
+				if (grep {$_ eq $splicing} ("canonical","alternative"))
+				{
+					$helper->disp("Selected splicing for template regions source: ",$splicing);
+				}
+				else
+				{
+					$helper->disp("Splicing for template region files is not well-defined! Using default (canonical)...");
+					$self->{"params"}->{"splicing"} = "canonical";
+				}
 			}
 		}
 		else
 		{
-			if ($source eq "ucsc" || $source eq "refseq")
+			if ($self->{"params"}->{"source"} eq "ucsc" || $self->{"params"}->{"source"} eq "refseq")
 			{
 				$helper->disp("Splicing for template region files required but not defined! Using default (canonical)...");
 				$self->{"params"}->{"splicing"} = "canonical";
-			}
-			else
-			{
-				$helper->disp("Splicing is not supported for Ensembl!");
-				delete $self->{"params"}->{"splicing"};
 			}
 		}
 	}
@@ -547,7 +558,7 @@ sub validate_fetch
 	# Check required packages
 	$helper->try_module("Tie::IxHash::Easy");
 
-	my @accept = ("silent","tmpdir","output");
+	my @accept = ("log","silent","tmpdir","output");
 	
 	# Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
@@ -571,7 +582,7 @@ sub validate_intersect
 	my $modname = "HTS::Tools::Intersect";
 	
 	my @accept = ("inputA","inputB","sort","percent","any","extend","mode","autoextend","both","exact","keeporder","maxud",
-			"reportonce","gap","output","multi","dryrun","waitbar","silent","tmpdir");
+			"reportonce","gap","output","multi","dryrun","waitbar","log","silent","tmpdir");
 	
 	# Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
