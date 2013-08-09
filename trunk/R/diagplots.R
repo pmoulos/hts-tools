@@ -177,8 +177,8 @@ plot.pairs <- function(x,type="simple",output="x11",fil=NULL,...)
 			{
 				plot(0:10,0:10,type="n",xaxt="n",yaxt="n",xlab="",ylab="") # Diagonal
 				#text(5,5,textwrap(nams[i],15),cex=1.2)
-				text(c(3,5,3),c(9.5,5,1),c("X-Y plots",textwrap(nams[i],15),"M-D plots"),cex=c(1,1.2,1))
-				#text(c(3,5,3),c(9.5,5,1),c("X-Y plots","XXX","M-D plots"),cex=c(1,1.2,1))
+				#text(c(3,5,3),c(9.5,5,1),c("X-Y plots",textwrap(nams[i],15),"M-D plots"),cex=c(1,1.2,1))
+				text(c(3,5,3),c(9.5,5,1),c("X-Y plots",nams[i],"M-D plots"),cex=c(1,1.2,1))
 				arrows(6,9.5,9.5,9.5,angle=20,length=0.1,lwd=1.1)
 				arrows(0.2,3.2,0.2,0.2,angle=20,length=0.1,lwd=1.1)
 			}

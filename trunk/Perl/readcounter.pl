@@ -33,6 +33,7 @@ our $keeporder; # Keep the order of input region file
 our $output; # The output file, can be auto
 our $source; # Source in case of downloading data
 our $splicing; # Splicing in case of downloading data from UCSC or RefSeq
+our $log; # Keep log?
 our $silent = 0; # Display verbose messages
 our $help = 0; # Help?
 
@@ -41,6 +42,7 @@ our $help = 0; # Help?
 my $tool = HTS::Tools->new({
 		"tool" => "count",
 		"silent" => $silent,
+		"log" => $log,
 		"params" => {
 			"input" => \@input,
 			"region" => $regionfile,
@@ -82,6 +84,7 @@ sub check_inputs
 		"ncore|n=i" => \$ncore,
 		"keeporder|k" => \$keeporder,
 		"output|o=s" => \$output,
+		"log|b=s" => \$log,
 		"silent|s" => \$silent,
 		"help|h" => \$help
 	);
@@ -107,7 +110,7 @@ linear probabilitistic score and an exponential probabilistic score.
 Please see program description in the header of the script for further
 details and file format descriptions.
 
-Author : Panagiotis Moulos (pmoulos\@eie.gr)
+Author : Panagiotis Moulos (pmoulos\@fleming.gr)
 
 Main usage
 $scriptname --input file1 [file2, file3, ..., filen] --region file [OPTIONS]
@@ -221,6 +224,8 @@ $scriptname --input file1 [file2, file3, ..., filen] --region file [OPTIONS]
   --output|o		A file to write the output to. If "auto", then it
 			generates an automatic filename in the folder where the
 			input files are. If not provided, output is written to STDOUT..
+  --log|b		Maintain the output messages to a log file. It can be a
+			file name or empty for auto-generation.
   --silent|s		Use this option if you want to turn informative
   			messages off.
   --help|h		Display this help text.

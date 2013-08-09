@@ -8,7 +8,8 @@
 use strict;
 use Getopt::Long;
 
-use lib 'D:/Software/hts-tools/HTS-Tools/lib';
+#use lib 'D:/Software/hts-tools/HTS-Tools/lib';
+use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools;
 			 
 # Make sure output is unbuffered
@@ -160,6 +161,11 @@ $scriptname --input peakfile(s) --region regfile --background backfile [OPTIONS]
 			IDs and modes are. You should provide two values (e.g
 			--idmode 4 5) where the first denotes the unique ID
 			column and the second the mode column. It defaults to (4,5).
+			Optionally, you can provide three values, where the 3rd 
+			represents a peak score if available. This will be reported
+			when using the "matrix-peak" output. The values must be 
+			provided strictly with the following order: id column, 
+			mode column, score column.
   --test|t		What over-representation statistical test to perform.
 			Can be one of hypgeom for hypergeometric test, chi2 for
 			chi-square test, auto for automatic selection and none for
@@ -210,7 +216,8 @@ $scriptname --input peakfile(s) --region regfile --background backfile [OPTIONS]
 			the case of selecting one of the prefefined region templates
 			with --region. Can be one of "ucsc", "refseq" or "ensembl".
 			Defaults to "ensembl".
-  --log|l		Output a log file.
+  --log|l		Output a log file. It can be a file name or empty for
+				auto-generation.
   --silent|s		Use this option if you want to turn informative 
   			messages off.
   --help|h		Display this help text.

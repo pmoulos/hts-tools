@@ -316,12 +316,15 @@ cor.qc <- function(input,classes,cor.type=c("counts","pca","mds","hilbert"),plot
  
 	colnames(window.counts) <- nams
 
+	if (save.rdata)
+		save(window.counts,file=file.path(real.fil[1],paste(real.fil[2],".RData",sep="")))
+
 	# Filter completely dead zones to avoid bias
 	not.dead <- which(apply(window.counts,1,any))
 	window.counts <- window.counts[not.dead,]
 
-	if (save.rdata)
-		save(window.counts,file=paste(real.fil[1],paste(real.fil[2],".RData",sep=""),sep=.Platform$file.sep))
+	#if (save.rdata)
+	#	save(window.counts,file=file.path(real.fil[1],paste(real.fil[2],".RData",sep="")))
 
 	# Calculate correlations and make plots
 	if ("counts" %in% cor.type)
@@ -512,8 +515,7 @@ prepareAutoGenName <- function(fil,output)
 {
 	real.fil <- character(4)
 	real.fil[1] <- dirname(fil)
-	#real.fil[2] <- sub("^([^.]*).*","\\1",basename(fil))
-	real.fil[2] <- sub("(.+)[.][^.]+$", "\\1", basename(treatment))
+	real.fil[2] <- sub("^([^.]*).*","\\1",basename(fil))
 	#real.fil[3] remains empty to be filled with the plot type
 	real.fil[4] <- paste(".",output,sep="")
 	return(real.fil)
