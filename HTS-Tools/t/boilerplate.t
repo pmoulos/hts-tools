@@ -4,7 +4,7 @@ use strict;
 use warnings FATAL => 'all';
 use Test::More;
 
-plan tests => 14;
+plan tests => 13;
 
 sub not_in_file_ok {
     my ($filename, %regex) = @_;
@@ -57,7 +57,6 @@ TODO: {
   module_boilerplate_ok('lib/HTS/Tools/Normalize.pm');
   module_boilerplate_ok('lib/HTS/Tools/Intersect.pm');
   module_boilerplate_ok('lib/HTS/Tools/Profile.pm');
-  module_boilerplate_ok('lib/HTS/Tools/Multisect.pm');
   module_boilerplate_ok('lib/HTS/Tools/QC.pm');
   module_boilerplate_ok('lib/HTS/Tools/Motifscan.pm');
   module_boilerplate_ok('lib/HTS/Tools/Convert.pm');

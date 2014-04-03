@@ -72,8 +72,6 @@ use File::Temp;
 use HTTP::Request;
 use LWP::UserAgent;
 
-#use lib 'D:/Software/hts-tools/HTS-Tools/lib';
-use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools::Constants;
 use HTS::Tools::Queries;
 use HTS::Tools::Utils;
@@ -191,13 +189,13 @@ sub fetch_ensembl_genes
 	seek($tmpfh,0,SEEK_SET);
 	my %strand = ( 1 => "+", -1 => "-" );
 	open(REGS,">$regs");
-	print REGS "chromosome\tstart\tend\tensembl_id\tgc_content\tstrand\tgene_name\n";
+	print REGS "chromosome\tstart\tend\tgene_id\tgc_content\tstrand\tgene_name\tbiotype\n";
 	while (my $line = <$tmpfh>)
 	{
 		next if ($line !~ m/^[0-9XY]/);
 		$line =~ s/\r|\n$//g;
 		my @cols = split(/\t/,$line);
-		print REGS "chr$cols[0]\t$cols[1]\t$cols[2]\t$cols[3]\t$cols[4]\t$strand{$cols[5]}\t$cols[6]\n";
+		print REGS "chr$cols[0]\t$cols[1]\t$cols[2]\t$cols[3]\t$cols[4]\t$strand{$cols[5]}\t$cols[6]\t$cols[7]\n";
 	}
 	close(REGS);
 	close($tmpfh);
@@ -244,13 +242,13 @@ sub fetch_ensembl_exons
 	seek($tmpfh,0,SEEK_SET);
 	my %strand = ( 1 => "+", -1 => "-" );
 	open(REGS,">$regs");
-	print REGS "chromosome\tstart\tend\tensembl_exon_id\tensembl_gene_id\tstrand\tgene_name\n";
+	print REGS "chromosome\tstart\tend\texon_id\tgene_id\tstrand\tgene_name\tbiotype\n";
 	while (my $line = <$tmpfh>)
 	{
 		next if ($line !~ m/^[0-9XY]/);
 		$line =~ s/\r|\n$//g;
 		my @cols = split(/\t/,$line);
-		print REGS "chr$cols[0]\t$cols[1]\t$cols[2]\t$cols[3]\t$cols[4]\t$strand{$cols[5]}\t$cols[6]\n";
+		print REGS "chr$cols[0]\t$cols[1]\t$cols[2]\t$cols[3]\t$cols[4]\t$strand{$cols[5]}\t$cols[6]\t$cols[7]\n";
 	}
 	close(REGS);
 	close($tmpfh);
@@ -297,14 +295,14 @@ sub fetch_ensembl_utr
 	seek($tmpfh,0,SEEK_SET);
 	my %strand = ( 1 => "+", -1 => "-" );
 	open(REGS,">$regs");
-	print REGS "chromosome\tstart\tend\tensembl_id\ttranscript_count\tstrand\tname\n";
+	print REGS "chromosome\tstart\tend\tgene_id\ttranscript_count\tstrand\tgene_name\tbiotype\n";
 	while (my $line = <$tmpfh>)
 	{
 		next if ($line !~ m/^[0-9XY]/);
 		$line =~ s/\r|\n$//g;
 		my @cols = split(/\t/,$line);
 		next if (!$cols[1]);
-		print REGS "chr$cols[0]\t$cols[1]\t$cols[2]\t$cols[3]\t$cols[4]\t$strand{$cols[5]}\t$cols[6]\n";
+		print REGS "chr$cols[0]\t$cols[1]\t$cols[2]\t$cols[3]\t$cols[4]\t$strand{$cols[5]}\t$cols[6]\t$cols[7]\n";
 	}
 	close(REGS);
 	close($tmpfh);
@@ -351,14 +349,14 @@ sub fetch_ensembl_cds
 	seek($tmpfh,0,SEEK_SET);
 	my %strand = ( 1 => "+", -1 => "-" );
 	open(REGS,">$regs");
-	print REGS "chromosome\tstart\tend\tensembl_exon_id\tensembl_gene_id\tstrand\tgene_name\n";
+	print REGS "chromosome\tstart\tend\texon_id\tgene_id\tstrand\tgene_name\tbiotype\n";
 	while (my $line = <$tmpfh>)
 	{
 		next if ($line !~ m/^[0-9XY]/);
 		$line =~ s/\r|\n$//g;
 		my @cols = split(/\t/,$line);
 		next if (!$cols[1]);
-		print REGS "chr$cols[0]\t$cols[1]\t$cols[2]\t$cols[3]\t$cols[4]\t$strand{$cols[5]}\t$cols[6]\n";
+		print REGS "chr$cols[0]\t$cols[1]\t$cols[2]\t$cols[3]\t$cols[4]\t$strand{$cols[5]}\t$cols[6]\t$cols[7]\n";
 	}
 	close(REGS);
 	close($tmpfh);
@@ -690,6 +688,7 @@ sub get_xml_genes_query
 			  "<Attribute name = \"percentage_gc_content\" />".
 			  "<Attribute name = \"strand\" />".
 			  "<Attribute name = \"external_gene_id\" />".
+			  "<Attribute name = \"gene_biotype\" />".
 			  "</Dataset>\n".
 			  "</Query>\n";
 	return($xml);
@@ -721,6 +720,7 @@ sub get_xml_exons_query
 		  "<Attribute name = \"ensembl_gene_id\" />".
 		  "<Attribute name = \"strand\" />".
 		  "<Attribute name = \"external_gene_id\" />".
+		  "<Attribute name = \"gene_biotype\" />".
 		  "</Dataset>\n".
 		  "</Query>\n";
 	return($xml);
@@ -752,6 +752,7 @@ sub get_xml_utr_query
 		"<Attribute name = \"transcript_count\" />\n".
 		"<Attribute name = \"strand\" />\n".
 		"<Attribute name = \"external_gene_id\" />\n".
+		"<Attribute name = \"gene_biotype\" />\n".
 		"</Dataset>\n".
 		"</Query>\n";
 	return($xml);
@@ -783,6 +784,7 @@ sub get_xml_cds_query
 		"<Attribute name = \"ensembl_gene_id\" />\n".
 		"<Attribute name = \"strand\" />\n".
 		"<Attribute name = \"external_gene_id\" />\n".
+		"<Attribute name = \"gene_biotype\" />\n".
 		"</Dataset>\n".
 		"</Query>\n";
 	return($xml);

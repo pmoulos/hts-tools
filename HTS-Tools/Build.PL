@@ -5,7 +5,7 @@ use Module::Build;
 
 my $builder = Module::Build->new(
     module_name         => 'HTS::Tools',
-    license             => 'Artistic_2_0',
+    license             => 'artistic_2',
     dist_author         => q{Panagiotis Moulos <moulos@fleming.gr>},
     dist_version_from   => 'lib/HTS/Tools.pm',
     release_status      => 'stable',
@@ -23,4 +23,5 @@ my $builder = Module::Build->new(
     create_makefile_pl => 'traditional',
 );
 
+$builder->add_build_element('yml');
 $builder->create_build_script();
