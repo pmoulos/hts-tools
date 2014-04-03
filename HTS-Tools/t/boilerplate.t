@@ -54,7 +54,7 @@ TODO: {
   module_boilerplate_ok('lib/HTS/Tools/Count.pm');
   module_boilerplate_ok('lib/HTS/Tools/Assign.pm');
   module_boilerplate_ok('lib/HTS/Tools/Utils.pm');
-  module_boilerplate_ok('lib/HTS/Tools/Normalize.pm');
+  module_boilerplate_ok('lib/HTS/Tools/Normalize/Bedgraph.pm');
   module_boilerplate_ok('lib/HTS/Tools/Intersect.pm');
   module_boilerplate_ok('lib/HTS/Tools/Profile.pm');
   module_boilerplate_ok('lib/HTS/Tools/QC.pm');
