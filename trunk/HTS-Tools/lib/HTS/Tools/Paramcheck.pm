@@ -42,8 +42,6 @@ use Carp;
 use File::Spec;
 use File::Basename;
 
-#use lib 'D:/Software/hts-tools/HTS-Tools/lib';
-use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools::Utils;
 
 use vars qw($helper);
