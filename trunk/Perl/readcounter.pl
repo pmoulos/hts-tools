@@ -8,7 +8,6 @@
 use strict;
 use Getopt::Long;
 
-use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools;
 
 # Make sure output is unbuffered
@@ -88,7 +87,7 @@ sub check_inputs
 		"silent|s" => \$silent,
 		"help|h" => \$help
 	);
-    if ($help)
+    if (!@ARGV || $help)
     {
     	&program_usage;
     	exit;

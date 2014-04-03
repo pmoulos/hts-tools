@@ -140,8 +140,10 @@ plot.cor <- function(mat,method="pearson",type="circle",log.mat=FALSE,is.cor.mat
 			notecex <- 0.9
 		else
 			notecex <- 0.7
-		my.heatmap.2(cor.mat,col=colorRampPalette(c("yellow","grey","blue")),revC=TRUE,trace="none",symm=TRUE,Colv=TRUE,#symkey=TRUE,
-					 cellnote=labs,keysize=1,density.info="density",notecex=notecex,cexRow=1,cexCol=1,margins=c(13,13),slimkey=TRUE)
+		#my.heatmap.2(cor.mat,col=colorRampPalette(c("yellow","grey","blue")),revC=TRUE,trace="none",symm=TRUE,Colv=TRUE,#symkey=TRUE,
+		#			 cellnote=labs,keysize=1,density.info="density",notecex=notecex,cexRow=1,cexCol=1,margins=c(13,13),slimkey=TRUE)
+		heatmap.2(cor.mat,col=colorRampPalette(c("yellow","grey","blue")),revC=TRUE,trace="none",symm=TRUE,Colv=TRUE,#symkey=TRUE,
+					 cellnote=labs,keysize=1,density.info="density",notecex=notecex,cexRow=1,cexCol=1,margins=c(13,13))
 	}
 	closeGraphics(output)
 }

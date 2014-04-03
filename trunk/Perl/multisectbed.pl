@@ -17,7 +17,6 @@ use File::Spec;
 use File::Temp;
 use File::Basename;
 
-use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools::Constants;
 use HTS::Tools::Intersect;
 use HTS::Tools::Utils;
@@ -100,7 +99,7 @@ sub check_inputs
     		   "silent|s" => \$silent,
     		   "help|h" => \$help);
     # Check if the required arguments are set
-    if ($help)
+    if (!@ARGV || $help)
     {
     	&program_usage;
     	exit;

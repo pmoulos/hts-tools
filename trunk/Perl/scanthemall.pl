@@ -13,7 +13,6 @@
 use strict;
 use Getopt::Long;
 
-use lib '/media/HD4/Fleming/hts-tools/HTS-Tools/lib';
 use HTS::Tools;
  
 # Make sure output is unbuffered
@@ -86,8 +85,7 @@ sub check_inputs
     		   "log|l" => \$log,
     		   "silent|s" => \$silent,
     		   "help|h" => \$help);
-    # Check if the required arguments are set
-    if ($help)
+    if (!@ARGV || $help)
     {
     	&program_usage;
     	exit;
