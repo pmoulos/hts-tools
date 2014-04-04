@@ -52,9 +52,9 @@ use HTS::Tools::Utils;
 use vars qw($tmpdir $helper);
 
 BEGIN {
-	$helper = HTS::Tools::Utils->new();
-	# On Ctrl-C or die, do cleanup
-	$SIG{INT} = sub { $helper->catch_cleanup; }
+    $helper = HTS::Tools::Utils->new();
+    # On Ctrl-C or die, do cleanup
+    $SIG{INT} = sub { $helper->catch_cleanup; }
 }
 
 =head2 new($args)
@@ -63,11 +63,11 @@ BEGIN {
 
 sub new
 {
-	my ($class,$args) = @_;
-	my $self = {};
-	bless($self,$class);
-	$self->init($args);
-	return($self);
+    my ($class,$args) = @_;
+    my $self = {};
+    bless($self,$class);
+    $self->init($args);
+    return($self);
 }
 
 =head2 init($args)
@@ -78,55 +78,55 @@ HTS::Tools object initialization method. NEVER use this directly, use new instea
 
 sub init
 {
-	my ($self,$args) = @_;
+    my ($self,$args) = @_;
 
-	# Init self with global variables such as tmpdir and verbosity
-	(defined($args->{"tmpdir"})) ? ($self->set("tmpdir",$args->{"tmpdir"})) :
-		($self->set("tmpdir",File::Temp->newdir()));
-	(defined($args->{"silent"})) ? ($self->set("silent",$args->{"silent"})) :
-		($self->set("silent",0));
-	(defined($args->{"log"})) ? ($self->set("log",$args->{"log"})) :
-		($self->set("log",0));
+    # Init self with global variables such as tmpdir and verbosity
+    (defined($args->{"tmpdir"})) ? ($self->set("tmpdir",$args->{"tmpdir"})) :
+        ($self->set("tmpdir",File::Temp->newdir()));
+    (defined($args->{"silent"})) ? ($self->set("silent",$args->{"silent"})) :
+        ($self->set("silent",0));
+    (defined($args->{"log"})) ? ($self->set("log",$args->{"log"})) :
+        ($self->set("log",0));
 
-	# Pass the above global parameters to the parameter structure for each tool. We do it like this
-	# because each module is supposed to be used also independently of the wrapper.
-	$args->{"params"}->{"tmpdir"} = $self->get("tmpdir");
-	$args->{"params"}->{"silent"} = $self->get("silent");
-	$args->{"params"}->{"log"} = $self->get("log");
-	
-	use v5.14;
-	given($args->{"tool"})
-	{
-		when(/assign/i) {
-			$self->set("tool",HTS::Tools::Assign->new($args->{"params"}));
-		}
-		when(/convert/i) {
-			$self->set("tool",HTS::Tools::Convert->new($args->{"params"}));
-		}
-		when(/count/i) {
-			$self->set("tool",HTS::Tools::Count->new($args->{"params"}));
-		}
-		when(/fetch/i) {
-			$self->set("tool",HTS::Tools::Fetch->new($args->{"params"}));
-		}
-		when(/intersect/i) {
-			$self->set("tool",HTS::Tools::Intersect->new($args->{"params"}));
-		}
-		when(/motifscan/i) {
-			$self->set("tool",HTS::Tools::Motifscan->new($args->{"params"}));
-		}
-		when(/normalize/i) {
-			$self->set("tool",HTS::Tools::Normalize->new($args->{"params"}));
-		}
-		when(/profile/i) {
-			$self->set("tool",HTS::Tools::Profile->new($args->{"params"}));
-		}
-		when(/qc/i) {
-			$self->set("tool",HTS::Tools::QC->new($args->{"params"}));
-		}
-	}
+    # Pass the above global parameters to the parameter structure for each tool. We do it like this
+    # because each module is supposed to be used also independently of the wrapper.
+    $args->{"params"}->{"tmpdir"} = $self->get("tmpdir");
+    $args->{"params"}->{"silent"} = $self->get("silent");
+    $args->{"params"}->{"log"} = $self->get("log");
+    
+    use v5.14;
+    given($args->{"tool"})
+    {
+        when(/assign/i) {
+            $self->set("tool",HTS::Tools::Assign->new($args->{"params"}));
+        }
+        when(/convert/i) {
+            $self->set("tool",HTS::Tools::Convert->new($args->{"params"}));
+        }
+        when(/count/i) {
+            $self->set("tool",HTS::Tools::Count->new($args->{"params"}));
+        }
+        when(/fetch/i) {
+            $self->set("tool",HTS::Tools::Fetch->new($args->{"params"}));
+        }
+        when(/intersect/i) {
+            $self->set("tool",HTS::Tools::Intersect->new($args->{"params"}));
+        }
+        when(/motifscan/i) {
+            $self->set("tool",HTS::Tools::Motifscan->new($args->{"params"}));
+        }
+        when(/normalize/i) {
+            $self->set("tool",HTS::Tools::Normalize->new($args->{"params"}));
+        }
+        when(/profile/i) {
+            $self->set("tool",HTS::Tools::Profile->new($args->{"params"}));
+        }
+        when(/qc/i) {
+            $self->set("tool",HTS::Tools::QC->new($args->{"params"}));
+        }
+    }
 
-	return($self);
+    return($self);
 }
 
 =head2 run
@@ -135,40 +135,40 @@ sub init
 
 =cut
 
-sub run	
+sub run 
 {
-	my $self = shift @_;
-	my $tool = $self->get("tool");
-	$self->get("tool")->run;
-	$helper->cleanup;
+    my $self = shift @_;
+    my $tool = $self->get("tool");
+    $self->get("tool")->run;
+    $helper->cleanup;
 }
 
 =head2 get
 
-HTS::Tools::Tools object getter
+HTS::Tools object getter
 
-	my $param_value = $tool->get("param_name")
+    my $param_value = $tool->get("param_name")
 =cut
 
 sub get
 {
-	my ($self,$name) = @_;
-	return($self->{$name});
+    my ($self,$name) = @_;
+    return($self->{$name});
 }
 
 =head2 set
 
-HTS::Tools::Tools object setter
+HTS::Tools object setter
 
-	$tool->set("param_name","param_value")
-	
+    $tool->set("param_name","param_value")
+    
 =cut
 
 sub set
 {
-	my ($self,$name,$value) = @_;
-	$self->{$name} = $value;
-	return($self);
+    my ($self,$name,$value) = @_;
+    $self->{$name} = $value;
+    return($self);
 }
 
 =head1 AUTHOR

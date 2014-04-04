@@ -29,8 +29,6 @@ if you don't export anything, such as for a purely object-oriented module.
 
 =head1 SUBROUTINES/METHODS
 
-=head2 function1
-
 =cut
 
 package HTS::Tools::Normalize;
@@ -46,6 +44,8 @@ use strict;
 use warnings FATAL => 'all';
 
 use Carp;
+use HTS::Tools::Normalize::Bed;
+use HTS::Tools::Normalize::Bedgraph;
 use HTS::Tools::Paramcheck;
 use HTS::Tools::Utils;
 
@@ -94,11 +94,75 @@ sub new
 }
 
 
-=head2 function2
+=head2 init($args)
+
+HTS::Tools::Normalize object initialization method. NEVER use this directly, use new instead.
 
 =cut
 
-sub function2 {
+sub init
+{
+    my ($self,$args) = @_;
+
+    ## Pass the above global parameters to the parameter structure for each tool. We do it like this
+    ## because each module is supposed to be used also independently of the wrapper.
+    #$args->{"params"}->{"tmpdir"} = $self->get("tmpdir");
+    #$args->{"params"}->{"silent"} = $self->get("silent");
+    #$args->{"params"}->{"log"} = $self->get("log");
+
+    # Can't use matching as bed and bedgraph would cause problem
+    if ($args->{"type"} eq "bed")
+    {
+        $self->set("tool",HTS::Tools::Normalize::Bed->new($args));
+    }
+    elsif ($args->{"type"} eq "bedgraph")
+    {
+        $self->set("tool",HTS::Tools::Normalize::Bedgraph->new($args));
+    }
+    
+    return($self);
+}
+
+=head2 run
+
+# The main running function of HTS::Tools::Normalize
+
+=cut
+
+sub run 
+{
+    my $self = shift @_;
+    my $tool = $self->get("tool");
+    $tool->run;
+    $helper->cleanup;
+}
+
+=head2 get
+
+HTS::Tools::Normalize object getter
+
+    my $param_value = $tool->get("param_name")
+=cut
+
+sub get
+{
+    my ($self,$name) = @_;
+    return($self->{$name});
+}
+
+=head2 set
+
+HTS::Tools::Normalize object setter
+
+    $tool->set("param_name","param_value")
+    
+=cut
+
+sub set
+{
+    my ($self,$name,$value) = @_;
+    $self->{$name} = $value;
+    return($self);
 }
 
 =head1 AUTHOR
@@ -110,9 +174,6 @@ Panagiotis Moulos, C<< <moulos at fleming.gr> >>
 Please report any bugs or feature requests to C<bug-hts-tools at rt.cpan.org>, or through
 the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=HTS-Tools>.  I will be notified, and then you'll
 automatically be notified of progress on your bug as I make changes.
-
-
-
 
 =head1 SUPPORT
 

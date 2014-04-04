@@ -723,7 +723,7 @@ sub validate_intersect
             $helper->disp("Module Tie::IxHash::Easy is required for the keeporder parameter! Deactivating...");
             $self->{"params"}->{"keeporder"} = 0;
         }
-        else { use Tie::IxHash::Easy; }
+        else { require Tie::IxHash::Easy; }
     }
     
     return($self->{"params"});
@@ -922,15 +922,48 @@ sub validate_normalize
     my $self = shift @_;
     my $modname = "HTS::Tools::Normalize";
     
-    my @accept = ("type","input","sort","output","extnorm","sumto","exportfactors","perlonly","prerun",
-            "prerunlog","savrem","sort","log","silent","tmpdir");
+    my @accept = ("type","input");
+    
+    # Check fatal
+    my $stop;
+    $stop .= "--- Please specify input file(s) ---\n" if (!@{$self->{"params"}->{"input"}});
+    $stop .= "--- Please specify file type ---\n" if (!$self->{"params"}->{"type"});
+    $stop .= "--- File type must be one of \"bed\", \"bedgraph\" ---\n" # Other will be added at some point
+        if ($self->{"params"}->{"type"} ne "bed" && $self->{"params"}->{"type"} ne "bedgraph");
+    
+    if ($stop)
+    {
+        $helper->disp("$stop\n");
+        $helper->disp("Type perldoc $modname for help in usage.\n\n");
+        exit;
+    }
+    
+    if ($self->{"params"}->{"type"} eq "bed")
+    {
+        $self->validate_normalize_bed;
+    }
+    elsif ($self->{"params"}->{"type"} eq "bedgraph")
+    {
+        $self->validate_normalize_bedgraph;
+    }
+}
+
+=head2 validate_normalize_bed
+
+The parameter validator function of the HTS::Normalize::Bed module. Do not use this directly, use the validate
+function instead
+
+=cut
+sub validate_normalize_bed
+{
+    my $self = shift @_;
+    my $modname = "HTS::Tools::Normalize::Bed";
+    
+    my @accept = ("type","input","sumto","sort","savrem","sort","log","silent","tmpdir");
     
     # Check fatal
     my $stop;
     $stop .= "--- Please specify input file(s) ---\n" if (!$self->{"params"}->{"input"});
-    $stop .= "--- Please specify file type ---\n" if (!$self->{"params"}->{"type"});
-    $stop .= "--- File type must be one of \"bed\", \"bedgraph\" ---\n" # Other will be added at some point
-        if ($self->{"params"}->{"type"} ne "bed" && $self->{"params"}->{"type"} ne "bedgraph")
     
     if ($stop)
     {
@@ -945,130 +978,122 @@ sub validate_normalize
         $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
     }
 
-    # Continue according to file type
-    if ($self->{"params"}->{"type"} eq "bed")
+    # Check normalization option
+    if (!$self->{"params"}->{"sumto"})
     {
-        # Stub
+        $helper->disp("The normalization mode not given! Using default(\"generate\")...");
+        $self->{"params"}->{"sumto"} = "generate";
     }
-    
+    if ($self->{"params"}->{"sumto"} && $self->{"params"}->{"sumto"} ne "generate" && $self->{"params"}->{"sumto"} ne "permute" &&
+        $self->{"params"}->{"sumto"} !~ m/^[1-9]\d*$/)
+    {
+        $helper->disp("The normalization mode must be one of \"generate\", \"permute\" or a positive integer for randomly removing tags! Using \"generate\"");
+        $self->{"params"}->{"sumto"} = "generate";
+    }
+
     # Check required packages
-    $helper->try_module("IntervalTree");
-    if ($self->{"params"}->{"keeporder"})
+    if ($self->{"params"}->{"sumto"} eq "generate" || $self->{"params"}->{"sumto"} eq "permute")
     {
-        $status = eval { $helper->try_module("Tie::IxHash::Easy") };
+        my $status = eval { $helper->try_module("Math::Random") };
         if ($status)
         {
-            $helper->disp("Module Tie::IxHash::Easy is required for the keeporder parameter! Deactivating...");
-            $self->{"params"}->{"keeporder"} = 0;
+            $helper->disp("Module Math::Random is required for the \"generate\" or \"permute\" normalization types! Deactivating and normalizing to 10M tags...");
+            $self->{"params"}->{"sumto"} = 10000000;
         }
-        else { use Tie::IxHash::Easy; }
-    }
-    # Check the rest
-    if (!$self->{"params"}->{"percent"} && !$self->{"params"}->{"lscore"} && !$self->{"params"}->{"escore"}) # If both given, use exponential scoring
-    {
-        $helper->disp("You did not define a partial overlap scheme! Using default (95% percent overlap)...");
-        $self->{"params"}->{"percent"} = 0.95;
-    }
-    if ($self->{"params"}->{"lscore"} && $self->{"params"}->{"escore"}) # If both given, use exponential scoring
-    {
-        $helper->disp("You chose both linear and exponential scoring. Only exponential will be used...");
-        $self->{"params"}->{"lscore"} = 0;
-    }
-    if ($self->{"params"}->{"stats"} && !($self->{"params"}->{"split"} || $self->{"params"}->{"nbins"}))
-    {
-        $helper->disp("You can't calculate area statistics without splitting to sub-areas or defining a number of bins! Option deactivated...");
-        $self->{"params"}->{"stats"} = 0;
-    }
-    if ($self->{"params"}->{"ncore"})
-    {
-        $status = eval { $helper->try_module("Parallel::ForkManager") };
-        if ($status)
-        {
-            $helper->disp("Module Parallel::ForkManager not found, proceeding with one core...");
-            $self->{"params"}->{"ncore"} = 1;
-        }
-        else { use Parallel::ForkManager; }
-        if ($self->{"params"}->{"ncore"} > MAXCORES)
-        {
-            my $c = MAXCORES;
-            $helper->disp("The maximum number of cores allowed is $c...");
-            $self->{"params"}->{"ncore"} = MAXCORES;
-        }
-    }
-    else { $self->{"params"}->{"ncore"} = 1; }
-    if ($self->{"params"}->{"output"})
-    {
-        if ($self->{"params"}->{"output"} eq "auto")
-        {
-            my ($base,$dir,$ext) = fileparse(${$self->{"params"}->{"input"}}[0],'\.[^.]*');
-            $self->{"params"}->{"output"} = File::Spec->catfile($dir,$base."_REGIONCOUNTSTATS".$ext);
-        }
-    }
-    if ($self->{"params"}->{"region"} =~ m/human-(gene|exon|(5|3)utr|cds)|mouse-(gene|exon|(5|3)utr|cds)|rat-(gene|exon|(5|3)utr|cds)|fly-(gene|exon|(5|3)utr|cds)|zebrafish-(gene|exon|(5|3)utr|cds)/i)
-    {
-        my %sources = ("ucsc" => "UCSC","refseq" => "RefSeq","ensembl" => "Ensembl");
-        my $source = $self->{"params"}->{"source"};
-        my $splicing = $self->{"params"}->{"splicing"};
-        if ($source)
-        {
-            $source = lc($source);
-            if (grep {$_ eq $source} keys(%sources))
-            {
-                $helper->disp("Selected template regions source: ",$sources{$source});
-            }
-            else
-            {
-                $helper->disp("Source for template region files is not well-defined! Using default (ensembl)...");
-                $self->{"params"}->{"source"} = "ensembl";
-            }
-        }
-        else
-        {
-            $helper->disp("Source for template region files not given! Using default (ensembl)...");
-            $self->{"params"}->{"source"} = "ensembl";
-        }
-        if ($splicing)
-        {
-            $splicing = lc($splicing);
-            if ($self->{"params"}->{"source"} eq "ensembl")
-            {
-                $helper->disp("Splicing is not supported for Ensembl!");
-                delete $self->{"params"}->{"splicing"};
-            }
-            else
-            {
-                if (grep {$_ eq $splicing} ("canonical","alternative"))
-                {
-                    $helper->disp("Selected splicing for template regions source: ",$splicing);
-                }
-                else
-                {
-                    $helper->disp("Splicing for template region files is not well-defined! Using default (canonical)...");
-                    $self->{"params"}->{"splicing"} = "canonical";
-                }
-            }
-        }
-        else
-        {
-            if ($self->{"params"}->{"source"} eq "ucsc" || $self->{"params"}->{"source"} eq "refseq")
-            {
-                $helper->disp("Splicing for template region files required but not defined! Using default (canonical)...");
-                $self->{"params"}->{"splicing"} = "canonical";
-            }
-        }
-    }
-    if ($self->{"params"}->{"nbins"})
-    {
-        $helper->disp("Number of genomic bins must be a positive integer! Using default (20)...")
-            if ($self->{"params"}->{"nbins"} < 0 || $self->{"params"}->{"nbins"} !~ m/\d+/);
-        $self->{"params"}->{"nbins"} = 20;
-    }
-    if ($self->{"params"}->{"nbins"} && $self->{"params"}->{"split"})
-    {
-        $helper->disp("nbins and split parameters are mutually exclusive! Using nbins...");
-        delete $self->{"params"}->{"split"};
+        else { require Math::Random; }
     }
     
+    return($self->{"params"});
+}
+
+=head2 validate_normalize_bedgraph
+
+The parameter validator function of the HTS::Normalize::Bedgraph module. Do not use this directly, use the validate
+function instead
+
+=cut
+sub validate_normalize_bedgraph
+{
+    my $self = shift @_;
+    my $modname = "HTS::Tools::Normalize::Bedgraph";
+    
+    my @accept = ("input","type","output","extnorm","sumto","exportfactors","perlonly","prerun",
+            "prerunlog","log","silent","tmpdir");
+    
+    # Check fatal
+    my $stop;
+    $stop .= "--- Please specify input file(s) ---\n" if (!$self->{"params"}->{"input"});
+    
+    if ($stop)
+    {
+        $helper->disp("$stop\n");
+        $helper->disp("Type perldoc $modname for help in usage.\n\n");
+        exit;
+    }
+
+    # Check and warn for unrecognized parameters
+    foreach my $p (keys(%{$self->{"params"}}))
+    {
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+    }
+    
+    # Check signal summarization
+    if (!$self->{"params"}->{"sumto"})
+    {
+        $helper->disp("The normalization mode not given! Using default(1000000000)...");
+        $self->{"params"}->{"sumto"} = 1000000000;
+    }
+    if ($self->{"params"}->{"sumto"} !~ m/^[1-9]\d*$/ || $self->{"params"}->{"sumto"} <= 0)
+    {
+        $helper->disp("The signal sum parameter must be a positive integer! Using default (1000000000)...");
+        $self->{"params"}->{"sumto"} = 1000000000;
+    }
+    # Check presence of external normalization factors
+    if (@{$self->{"params"}->{"extnorm"}})
+    {
+        my $e = @{$self->{"params"}->{"extnorm"}};
+        my $b = @{$self->{"params"}->{"input"}};
+        if ($e != $b)
+        {
+            $helper->disp("The number of external normalization factors given must be equal to the number of input files! Ignoring...");
+            @{$self->{"params"}->{"extnorm"}} = ();
+        }
+        if (@{$self->{"params"}->{"extnorm"}} && $self->{"params"}->{"sumto"})
+        {
+            $helper->disp("Normalizing signal sum (sumto) and external normalization factors (extnorm) are mutually exclusive! Ignoring sumto...");
+            $self->{"params"}->{"sumto"} = 0;
+        }
+    }
+    # Check dry run and output files
+    if (!$self->{"params"}->{"prerun"} && !$self->{"params"}->{"prerunlog"})
+    {
+        if (@{$self->{"params"}->{"output"}} && ${$self->{"params"}->{"output"}}->[0] ne "stdout")
+        {
+            my $o = @{$self->{"params"}->{"output"}};
+            my $b = @{$self->{"params"}->{"input"}};
+            if ($o != $b)
+            {
+                $helper->disp("The number of output files must be equal to the number of input files! Ignoring and autogenerating...");
+                @{$self->{"params"}->{"output"}} = ();
+            }
+        }
+        elsif (!@{$self->{"params"}->{"output"}})
+        {
+            $helper->disp("Output filenames will be autogenerated...");
+            @{$self->{"params"}->{"output"}} = ();
+        }
+    }
+
+    # Check if we are on Linux for the usage of awk
+    if (!$self->{"params"}->{"perlonly"})
+    {
+        if ($^O =~ /MSWin/) # Windows... bad news...
+        {
+            $helper->disp("Windows OS detected! Switching to pure Perl for file streaming...");
+            $self->{"params"}->{"perlonly"} = 1;
+        }
+    }
+
     return($self->{"params"});
 }
 
