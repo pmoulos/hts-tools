@@ -47,31 +47,31 @@ use warnings FATAL => 'all';
 
 use Carp;
 use Log::Log4perl qw(get_logger :levels);
-	
+    
 use File::Spec;
 use File::Path qw(make_path remove_tree);
 use DBI;
 use POSIX qw(floor ceil);
 
 BEGIN {
-	select(STDOUT);
-	$|=1;
+    select(STDOUT);
+    $|=1;
 }
 
 =head2 new
 
 Simple class constructor
 
-	my $helper = HTS::Tools::Utils->new;
+    my $helper = HTS::Tools::Utils->new;
 
 =cut
 
 sub new
 {
-	my $class = $_[0];
-	my $self = {};
-	bless($self,$class);
-	return($self);
+    my $class = $_[0];
+    my $self = {};
+    bless($self,$class);
+    return($self);
 }
 
 =head2 set_logger($filename)
@@ -79,26 +79,26 @@ sub new
 Creates a logger object using Log::Log4perl and sends messages to a specific log file defined by the
 calling module. Sets also the logger layout.
 
-	$helper->set_logger("log.txt");
+    $helper->set_logger("log.txt");
 
 =cut
 
 sub set_logger
 {
-	my ($self,$logfilename) = @_;
-	#croak "\nA log file name MUST be defined if output log file is requested!\n" if (!$logfilename);
-	$logfilename = $self->now("machine").".log" if (!$logfilename || $logfilename eq "auto");
-	my $logger = get_logger("HTS::Tools::Utils");
-	$logger->level($INFO);
-	my $appender = Log::Log4perl::Appender->new(
-		"Log::Dispatch::File",
-		filename => $logfilename,
-	);
-	my $layout = Log::Log4perl::Layout::PatternLayout->new(
-		"%d %p> %m%n"
-	);
-	$appender->layout($layout);
-	$logger->add_appender($appender);
+    my ($self,$logfilename) = @_;
+    #croak "\nA log file name MUST be defined if output log file is requested!\n" if (!$logfilename);
+    $logfilename = $self->now("machine").".log" if (!$logfilename || $logfilename eq "auto");
+    my $logger = get_logger("HTS::Tools::Utils");
+    $logger->level($INFO);
+    my $appender = Log::Log4perl::Appender->new(
+        "Log::Dispatch::File",
+        filename => $logfilename,
+    );
+    my $layout = Log::Log4perl::Layout::PatternLayout->new(
+        "%d %p> %m%n"
+    );
+    $appender->layout($layout);
+    $logger->add_appender($appender);
 }
 
 =head2 now($format)
@@ -106,85 +106,85 @@ sub set_logger
 Formats the current time in a human readable or machine friendly (just one string) format. $format
 can be "human" (default) or "machine"
 
-	my $date_human = $helper->now;
-	my $date_machine = $helper->now("machine");
+    my $date_human = $helper->now;
+    my $date_machine = $helper->now("machine");
 
 =cut
 
 sub now
 {
-	my ($self,$format) = @_;
-	$format = "human" if (!$format);
-	my ($sec,$min,$hour,$day,$month,$year) = localtime(time);
-	$year += 1900;
-	$month++;
-	$month = "0".$month if (length($month)==1);
-	$day = "0".$day if (length($day)==1);
-	$hour = "0".$hour if (length($hour)==1);
-	$min = "0".$min if (length($min)==1);
-	$sec = "0".$sec if (length($sec)==1);
-	($format ne "machine") ? (return($day."/".$month."/".$year." ".$hour.":".$min.":".$sec)) :
-	(return($year.$month.$day.$hour.$min.$sec));
+    my ($self,$format) = @_;
+    $format = "human" if (!$format);
+    my ($sec,$min,$hour,$day,$month,$year) = localtime(time);
+    $year += 1900;
+    $month++;
+    $month = "0".$month if (length($month)==1);
+    $day = "0".$day if (length($day)==1);
+    $hour = "0".$hour if (length($hour)==1);
+    $min = "0".$min if (length($min)==1);
+    $sec = "0".$sec if (length($sec)==1);
+    ($format ne "machine") ? (return($day."/".$month."/".$year." ".$hour.":".$min.":".$sec)) :
+    (return($year.$month.$day.$hour.$min.$sec));
 }
 
 =head2 unique(@array)
 
 Returns a hash whose keys are the unique elements of an array
 
-	my %uhash = $helper->unique(@array);
-	my @uniques = keys(%uhash);
+    my %uhash = $helper->unique(@array);
+    my @uniques = keys(%uhash);
 
 =cut
 
 sub unique
 {
-	my ($self,@list) = @_;
-	my (%seen,$item);
-	foreach $item (@list) 
-	{
-		$seen{$item}++;
-	}
-	return(%seen);
+    my ($self,@list) = @_;
+    my (%seen,$item);
+    foreach $item (@list) 
+    {
+        $seen{$item}++;
+    }
+    return(%seen);
 }
 
 =head2 count_lines($file)
 
 Counts the lines of a (non-binary) file
 
-	my $number_of_lines = $helper->count_lines($file);
+    my $number_of_lines = $helper->count_lines($file);
 
 =cut
 
 sub count_lines
 {
-	open(IN,$_[1]) or die "\nThe file $_[0] does not exist!\n\n";
-	my $totlines=0;
-	$totlines += tr/\n/\n/ while sysread(IN,$_,2**16);
-	close(IN);
-	return $totlines;
+    open(IN,$_[1]) or die "\nThe file $_[0] does not exist!\n\n";
+    my $totlines=0;
+    $totlines += tr/\n/\n/ while sysread(IN,$_,2**16);
+    close(IN);
+    return $totlines;
 }
 
 =head2 count_unique_lines($file)
 
 Counts the unique lines of a (non-binary) file
 
-	my $uniqe_number_of_lines = $helper->count_unique_lines($file);
+    my $uniqe_number_of_lines = $helper->count_unique_lines($file);
 
 =cut
 
 sub count_unique_lines
 {
-	my ($self,$in) = @_;
-	open(IN,$in) or croak "\nThe file $in does not exist!\n\n";
-	my ($l,@li,%lh);
-	while ($l = <IN>)
-	{
-		@li = split(/\t/,$l);
-		$lh{$li[0]}++;
-	}
-	close(IN);
-	my $totlines = keys(%lh);
-	return $totlines;
+    my ($self,$in) = @_;
+    open(IN,$in) or croak "\nThe file $in does not exist!\n\n";
+    my ($l,@li,%lh);
+    while ($l = <IN>)
+    {
+        @li = split(/\t/,$l);
+        $lh{$li[0]}++;
+    }
+    close(IN);
+    my $totlines = keys(%lh);
+    return $totlines;
 }
 
 =head2 decide_header
@@ -192,238 +192,245 @@ sub count_unique_lines
 Parse the first line of a bed-like file and decide if it has a header line that describes each column or data start right away.
 Internal use.
 
-	my $has_header = $helper->decide_header($first_line);
-	
+    my $has_header = $helper->decide_header($first_line);
+    
 =cut
 
 sub decide_header
 {
-	my ($self,$line)= @_;
-	$line =~ s/\r|\n$//g;
-	my @cols = split(/\t/,$line);
-	if ($cols[0] =~ m/^chr/ && $cols[1] =~ m/\d+/ && $cols[2] =~ m/\d+/)
-	{
-		return(0); # Does not contain a header, is proper bed line
-	}
-	else
-	{
-		return($line);
-	}
+    my ($self,$line)= @_;
+    $line =~ s/\r|\n$//g;
+    my @cols = split(/\t/,$line);
+    if ($cols[0] =~ m/^chr/ && $cols[1] =~ m/\d+/ && $cols[2] =~ m/\d+/)
+    {
+        return(0); # Does not contain a header, is proper bed line
+    }
+    else
+    {
+        return($line);
+    }
 }
 
 =head2 count_fasta($fasta_file)
 
 Counts the number of sequences in a FASTA file
 
-	my $number_of_seqs = $helper->count_fasta($fasta_file);
+    my $number_of_seqs = $helper->count_fasta($fasta_file);
 
 =cut
 
 sub count_fasta
 {
-	my ($self,$in) = @_;
-	open(IN,$in) or croak "\nThe file $in does not exist!\n\n";
-	my $totfa=0;
-	$totfa += tr/\>/\>/ while sysread(IN,$_,2**16);
-	close(IN);
-	return $totfa;
+    my ($self,$in) = @_;
+    open(IN,$in) or croak "\nThe file $in does not exist!\n\n";
+    my $totfa=0;
+    $totfa += tr/\>/\>/ while sysread(IN,$_,2**16);
+    close(IN);
+    return $totfa;
 }
 
 =head2 check_fasta($file)
 
 Quick (and dirty) check if the input file is a FASTA file
 
-	my $is_fasta = $helper->check_fasta($file);
+    my $is_fasta = $helper->check_fasta($file);
 
 =cut
 
 sub check_fasta
 {
-	my ($self,$in) = @_;
-	open(FCHK,$in) or croak "\nThe file $in does not exist!\n";
-	my $chk = 0;
-	$chk = 1 if (<FCHK> !~ /^>/);
-	close(FCHK);
-	return($chk);
+    my ($self,$in) = @_;
+    open(FCHK,$in) or croak "\nThe file $in does not exist!\n";
+    my $chk = 0;
+    $chk = 1 if (<FCHK> !~ /^>/);
+    close(FCHK);
+    return($chk);
 }
 
 =head2 check_tabseq($file)
 
 Quick (and dirty) check if the input file is a tabular sequence file
 
-	my $is_tab = $helper->check_tabseq($file);
+    my $is_tab = $helper->check_tabseq($file);
 
 =cut
 
 sub check_tabseq
 {
-	my ($self,$in) = @_;
-	open(TCHK,$in) or die "\nThe file $in does not exist!\n";
-	my $chk = 0;
-	my @test = split(/\t/,<TCHK>);
-	my $len = @test;
-	$chk = 1 if ($len < 2);
-	close(TCHK);
-	return($chk);
+    my ($self,$in) = @_;
+    open(TCHK,$in) or die "\nThe file $in does not exist!\n";
+    my $chk = 0;
+    my @test = split(/\t/,<TCHK>);
+    my $len = @test;
+    $chk = 1 if ($len < 2);
+    close(TCHK);
+    return($chk);
 }
 
 =head2 range_vector
 
 Create an expanded array from the numbers start, increment, end. MATLAB-like expansion.
 
-	my $array = $helper->range_vector($start,$end,$inc);
+    my $array = $helper->range_vector($start,$end,$inc);
 
 =cut
 
 sub range_vector
 {
-	my ($self,$s,$e,$inc) = @_;
-	my @rout;
-	my $counter = 0;
-	my $temp = $s;
-	# Create output vector according to order
-	if ($s < $e)
-	{
-		while ($temp <= $e)
-		{
-			$rout[$counter] = $temp;
-			$counter++;
-			$temp += $inc;
-		}
-	}
-	else
-	{
-		while ($temp >= $e)
-		{
-			$rout[$counter] = $temp;
-			$counter++;
-			$temp -= $inc;
-		}
-	}
-	return(@rout);
+    my ($self,$s,$e,$inc) = @_;
+    my @rout;
+    my $counter = 0;
+    my $temp = $s;
+    # Create output vector according to order
+    if ($s < $e)
+    {
+        while ($temp <= $e)
+        {
+            $rout[$counter] = $temp;
+            $counter++;
+            $temp += $inc;
+        }
+    }
+    else
+    {
+        while ($temp >= $e)
+        {
+            $rout[$counter] = $temp;
+            $counter++;
+            $temp -= $inc;
+        }
+    }
+    return(@rout);
 }
 
 =head2 round($number)
 
-Scientifically rounds a number to the closest integer
+Scientifically rounds a number to the closest integer or to a real specified by $digits. Passing $digits is optional.
 
-	my $rounded = $helper->round($real);
-	
+    my $rounded = $helper->round($real,2);
+    
 =cut
 
 sub round
 {
-	my ($self,$number) = @_;
-	return int($number + .5*($number <=> 0));
+    my ($self,$number,$digits) = @_;
+    if (!$digits)
+    {
+        return int($number + .5*($number <=> 0));
+    }
+    else
+    {
+        return(sprintf("%.".$digits."f",$number));
+    }
 }
 
 =head2 mean(@array)
 
 Calculates the arithmetic mean of a numeric array
 
-	my $mean = $helper->mean(@array);
-	
+    my $mean = $helper->mean(@array);
+    
 =cut
 
 sub mean 
 {
-	my $self = shift @_;
-	my $result;
-	foreach (@_) { $result += $_ ;}
-	return $result/@_;
+    my $self = shift @_;
+    my $result;
+    foreach (@_) { $result += $_ ;}
+    return $result/@_;
 }
 
 =head2 stdev(@array)
 
 Calculates the standard deviation of a numeric array
 
-	my $stdev = $helper->stdev(@array);
-	
+    my $stdev = $helper->stdev(@array);
+    
 =cut
 
 sub stdev 
 {
-	my $self = shift @_;
-	my $mean = mean(@_);
-	my @elemsquared;
-	foreach (@_)
-	{
-		push (@elemsquared,($_**2));
-	}
-	return sqrt(mean(@elemsquared) - ($mean**2));
-}	
+    my $self = shift @_;
+    my $mean = mean(@_);
+    my @elemsquared;
+    foreach (@_)
+    {
+        push (@elemsquared,($_**2));
+    }
+    return sqrt(mean(@elemsquared) - ($mean**2));
+}   
 
 =head2 median(@array)
 
 Calculates the median of a numeric array
 
-	my $med = $helper->median(@array);
-	
+    my $med = $helper->median(@array);
+    
 =cut
 
 sub median
 {
-	my $self = shift @_;
+    my $self = shift @_;
     my @pole = sort(@_);
     my $ret;
     if((@pole % 2) == 1)
     {
-    	$ret = $pole[((@pole+1)/2) - 1];
+        $ret = $pole[((@pole+1)/2) - 1];
     }
     else 
     {
         $ret = ($pole[(@pole/2) - 1] + $pole[@pole/2])/2;
     }
-	return $ret;
+    return $ret;
 }
 
 =head2 mad(@array)
 
 Calculates the median absolute deviation of a numeric array
 
-	my $MAD = $helper->mad(@array);
-	
+    my $MAD = $helper->mad(@array);
+    
 =cut
 
 sub mad
 {
-	my $self = shift @_;
-	my @absdiff;
-	my $med = median(@_);
-	foreach (@_)
-	{
-		push(@absdiff,($_ - $med));
-	}
-	return abs(median(@absdiff));
+    my $self = shift @_;
+    my @absdiff;
+    my $med = median(@_);
+    foreach (@_)
+    {
+        push(@absdiff,($_ - $med));
+    }
+    return abs(median(@absdiff));
 }
 
 =head2 minmax(@array)
 
 Returns the minimum and the maximum value of an arithmetic arraty
 
-	my $minmax = $helper->minmax(@array);
-	
+    my $minmax = $helper->minmax(@array);
+    
 =cut
 
 sub minmax
 {
-	my $self = shift @_;
-	my @s = sort { $a <=> $b } @_;
-	return($s[0],$s[$#s]);
+    my $self = shift @_;
+    my @s = sort { $a <=> $b } @_;
+    return($s[0],$s[$#s]);
 }
 
 =head2 get_sys_sep
 
 Returns the OS system path separator
 
-	my $sysep = $helper->get_sys_sep;
-	
+    my $sysep = $helper->get_sys_sep;
+    
 =cut
 
 sub get_sys_sep
 {
-	my $self = shift @_;
-	($^O !~ /MSWin/) ? (return("/")) : (return("\\"))
+    my $self = shift @_;
+    ($^O !~ /MSWin/) ? (return("/")) : (return("\\"))
 }
 
 =head2 try_module($module)
@@ -431,34 +438,34 @@ sub get_sys_sep
 Checks if a required by the package module exists and dies with additional info in the case that the
 module does not exist
 
-	my $exists = $helper->try_module($module);
-	
+    my $exists = $helper->try_module($module);
+    
 =cut
 
 sub try_module
 {
-	my ($self,$module,@fun) = @_;
-	eval "require $module";
-	if ($@)
-	{
-		my $killer = "Module $module is required to continue with the execution. If you are in\n". 
-					 "Windows and you have ActiveState Perl installed, use the Package Manager\n".
-					 "to get the module. If you are under Linux, log in as a super user (or use\n".
-					 "sudo under Ubuntu) and type \"perl -MCPAN -e shell\" (you will possibly have\n".
-					 "to answer some questions). After this type \"install $module\" to install\n".
-					 "the module. If you don't know how to install the module, contact your\n".
-					 "system administrator.";
-		croak "\n$killer\n\n";
-	}
-	else
-	{
-		if (@fun)
-		{
-			my $funs = join(" ",@fun);
-			eval "use $module qw($funs)";
-		}
-		else { eval "use $module"; }
-	}
+    my ($self,$module,@fun) = @_;
+    eval "require $module";
+    if ($@)
+    {
+        my $killer = "Module $module is required to continue with the execution. If you are in\n". 
+                     "Windows and you have ActiveState Perl installed, use the Package Manager\n".
+                     "to get the module. If you are under Linux, log in as a super user (or use\n".
+                     "sudo under Ubuntu) and type \"perl -MCPAN -e shell\" (you will possibly have\n".
+                     "to answer some questions). After this type \"install $module\" to install\n".
+                     "the module. If you don't know how to install the module, contact your\n".
+                     "system administrator.";
+        croak "\n$killer\n\n";
+    }
+    else
+    {
+        if (@fun)
+        {
+            my $funs = join(" ",@fun);
+            eval "use $module qw($funs)";
+        }
+        else { eval "use $module"; }
+    }
 }
 
 =head2 swap(@array_two_members)
@@ -466,13 +473,13 @@ sub try_module
 Simply swaps the two first elements of an array, ignores the rest. It is intended to be used ONLY with
 arrays with two elements.
 
-	my @swapped_array = $helper->swap(@array);
-	
+    my @swapped_array = $helper->swap(@array);
+    
 =cut
 
 sub swap
 {
-	return($_[2],$_[1]);
+    return($_[2],$_[1]);
 }
 
 =head2 disp(@array_of_messages)
@@ -480,71 +487,71 @@ sub swap
 Simply displays a user-defined message in STDERR if verbosity is requested from a higher level. It also
 prints messages to a log file handle, if requested from a higher level.
 
-	$helper->disp("Hello world!");
-	
+    $helper->disp("Hello world!");
+    
 =cut
 
 sub disp
 {
-	my $self = shift @_;
-	my @msg = @_;
-	my $logger = get_logger("HTS::Tools::Utils");
-	#use Data::Dumper;
-	#print "\n",Dumper($logger),"\n";
-	print STDERR "\n@msg" if (!$self->get("silent"));
-	$logger->info("\n@msg") if ($self->get("log"));
+    my $self = shift @_;
+    my @msg = @_;
+    my $logger = get_logger("HTS::Tools::Utils");
+    #use Data::Dumper;
+    #print "\n",Dumper($logger),"\n";
+    print STDERR "\n@msg" if (!$self->get("silent"));
+    $logger->info("\n@msg") if ($self->get("log"));
 }
 
 =head2 disp(@array_of_messages)
 
 Prints some credits for the respective module
 
-	my $mod = "My::Module"
-	my $ver = "0.01";
-	my $auth = "John Doe";
-	my $email = "john.doe\@example.com"
-	my $adtext = "My extraordinary module."
-	my $helper = HTS::Tools::Utils->new();
-	$helper->advertise($mod,$ver,$auth,$email,$adtext);
-	
+    my $mod = "My::Module"
+    my $ver = "0.01";
+    my $auth = "John Doe";
+    my $email = "john.doe\@example.com"
+    my $adtext = "My extraordinary module."
+    my $helper = HTS::Tools::Utils->new();
+    $helper->advertise($mod,$ver,$auth,$email,$adtext);
+    
 =cut
 
 sub advertise
 {
-	my ($self,$mod,$ver,$auth,$email,$adtext) = @_;
-	$mod = "My::Module" unless($mod);
-	$ver = "0.01" unless($ver);
-	$auth = "John Doe" unless($auth);
-	$email = "john.doe\@example.com" unless($email);
-	$adtext = "My extraordinary module" unless($adtext);
-	my $credits = $adtext." Copyright: ".$auth." ".$email;
-	#use Term::ANSIColor;
-	#print color 'bold yellow on_blue';
-	$self->disp($mod." ".$ver);
-	#print color 'bold green';
-	$self->disp($credits."\n");
-	#print color 'reset';
+    my ($self,$mod,$ver,$auth,$email,$adtext) = @_;
+    $mod = "My::Module" unless($mod);
+    $ver = "0.01" unless($ver);
+    $auth = "John Doe" unless($auth);
+    $email = "john.doe\@example.com" unless($email);
+    $adtext = "My extraordinary module" unless($adtext);
+    my $credits = $adtext." Copyright: ".$auth." ".$email;
+    #use Term::ANSIColor;
+    #print color 'bold yellow on_blue';
+    $self->disp($mod." ".$ver);
+    #print color 'bold green';
+    $self->disp($credits."\n");
+    #print color 'reset';
 }
 
 =head2 count_hoh(%hash_of_hashes)
 
 Counts internal hash elements in a hash of hashes
 
-	$helper->count_hoh(%complex_hash);
-	
+    $helper->count_hoh(%complex_hash);
+    
 =cut
 
 sub count_hoh
 {
-	my ($self,$inhash) = @_;
-	my ($c,$h,$i,$count);
-	foreach $c (keys(%$inhash))
-	{
-		$h = $inhash->{$c};
-		$count+= keys(%$h); 
-	}
-	$count = 0 if (!$count);
-	return($count);
+    my ($self,$inhash) = @_;
+    my ($c,$h,$i,$count);
+    foreach $c (keys(%$inhash))
+    {
+        $h = $inhash->{$c};
+        $count+= keys(%$h); 
+    }
+    $count = 0 if (!$count);
+    return($count);
 }
 
 =head2 catch_cleanup
@@ -552,105 +559,121 @@ sub count_hoh
 Ctrl-C signal catcher that ensures removing of temporary directories. Never use this directly as it
 will throw an error
 
-	SIG{INT} = sub { $helper->catch_cleanup }
+    SIG{INT} = sub { $helper->catch_cleanup }
 
 =cut
 
 sub catch_cleanup 
 {
-	my $self = shift @_;
-	$self->cleanup;
-	croak "\nCatching Ctrl-C, cleaning temporary files!\n";
+    my $self = shift @_;
+    $self->cleanup;
+    croak "\nCatching Ctrl-C, cleaning temporary files!\n";
 }
 
 =head2 cleanup
 
 The cleanup function of the signal catcher
 
-	$helper->cleanup
+    $helper->cleanup
 
 =cut
 
 sub cleanup 
 {
-	my $self = shift @_;
-	remove_tree($self->get("tmpdir"));
+    my $self = shift @_;
+    remove_tree($self->get("tmpdir"));
 }
 
 =head2 waitbar_init
 
 Very simple waitbar inititation
 
-	$helper->waitbar_init;
+    $helper->waitbar_init;
 
 =cut
 
 sub waitbar_init
 {
-	my ($self,$initlen) = @_;
-	$initlen = 50 if (!$initlen);
-	my $printlen = ' 'x$initlen;
-	print "\nProgress\n";
-	print "|$printlen|\n";
-	print("|");
+    my ($self,$initlen) = @_;
+    $initlen = 50 if (!$initlen);
+    my $printlen = ' 'x$initlen;
+    print "\nProgress\n";
+    print "|$printlen|\n";
+    print("|");
 }
 
 =head2 waitbar_update
 
 Very simple waitbar progress
 
-	$helper->waitbar_update($curr_iter,$total_length)
+    $helper->waitbar_update($curr_iter,$total_length)
 
 =cut
 
 sub waitbar_update
 {
-	my ($self,$curr,$tot,$waitbarlen) = @_;
-	$waitbarlen = 50 if (!$waitbarlen);
-	my $step;
-	if ($tot > $waitbarlen)
-	{
-		$step = ceil($tot/$waitbarlen);
-		print "#" if ($curr%$step == 0);
-	}
-	else
-	{
-		$step = floor($waitbarlen/$tot);
-		print "#" x $step;
-	}
-	if ($curr == $tot)
-	{
-		my $rem = $waitbarlen - floor($tot/$step);
-		($rem != 0) ? (print "#" x $rem."|\n") : print "|\n";
-	}
+    my ($self,$curr,$tot,$waitbarlen) = @_;
+    $waitbarlen = 50 if (!$waitbarlen);
+    my $step;
+    if ($tot > $waitbarlen)
+    {
+        $step = ceil($tot/$waitbarlen);
+        print "#" if ($curr%$step == 0);
+    }
+    else
+    {
+        $step = floor($waitbarlen/$tot);
+        print "#" x $step;
+    }
+    if ($curr == $tot)
+    {
+        my $rem = $waitbarlen - floor($tot/$step);
+        ($rem != 0) ? (print "#" x $rem."|\n") : print "|\n";
+    }
+}
+
+=head2 sort_by_index
+
+Sort numeric array by index
+
+    $helper->sort_by_index(@array);
+    
+=cut
+
+sub sort_by_index
+{
+    my $self = shift @_;
+    my @values = @_;
+    my @ind = sort {$values[$a] <=> $values[$b]} 0..$#values;
+    return (@ind);
 }
 
 =head2 get
 
 HTS::Tools::Utils object getter
 
-	my $param_value = $helper->get("param_name")
+    my $param_value = $helper->get("param_name")
 =cut
 
 sub get
 {
-	my ($self,$name) = @_;
-	return($self->{$name});
+    my ($self,$name) = @_;
+    return($self->{$name});
 }
 
 =head2 set
 
 HTS::Tools::Utils object setter
 
-	$helper->set("param_name","param_value")
-	
+    $helper->set("param_name","param_value")
+    
 =cut
 
 sub set
 {
-	my ($self,$name,$value) = @_;
-	$self->{$name} = $value;
-	return($self);
+    my ($self,$name,$value) = @_;
+    $self->{$name} = $value;
+    return($self);
 }
 
 =head1 AUTHOR
