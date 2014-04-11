@@ -121,6 +121,8 @@ sub run
 {
     my $self = shift @_;
 
+    use Data::Dumper;
+    
     my @infile = @{$self->get("input")};
     my $savrem = $self->get("savrem");
     my $rand = $self->get("sumto");
@@ -161,6 +163,7 @@ sub run
             @sortidx = $helper->sort_by_index(@randnum);
             $helper->disp("Getting required and writing output...");
             @indrem = sort {$a <=> $b} @sortidx[0..$linesfiles[$i] - $minlines - 1];
+            $nochange = 1 if ($#indrem == -1);
         }
         elsif ($rand eq "permute")
         {
@@ -168,6 +171,7 @@ sub run
             @randnum = Math::Random::random_permuted_index($linesfiles[$i]);
             $helper->disp("Getting required and writing output...");
             @indrem = sort {$a <=> $b} @randnum[0..$linesfiles[$i] - $minlines - 1];
+            $nochange = 1 if ($#indrem == -1);
         }
         else # $rand is an integer
         {
@@ -195,7 +199,7 @@ sub run
         $outfile[$i] = $dir[$i].$base[$i]."_norm".$ext[$i];
         open(INPUT,$infile[$i]) or die "\nThe file $infile[$i] does not exist!\n";
         open(OUTPUT,">$outfile[$i]");
-        $j = 0;
+        $j = 1;
 
         if ($nochange)
         {
@@ -205,13 +209,17 @@ sub run
         {
             while (<INPUT>)
             {
-                if (($. - 1) == $indrem[$j] && $j <= $#indrem)
+                #if (($. - 1) == $indrem[$j] && $j <= $#indrem)
+                if ($. == $indrem[$j-1] && $j <= $#indrem)
                 {
                     $j++;
                     print SAVEREMTAGS "$indrem[$j]"."\t".$_ if ($savrem);
-                    next;
+                    #next;
                 }
-                print OUTPUT $_;
+                else
+                {
+                    print OUTPUT $_;
+                }
             }
         }
 

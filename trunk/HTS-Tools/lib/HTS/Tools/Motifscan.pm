@@ -20,18 +20,18 @@ fasta file provided and on the false postive rate (fpr) provided. The module pro
 a simple file with the number of hits of each motif in each input file, gff files with the hits and bed
 files with the hits, including also a significance score of the scan hit in the 5th column of the bed file.
 
-	use HTS::Tools::Motifscan;
-	my %params = (
-		'input' => ['normal_nfkb_peaks.fa','cancer_nfkb_peaks.fa','mock_peaks.fa']
-		'motif' => 'my_motif_matrices.pwm',
-		'scanner' => 'pwmscan',
-		'background' => 'background_sequences.tab',
-		'range' => 0.1:0.1:1,
-		'fpr' => 0.05,
-		'times' => 10,
-		'length' => 400,
-		'output' => ['gff','bed','stats']
-	)
+    use HTS::Tools::Motifscan;
+    my %params = (
+        'input' => ['normal_nfkb_peaks.fa','cancer_nfkb_peaks.fa','mock_peaks.fa']
+        'motif' => 'my_motif_matrices.pwm',
+        'scanner' => 'pwmscan',
+        'background' => 'background_sequences.tab',
+        'range' => 0.1:0.1:1,
+        'fpr' => 0.05,
+        'times' => 10,
+        'length' => 400,
+        'output' => ['gff','bed','stats']
+    )
     my $motifscanner = HTS::Tools::Motifscan->new(\%params);
     $motifscanner->run;
 
@@ -161,11 +161,11 @@ our $EMAIL = "moulos\@fleming.gr";
 our $DESC = "Motif scan in a set of sequences using 3rd party tools.";
 
 BEGIN {
-	$helper = HTS::Tools::Utils->new();
-	$const = HTS::Tools::Constants->new();
-	select(STDOUT);
-	$|=1;
-	$SIG{INT} = sub { $helper->catch_cleanup; }
+    $helper = HTS::Tools::Utils->new();
+    $const = HTS::Tools::Constants->new();
+    select(STDOUT);
+    $|=1;
+    $SIG{INT} = sub { $helper->catch_cleanup; }
 }
 
 =head2 new
@@ -173,34 +173,34 @@ BEGIN {
 The HTS::Tools::Motifscan object constructor. It accepts a set of parameters that are required to run the
 motifscanner and get the output.
 
-	my $motifscanner = HTS::Tools::Motifscan->new({'input' => ['peaks_1.fa','peaks_2.fa'],'motif' => 'my_motifs.pwm',
-		'scanner' => 'pwmscan','justscan' => 1});
+    my $motifscanner = HTS::Tools::Motifscan->new({'input' => ['peaks_1.fa','peaks_2.fa'],'motif' => 'my_motifs.pwm',
+        'scanner' => 'pwmscan','justscan' => 1});
 
 =cut
 
 sub new
 {
-	my ($class,$params) = @_;
-	my $self = {};
+    my ($class,$params) = @_;
+    my $self = {};
 
-	# Pass global variables to the helper
-	(defined($params->{"silent"})) ? ($helper->set("silent",$params->{"silent"})) :
-		($helper->set("silent",0));
-	(defined($params->{"tmpdir"})) ? ($helper->set("tmpdir",$params->{"tmpdir"})) :
-		($helper->set("tmpdir",File::Temp->newdir()));
-	$helper->set_logger($params->{"log"}) if (defined($params->{"log"}));
-	$helper->advertise($MODNAME,$VERSION,$AUTHOR,$EMAIL,$DESC);
+    # Pass global variables to the helper
+    (defined($params->{"silent"})) ? ($helper->set("silent",$params->{"silent"})) :
+        ($helper->set("silent",0));
+    (defined($params->{"tmpdir"})) ? ($helper->set("tmpdir",$params->{"tmpdir"})) :
+        ($helper->set("tmpdir",File::Temp->newdir()));
+    $helper->set_logger($params->{"log"}) if (defined($params->{"log"}));
+    $helper->advertise($MODNAME,$VERSION,$AUTHOR,$EMAIL,$DESC);
 
-	# Validate the input parameters
-	my $checker = HTS::Tools::Paramcheck->new();
-	$checker->set("tool","motifscan");
-	$checker->set("params",$params);
-	$params = $checker->validate;
+    # Validate the input parameters
+    my $checker = HTS::Tools::Paramcheck->new();
+    $checker->set("tool","motifscan");
+    $checker->set("params",$params);
+    $params = $checker->validate;
 
-	# After validating, bless and initialize
-	bless($self,$class);
-	$self->init($params);
-	return($self);
+    # After validating, bless and initialize
+    bless($self,$class);
+    $self->init($params);
+    return($self);
 }
 
 =head2 init
@@ -211,14 +211,14 @@ HTS::Tools::Motifscan object initialization method. NEVER use this directly, use
 
 sub init
 {
-	my ($self,$params) = @_;
+    my ($self,$params) = @_;
 
-	# Basic
-	foreach my $p (keys(%$params)) { $self->set($p,$params->{$p}); }
+    # Basic
+    foreach my $p (keys(%$params)) { $self->set($p,$params->{$p}); }
 
     # Global
-	$self->set("silent",$helper->get("silent")) unless defined($self->{"silent"});
-	$self->set("tmpdir",$helper->get("tmpdir")) unless defined($self->{"tmpdir"});
+    $self->set("silent",$helper->get("silent")) unless defined($self->{"silent"});
+    $self->set("tmpdir",$helper->get("tmpdir")) unless defined($self->{"tmpdir"});
     
     return($self);
 }
@@ -228,569 +228,569 @@ sub init
 The HTS::Tools::Motifscan run subroutine. It runs the motifscanner with the given parameters in the 
 constructor.
 
-	$motifscanner->run;
-	
+    $motifscanner->run;
+    
 =cut
 
 sub run
 {
-	my $self = shift @_;
-	
-	# Copy some memory-less variables to avoid rewriting the whole thing...
-	our @seqfile = @{$self->get("input")};
-	our @output = @{$self->get("output")};
-	our @cntfile = @{$self->get("center")};
-	our @cntcol = @{$self->get("colext")};
-	our @range = @{$self->get("range")};
-	our $motfile = $self->get("motif"); 
-	our $backfile = $self->get("background");
-	our $scanner = $self->get("scanner");
-	our $fpr = $self->get("fpr");
-	our $times = $self->get("times");
-	our $length = $self->get("length");
-	our $besthit = $self->get("besthit");
-	our $unistats = $self->get("uniquestats");
-	our $justscan = $self->get("justscan");
-	
-	my ($ogff,$obed,$ostat);
-	our $olog;
-	foreach my $o (@output)
-	{
-		$ogff = 1 if ($o eq "gff");
-		$obed = 1 if ($o eq "bed");
-		$ostat = 1 if ($o eq "stats");
-		$olog = 1 if ($o eq "log");
-	}
+    my $self = shift @_;
+    
+    # Copy some memory-less variables to avoid rewriting the whole thing...
+    our @seqfile = @{$self->get("input")};
+    our @output = @{$self->get("output")};
+    our @cntfile = @{$self->get("center")};
+    our @cntcol = @{$self->get("colext")};
+    our @range = @{$self->get("range")};
+    our $motfile = $self->get("motif"); 
+    our $backfile = $self->get("background");
+    our $scanner = $self->get("scanner");
+    our $fpr = $self->get("fpr");
+    our $times = $self->get("times");
+    our $length = $self->get("length");
+    our $besthit = $self->get("besthit");
+    our $unistats = $self->get("uniquestats");
+    our $justscan = $self->get("justscan");
+    
+    my ($ogff,$obed,$ostat);
+    our $olog;
+    foreach my $o (@output)
+    {
+        $ogff = 1 if ($o eq "gff");
+        $obed = 1 if ($o eq "bed");
+        $ostat = 1 if ($o eq "stats");
+        $olog = 1 if ($o eq "log");
+    }
 
-	# Start logging if chosen
-	our @log;
-	push(@log,"##########     HTS::Tools::Motifscan logfile     ##########\n") if ($olog);
+    # Start logging if chosen
+    our @log;
+    push(@log,"##########     HTS::Tools::Motifscan logfile     ##########\n") if ($olog);
 
-	# Bavard
-	my $date = $helper->now;
-	$helper->disp("$date - Started...\n");
+    # Bavard
+    my $date = $helper->now;
+    $helper->disp("$date - Started...\n");
 
-	# More bavard... I like information...
-	$helper->disp("Selected scanner : $scanner");
-	($justscan) ? ($helper->disp("Cutoff range : $justscan")) : 
-	($helper->disp("Cutoff range : ",$range[0],"to",$range[$#range]));
-	$helper->disp("False Positive Rate : $fpr");
-	$helper->disp("Chosen output(s) : ",join("\, ",@output),"\n");
+    # More bavard... I like information...
+    $helper->disp("Selected scanner : $scanner");
+    ($justscan) ? ($helper->disp("Cutoff range : $justscan")) : 
+    ($helper->disp("Cutoff range : ",$range[0],"to",$range[$#range]));
+    $helper->disp("False Positive Rate : $fpr");
+    $helper->disp("Chosen output(s) : ",join("\, ",@output),"\n");
 
-	# If bed output chosen and cntfile given, read them and merge them to database
-	my %cnthash;
-	if ($obed && @cntfile)
-	{
-		$helper->disp("Merging files containing peak centers...");
-		foreach my $c (@cntfile)
-		{
-			my ($line,@columns);
-			open(CNT,"$c");
-			$line = <CNT>;
-			my $header = $helper->decide_header($line);
-			seek(CNT,0,0) if (!$header);
-			while ($line = <CNT>)
-			{
-				@columns = split(/\t/,$line);
-				$cnthash{$columns[$cntcol[0]]} = $columns[$cntcol[1]];
-			}
-			close(CNT);
-		}
-	}
-	elsif ($obed && !(@cntfile || @cntcol))
-	{
-		$helper->disp("WARNING! BED output requested but no files containing peak centers are given...");
-		$helper->disp("Proceeding only with co-ordinates as will can be derived from sequence IDs...");
-		$helper->disp("Assuming sequence ID format : chr:start-end or chr:start:end...\n");
-	}
+    # If bed output chosen and cntfile given, read them and merge them to database
+    my %cnthash;
+    if ($obed && @cntfile)
+    {
+        $helper->disp("Merging files containing peak centers...");
+        foreach my $c (@cntfile)
+        {
+            my ($line,@columns);
+            open(CNT,"$c");
+            $line = <CNT>;
+            my $header = $helper->decide_header($line);
+            seek(CNT,0,0) if (!$header);
+            while ($line = <CNT>)
+            {
+                @columns = split(/\t/,$line);
+                $cnthash{$columns[$cntcol[0]]} = $columns[$cntcol[1]];
+            }
+            close(CNT);
+        }
+    }
+    elsif ($obed && !(@cntfile || @cntcol))
+    {
+        $helper->disp("WARNING! BED output requested but no files containing peak centers are given...");
+        $helper->disp("Proceeding only with co-ordinates as will can be derived from sequence IDs...");
+        $helper->disp("Assuming sequence ID format : chr:start-end or chr:start:end...\n");
+    }
 
-	my ($i,$j,$k); # General indices
-	my @stats; # Stats array in case
+    my ($i,$j,$k); # General indices
+    my @stats; # Stats array in case
 
-	# Parse the motifs file, split it into different files
-	my @mfiles = $self->parse_motifs($motfile,$scanner);
+    # Parse the motifs file, split it into different files
+    my @mfiles = $self->parse_motifs($motfile,$scanner);
 
-	# If running the full process, not just scanning given only one threshold
-	if (!$justscan)
-	{
-		# Quick and dirty checking about tabular file
-		my $chk = $helper->check_tabseq($backfile);
-		my $backbackup = $backfile;
-		if ($chk)
-		{
-			$helper->disp("Background file $backfile does not appear to be a tabular sequence file...");
-			$helper->disp("Checking if $backfile is in FASTA format...");
-			my $chkchk = $helper->check_fasta($backfile);
-			croak "\nBackground file $backfile does not appear to be in FASTA format either! Exiting...\n" if ($chkchk);
-			$helper->disp("$backfile is in FASTA format. Converting to tabular format...");
-			$backbackup = $backfile;
-			my $converter = HTS::Tools::Convert->new();
-			$backfile = $converter->fasta2tab($backfile);
-		}
+    # If running the full process, not just scanning given only one threshold
+    if (!$justscan)
+    {
+        # Quick and dirty checking about tabular file
+        my $chk = $helper->check_tabseq($backfile);
+        my $backbackup = $backfile;
+        if ($chk)
+        {
+            $helper->disp("Background file $backfile does not appear to be a tabular sequence file...");
+            $helper->disp("Checking if $backfile is in FASTA format...");
+            my $chkchk = $helper->check_fasta($backfile);
+            croak "\nBackground file $backfile does not appear to be in FASTA format either! Exiting...\n" if ($chkchk);
+            $helper->disp("$backfile is in FASTA format. Converting to tabular format...");
+            $backbackup = $backfile;
+            my $converter = HTS::Tools::Convert->new();
+            $backfile = $converter->fasta2tab($backfile);
+        }
 
-		# Count number of background sequences
-		$helper->disp("Counting sequences in background file $backfile...");
-		my $nback = $helper->count_lines($backfile); 
-		$helper->disp("Background file $backfile contains $nback sequences.");
+        # Count number of background sequences
+        $helper->disp("Counting sequences in background file $backfile...");
+        my $nback = $helper->count_lines($backfile); 
+        $helper->disp("Background file $backfile contains $nback sequences.");
 
-		# Construct background index file for quick reference
-		my ($bbi,$bbd) = fileparse($backfile,'\.[^.]*');
-		$bbi = $bbd.$bbi.".idx";
-		if (! -e $bbi)
-		{
-			$helper->disp("Constructing index file for background file $backfile...");
-			open(BACK,"< $backfile");
-			open(INDEX,"+>$bbi") or croak "Can't open $bbi for read/write: $!\n";
-			$self->build_index(*BACK,*INDEX);
-			close(BACK);
-			close(INDEX);
-			$helper->disp("Index file for background constructed in $bbi.");
-		}
-		else
-		{
-			$helper->disp("Index file $bbi for background file $backfile already exists. Proceeding...\n");
-		}
-		
-		if ($scanner =~ /MotifScanner/i)
-		{
-			$helper->disp("Constructing Markov background model to be used with MotifScanner...");
-			$self->constructMSBackground($backbackup);
-		}
+        # Construct background index file for quick reference
+        my ($bbi,$bbd) = fileparse($backfile,'\.[^.]*');
+        $bbi = $bbd.$bbi.".idx";
+        if (! -e $bbi)
+        {
+            $helper->disp("Constructing index file for background file $backfile...");
+            open(BACK,"< $backfile");
+            open(INDEX,"+>$bbi") or croak "Can't open $bbi for read/write: $!\n";
+            $self->build_index(*BACK,*INDEX);
+            close(BACK);
+            close(INDEX);
+            $helper->disp("Index file for background constructed in $bbi.");
+        }
+        else
+        {
+            $helper->disp("Index file $bbi for background file $backfile already exists. Proceeding...\n");
+        }
+        
+        if ($scanner =~ /MotifScanner/i)
+        {
+            $helper->disp("Constructing Markov background model to be used with MotifScanner...");
+            $self->constructMSBackground($backbackup);
+        }
 
-		# Do job for peak-region-whatever files
-		for ($i=0; $i<@seqfile; $i++)
-		{
-			$helper->disp("Processing $seqfile[$i]...");
-			my $chkat1 = 0;
-			my $chk = $helper->check_fasta($seqfile[$i]);
-			if ($chk)
-			{
-				$helper->disp("File $seqfile[$i] does not appear to be a FASTA file. Proceeding to next...");
-				next;
-			}
-			else { $chkat1 = 1; }
-			
-			# Open, count lines, call background etc.
-			$helper->disp("Counting sequences in file $seqfile[$i]...");
-			my $nseqs = $helper->count_fasta($seqfile[$i]);
-			$helper->disp("File $seqfile[$i] has $nseqs sequences.");
-			
-			# Generate adjusted background for each input file
-			my $n = $times*$nseqs;
-			$helper->disp("Generating $n background sequences to be used for scanning of $seqfile[$i]...");
-			my $bfile = $self->get_random_seq($backfile,$bbi,$nback,$length,$n);
-			$helper->disp("$n background sequences written in file $bfile...\n");
-			
-			# For each motif, calculate threshold and scan according to selected scanner
-			use v5.10;
-			given($scanner)
-			{
-				when(/pwmscan/i)
-				{
-					my ($sl,$cutoff);
-					for ($j=0; $j<@mfiles; $j++)
-					{
-						$helper->disp("Calculating score cutoff based on sequences in $bfile for motif $mfiles[$j] using pwmscan...");
-						$helper->disp("Output will be written in bgcut.gff.\n");
-						# Use range vector
-						for  ($k=0; $k<@range; $k++)
-						{
-							$helper->disp("Now testing threshold $range[$k]...\n");
-							`pwmscan.py -i $bfile -c $range[$k] -p $mfiles[$j] -n $besthit > bgcut.gff `;
-							if ($besthit > 1) 
-							{
-								($unistats) ? ($sl = $helper->count_unique_lines("bgcut.gff")) : ($sl = &countLines("bgcut.gff"));
-							}
-							else { $sl = $helper->count_lines("bgcut.gff"); }
-							if ($sl <= $fpr*$n)
-							{
-								$cutoff = $range[$k];
-								last;
-							}
-							$helper->disp("FPR $fpr not reached... $sl matches out of $n sequences remain in background.");
-						}
-						if ($k == @range)
-						{
-							$helper->disp("Last number of sequences remaining in background : $sl");
-							$helper->disp("No cutoff within given range satisfies FPR criteria... Skipping to next.\n");
-							$cutoff = 0;
-							$stats[$i][$j] = 0 if ($ostat);
-							next;
-						} 
-						else 
-						{ 
-							$helper->disp("Cutoff for FPR $fpr determined at $cutoff.");
-							$helper->disp("$sl matches out of $n sequences remain in background.\n");
-						}
-						$helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j] using pwmscan... Cutoff: $cutoff.\n");
-						my $mbase = fileparse($mfiles[$j],'\.[^.]*');
-						my $currout = $self->create_output_file($seqfile[$i],"output",$mbase);
-						#`python pwmscan.py -i $seqfile[$i] -c $cutoff -s $spacer[$j] -p $mfiles[$j] -n $besthit > $currout `;
-						`pwmscan.py -i $seqfile[$i] -c $cutoff -p $mfiles[$j] -n $besthit > $currout `;
-						$self->convert2bed($currout,%cnthash) if ($obed);
-						my $nmatch;
-						if ($besthit > 1) 
-						{
-							($unistats) ? ($nmatch = $helper->count_unique_lines($currout)) : ($nmatch = &countLines($currout));
-						}
-						else { $nmatch = $helper->count_lines($currout); }
-						$stats[$i][$j] = $nmatch if ($ostat);
-						$helper->disp("$nmatch matches found in $seqfile[$i]. Output written in $currout.\n");
-						unlink($currout) if (!$ogff);
-					}
-				}
-				
-				when(/MotifScanner/i)
-				{
-					my ($sl,$cutoff);
-					for ($j=0; $j<@mfiles; $j++)
-					{
-						$helper->disp("Calculating score cutoff based on sequences in $bfile for motif $mfiles[$j] using MotifScanner...");
-						$helper->disp("Output will be written in bgcut.gff.\n");
-						# Use range vector
-						for  ($k=0; $k<@range; $k++)
-						{
-							$helper->disp("Now testing p-value threshold $range[$k]...\n");
-							($^O !~ /MSWin/) ? (`./MotifScanner -f $bfile -b MSmodel.bkg -m $mfiles[$j] -p $range[$k] -s 0 -o bgcut.gff `) :
-							(`MotifScanner -f $bfile -b MSmodel.bkg -m $mfiles[$j] -p $range[$k] -s 0 -o bgcut.gff `);
-							($unistats) ? ($sl = $helper->count_unique_lines("bgcut.gff")) : ($sl = $helper->count_lines("bgcut.gff"));
-							$sl--; # One line header of MotifScanner output
-							if ($sl <= $fpr*$n) 
-							{
-								$cutoff = $range[$k];
-								last;
-							}
-							$helper->disp("FPR $fpr not reached... $sl matches out of $n sequences remain in background.");
-						}
-						if ($k == @range)
-						{
-							$helper->disp ("Last number of sequences remaining in background : $sl");
-							$helper->disp ("No cutoff within given range satisfies FPR criteria... Skipping to next.\n");
-							$cutoff = 0;
-							$stats[$i][$j] = 0 if ($ostat);
-							next;
-						} 
-						else 
-						{ 
-							$helper->disp("Cutoff for FPR $fpr determined at $cutoff.");
-							$helper->disp("$sl matches out of $n sequences remain in background.\n");
-						}
-						$helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j]... Cutoff: $cutoff.\n");
-						my $mbase = fileparse($mfiles[$j],'\.[^.]*');
-						my $currout = $self->create_output_file($seqfile[$i],"output",$mbase);
-						($^O !~ /MSWin/) ? (`./MotifScanner -f $seqfile[$i] -b MSmodel.bkg -m $mfiles[$j] -p $cutoff -s 0 -o $currout `) :
-						(`MotifScanner -f $seqfile[$i] -b MSmodel.bkg -m $mfiles[$j] -p $cutoff -s 0 -o $currout `);
-						$self->convert2bed($currout,%cnthash) if ($obed);
-						my $nmatch;
-						($unistats) ? ($nmatch = $helper->count_unique_lines($currout)) : ($nmatch = $helper->count_lines($currout));
-						$nmatch--; # One line header of MotifScanner output
-						$stats[$i][$j] = $nmatch if ($ostat);
-						$helper->disp("$nmatch matches found in $seqfile[$i]. Output written in $currout.\n");
-						unlink($currout) if (!$ogff);
-					}
-				}
-			}
-			$helper->disp(" ");
-		}
-	}
-	else # Just scan the sequence files using one defined threshold
-	{
-		# Do job for peak-region-whatever files
-		for ($i=0; $i<@seqfile; $i++)
-		{
-			$helper->disp("Processing $seqfile[$i]...");
-			my $chkat1 = 0;
-			my $chk = $helper->check_fasta($seqfile[$i]);
-			if ($chk)
-			{
-				$helper->disp("File $seqfile[$i] does not appear to be a FASTA file. Proceeding to next...");
-				next;
-			}
-			else { $chkat1 = 1; }
+        # Do job for peak-region-whatever files
+        for ($i=0; $i<@seqfile; $i++)
+        {
+            $helper->disp("Processing $seqfile[$i]...");
+            my $chkat1 = 0;
+            my $chk = $helper->check_fasta($seqfile[$i]);
+            if ($chk)
+            {
+                $helper->disp("File $seqfile[$i] does not appear to be a FASTA file. Proceeding to next...");
+                next;
+            }
+            else { $chkat1 = 1; }
+            
+            # Open, count lines, call background etc.
+            $helper->disp("Counting sequences in file $seqfile[$i]...");
+            my $nseqs = $helper->count_fasta($seqfile[$i]);
+            $helper->disp("File $seqfile[$i] has $nseqs sequences.");
+            
+            # Generate adjusted background for each input file
+            my $n = $times*$nseqs;
+            $helper->disp("Generating $n background sequences to be used for scanning of $seqfile[$i]...");
+            my $bfile = $self->get_random_seq($backfile,$bbi,$nback,$length,$n);
+            $helper->disp("$n background sequences written in file $bfile...\n");
+            
+            # For each motif, calculate threshold and scan according to selected scanner
+            use v5.10;
+            given($scanner)
+            {
+                when(/pwmscan/i)
+                {
+                    my ($sl,$cutoff);
+                    for ($j=0; $j<@mfiles; $j++)
+                    {
+                        $helper->disp("Calculating score cutoff based on sequences in $bfile for motif $mfiles[$j] using pwmscan...");
+                        $helper->disp("Output will be written in bgcut.gff.\n");
+                        # Use range vector
+                        for  ($k=0; $k<@range; $k++)
+                        {
+                            $helper->disp("Now testing threshold $range[$k]...\n");
+                            `pwmscan.py -i $bfile -c $range[$k] -p $mfiles[$j] -n $besthit > bgcut.gff `;
+                            if ($besthit > 1) 
+                            {
+                                ($unistats) ? ($sl = $helper->count_unique_lines("bgcut.gff")) : ($sl = &countLines("bgcut.gff"));
+                            }
+                            else { $sl = $helper->count_lines("bgcut.gff"); }
+                            if ($sl <= $fpr*$n)
+                            {
+                                $cutoff = $range[$k];
+                                last;
+                            }
+                            $helper->disp("FPR $fpr not reached... $sl matches out of $n sequences remain in background.");
+                        }
+                        if ($k == @range)
+                        {
+                            $helper->disp("Last number of sequences remaining in background : $sl");
+                            $helper->disp("No cutoff within given range satisfies FPR criteria... Skipping to next.\n");
+                            $cutoff = 0;
+                            $stats[$i][$j] = 0 if ($ostat);
+                            next;
+                        } 
+                        else 
+                        { 
+                            $helper->disp("Cutoff for FPR $fpr determined at $cutoff.");
+                            $helper->disp("$sl matches out of $n sequences remain in background.\n");
+                        }
+                        $helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j] using pwmscan... Cutoff: $cutoff.\n");
+                        my $mbase = fileparse($mfiles[$j],'\.[^.]*');
+                        my $currout = $self->create_output_file($seqfile[$i],"output",$mbase);
+                        #`python pwmscan.py -i $seqfile[$i] -c $cutoff -s $spacer[$j] -p $mfiles[$j] -n $besthit > $currout `;
+                        `pwmscan.py -i $seqfile[$i] -c $cutoff -p $mfiles[$j] -n $besthit > $currout `;
+                        $self->convert2bed($currout,%cnthash) if ($obed);
+                        my $nmatch;
+                        if ($besthit > 1) 
+                        {
+                            ($unistats) ? ($nmatch = $helper->count_unique_lines($currout)) : ($nmatch = &countLines($currout));
+                        }
+                        else { $nmatch = $helper->count_lines($currout); }
+                        $stats[$i][$j] = $nmatch if ($ostat);
+                        $helper->disp("$nmatch matches found in $seqfile[$i]. Output written in $currout.\n");
+                        unlink($currout) if (!$ogff);
+                    }
+                }
+                
+                when(/MotifScanner/i)
+                {
+                    my ($sl,$cutoff);
+                    for ($j=0; $j<@mfiles; $j++)
+                    {
+                        $helper->disp("Calculating score cutoff based on sequences in $bfile for motif $mfiles[$j] using MotifScanner...");
+                        $helper->disp("Output will be written in bgcut.gff.\n");
+                        # Use range vector
+                        for  ($k=0; $k<@range; $k++)
+                        {
+                            $helper->disp("Now testing p-value threshold $range[$k]...\n");
+                            ($^O !~ /MSWin/) ? (`./MotifScanner -f $bfile -b MSmodel.bkg -m $mfiles[$j] -p $range[$k] -s 0 -o bgcut.gff `) :
+                            (`MotifScanner -f $bfile -b MSmodel.bkg -m $mfiles[$j] -p $range[$k] -s 0 -o bgcut.gff `);
+                            ($unistats) ? ($sl = $helper->count_unique_lines("bgcut.gff")) : ($sl = $helper->count_lines("bgcut.gff"));
+                            $sl--; # One line header of MotifScanner output
+                            if ($sl <= $fpr*$n) 
+                            {
+                                $cutoff = $range[$k];
+                                last;
+                            }
+                            $helper->disp("FPR $fpr not reached... $sl matches out of $n sequences remain in background.");
+                        }
+                        if ($k == @range)
+                        {
+                            $helper->disp ("Last number of sequences remaining in background : $sl");
+                            $helper->disp ("No cutoff within given range satisfies FPR criteria... Skipping to next.\n");
+                            $cutoff = 0;
+                            $stats[$i][$j] = 0 if ($ostat);
+                            next;
+                        } 
+                        else 
+                        { 
+                            $helper->disp("Cutoff for FPR $fpr determined at $cutoff.");
+                            $helper->disp("$sl matches out of $n sequences remain in background.\n");
+                        }
+                        $helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j]... Cutoff: $cutoff.\n");
+                        my $mbase = fileparse($mfiles[$j],'\.[^.]*');
+                        my $currout = $self->create_output_file($seqfile[$i],"output",$mbase);
+                        ($^O !~ /MSWin/) ? (`./MotifScanner -f $seqfile[$i] -b MSmodel.bkg -m $mfiles[$j] -p $cutoff -s 0 -o $currout `) :
+                        (`MotifScanner -f $seqfile[$i] -b MSmodel.bkg -m $mfiles[$j] -p $cutoff -s 0 -o $currout `);
+                        $self->convert2bed($currout,%cnthash) if ($obed);
+                        my $nmatch;
+                        ($unistats) ? ($nmatch = $helper->count_unique_lines($currout)) : ($nmatch = $helper->count_lines($currout));
+                        $nmatch--; # One line header of MotifScanner output
+                        $stats[$i][$j] = $nmatch if ($ostat);
+                        $helper->disp("$nmatch matches found in $seqfile[$i]. Output written in $currout.\n");
+                        unlink($currout) if (!$ogff);
+                    }
+                }
+            }
+            $helper->disp(" ");
+        }
+    }
+    else # Just scan the sequence files using one defined threshold
+    {
+        # Do job for peak-region-whatever files
+        for ($i=0; $i<@seqfile; $i++)
+        {
+            $helper->disp("Processing $seqfile[$i]...");
+            my $chkat1 = 0;
+            my $chk = $helper->check_fasta($seqfile[$i]);
+            if ($chk)
+            {
+                $helper->disp("File $seqfile[$i] does not appear to be a FASTA file. Proceeding to next...");
+                next;
+            }
+            else { $chkat1 = 1; }
 
-			# For each motif, calculate threshold and scan according to selected scanner
-			given($scanner)
-			{
-				when(/pwmscan/i)
-				{
-					for ($j=0; $j<@mfiles; $j++)
-					{
-						$helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j] using pwmscan... Cutoff: $justscan.\n");
-						my $mbase = fileparse($mfiles[$j],'\.[^.]*');
-						my $currout = $self->create_output_file($seqfile[$i],"output",$mbase);
-						#`python pwmscan.py -i $seqfile[$i] -c $justscan -s $spacer[$j] -p $mfiles[$j] -n $besthit > $currout `;
-						`pwmscan.py -i $seqfile[$i] -c $justscan -p $mfiles[$j] -n $besthit > $currout `;
-						$self->convert2bed($currout,%cnthash) if ($obed);
-						my $nmatch;
-						if ($besthit > 1) 
-						{
-							($unistats) ? ($nmatch = $helper->count_unique_lines($currout)) : ($nmatch = $helper->count_lines($currout));
-						}
-						else { $nmatch = $helper->count_lines($currout); }
-						$stats[$i][$j] = $nmatch if ($ostat);
-						$helper->disp("$nmatch matches found in $seqfile[$i]. Output written in $currout.\n");
-						unlink($currout) if (!$ogff);
-					}
-				}
-				
-				when(/MotifScanner/i)
-				{
-					for ($j=0; $j<@mfiles; $j++)
-					{
-						$helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j]... Cutoff: $justscan.\n");
-						my $mbase = fileparse($mfiles[$j],'\.[^.]*');
-						my $currout = $self->create_output_file($seqfile[$i],"output",$mbase);
-						($^O !~ /MSWin/) ? (`./MotifScanner -f $seqfile[$i] -b MSmodel.bkg -m $mfiles[$j] -p $justscan -s 0 -o $currout `) :
-						(`MotifScanner -f $seqfile[$i] -b MSmodel.bkg -m $mfiles[$j] -p $justscan -s 0 -o $currout `);
-						$self->convert2bed($currout,%cnthash) if ($obed);
-						my $nmatch;
-						($unistats) ? ($nmatch = $helper->count_unique_lines($currout)) : ($nmatch = $helper->count_lines($currout));
-						$nmatch--; # One line header of MotifScanner output
-						$stats[$i][$j] = $nmatch if ($ostat);
-						$helper->disp("$nmatch matches found in $seqfile[$i]. Output written in $currout.\n");
-						unlink($currout) if (!$ogff);
-					}
-				}
-			}
-			$helper->disp(" ");
-		}
-	}
+            # For each motif, calculate threshold and scan according to selected scanner
+            given($scanner)
+            {
+                when(/pwmscan/i)
+                {
+                    for ($j=0; $j<@mfiles; $j++)
+                    {
+                        $helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j] using pwmscan... Cutoff: $justscan.\n");
+                        my $mbase = fileparse($mfiles[$j],'\.[^.]*');
+                        my $currout = $self->create_output_file($seqfile[$i],"output",$mbase);
+                        #`python pwmscan.py -i $seqfile[$i] -c $justscan -s $spacer[$j] -p $mfiles[$j] -n $besthit > $currout `;
+                        `pwmscan.py -i $seqfile[$i] -c $justscan -p $mfiles[$j] -n $besthit > $currout `;
+                        $self->convert2bed($currout,%cnthash) if ($obed);
+                        my $nmatch;
+                        if ($besthit > 1) 
+                        {
+                            ($unistats) ? ($nmatch = $helper->count_unique_lines($currout)) : ($nmatch = $helper->count_lines($currout));
+                        }
+                        else { $nmatch = $helper->count_lines($currout); }
+                        $stats[$i][$j] = $nmatch if ($ostat);
+                        $helper->disp("$nmatch matches found in $seqfile[$i]. Output written in $currout.\n");
+                        unlink($currout) if (!$ogff);
+                    }
+                }
+                
+                when(/MotifScanner/i)
+                {
+                    for ($j=0; $j<@mfiles; $j++)
+                    {
+                        $helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j]... Cutoff: $justscan.\n");
+                        my $mbase = fileparse($mfiles[$j],'\.[^.]*');
+                        my $currout = $self->create_output_file($seqfile[$i],"output",$mbase);
+                        ($^O !~ /MSWin/) ? (`./MotifScanner -f $seqfile[$i] -b MSmodel.bkg -m $mfiles[$j] -p $justscan -s 0 -o $currout `) :
+                        (`MotifScanner -f $seqfile[$i] -b MSmodel.bkg -m $mfiles[$j] -p $justscan -s 0 -o $currout `);
+                        $self->convert2bed($currout,%cnthash) if ($obed);
+                        my $nmatch;
+                        ($unistats) ? ($nmatch = $helper->count_unique_lines($currout)) : ($nmatch = $helper->count_lines($currout));
+                        $nmatch--; # One line header of MotifScanner output
+                        $stats[$i][$j] = $nmatch if ($ostat);
+                        $helper->disp("$nmatch matches found in $seqfile[$i]. Output written in $currout.\n");
+                        unlink($currout) if (!$ogff);
+                    }
+                }
+            }
+            $helper->disp(" ");
+        }
+    }
 
-	# Print stats if requested
-	if ($ostat)
-	{
-		my $outstat = $self->create_output_file(" ","stats");
-		open(STATS,">$outstat");
-		print STATS "\t",join("\t",@mfiles),"\n";
-		for ($i=0; $i<@seqfile; $i++)
-		{
-			print STATS "$seqfile[$i]";
-			for ($j=0; $j<@mfiles; $j++)
-			{
-				print STATS "\t$stats[$i][$j]";
-			}
-			print STATS "\n";
-		}
-		close(STATS);
-	}
+    # Print stats if requested
+    if ($ostat)
+    {
+        my $outstat = $self->create_output_file(" ","stats");
+        open(STATS,">$outstat");
+        print STATS "\t",join("\t",@mfiles),"\n";
+        for ($i=0; $i<@seqfile; $i++)
+        {
+            print STATS "$seqfile[$i]";
+            for ($j=0; $j<@mfiles; $j++)
+            {
+                print STATS "\t$stats[$i][$j]";
+            }
+            print STATS "\n";
+        }
+        close(STATS);
+    }
 
-	$date = $helper->now;
-	$helper->disp("$date - Finished!\n\n");
+    $date = $helper->now;
+    $helper->disp("$date - Finished!\n\n");
 
-	if ($olog)
-	{
-		my $logfile = $self->create_output_file(" ","log");
-		open(LOG,">$logfile");
-		print LOG join("\n",@log),"\n";
-		close(LOG);
-	}
+    if ($olog)
+    {
+        my $logfile = $self->create_output_file(" ","log");
+        open(LOG,">$logfile");
+        print LOG join("\n",@log),"\n";
+        close(LOG);
+    }
 }
 
-=head2 get_random_seq
+=head2 parse_motifs
 
 Parse a file of PWMs and construct different files, specific for the scanner in use. Internal use.
 
-	$motifscanner->parse_motifs($motifsfile,$scanner);
+    $motifscanner->parse_motifs($motifsfile,$scanner);
 
 =cut
 
 sub parse_motifs
 {
-	my ($self,$infile,$scn) = shift @_;
-	my ($base,$dir) = fileparse($infile,'\.[^.]*');
-	my ($c,$line,$om,$f,@fhs,@outnames);
-	open(MOTIF,"$infile");
-	
-	use v5.14;
-	given($scn)
-	{
-		when(/pwmscan/i)
-		{
-			$line = <MOTIF>;
-			die "\nMotif file (pwmscan) does not appear to have the correct syntax!\n" if ($line !~ /^>/);
-			seek(MOTIF,0,0);
-			while ($line = <MOTIF>)
-			{
-				if ($line =~ /^>/) # Signal to open new file
-				{
-					$line =~ s/\r|\n$//g;
-					my $bline = $line;
-					$line =~ s/^>//g;
-					$om = $self->create_output_file($infile,$line);
-					push(@outnames,$om);
-					local *PWM;
-					open(PWM,">$om");
-					$fhs[$c] = *PWM;
-					$c++;
-					print PWM $bline."\n";
-				}
-				else 
-				{ 
-					$f = $fhs[$c-1];
-					print $f $line;
-				}
-			}
-			# Close the split motifs
-			foreach my $fh (@fhs) { close($fh); }
-		}
-		when(/MotifScanner/i)
-		{
-			# Some checking
-			my $fline = <MOTIF>;
-			$fline =~ s/\r|\n$//g;
-			die "\nMotif file (MotifScanner) does not appear to have the correct syntax (line 1)!\n" if ($fline !~ /^#INCLUSive/i);
-			$c = 0; # Reset counter
-			my %motifs;
-			while ($line = <MOTIF>)
-			{
-				$line =~ s/\r|\n$//g;
-				if ($line =~ /^#ID/) # Signal to open new file
-				{ 
-					my @sep = split("=",$line);
-					$sep[1] =~ s/^\s+|\s+$//g;
-					my $name = $sep[1];
-					$om = $self->create_output_file($infile,$name);
-					push(@outnames,$om);
-					local *PWM;
-					open(PWM,">$om");
-					$fhs[$c] = *PWM;
-					push(@{$motifs{$c}},$fline);
-					$c++;
-				}
-				next if ($line =~ /^#W/); # Skip, we will create afterwards...
-				push(@{$motifs{$c-1}},$line);		
-			}
-			foreach my $k (sort { $a <=> $b } keys(%motifs))
-			{
-				my @fileconts = @{$motifs{$k}};
-				my $mw = $#fileconts - 1;
-				splice(@fileconts,2,0,"#W = $mw");
-				$f = $fhs[$k];
-				print $f join("\n",@fileconts);
-				print $f "\n";
-				close($f)
-			}
-		}
-	}
-	
-	return(@outnames);
+    my ($self,$infile,$scn) = shift @_;
+    my ($base,$dir) = fileparse($infile,'\.[^.]*');
+    my ($c,$line,$om,$f,@fhs,@outnames);
+    open(MOTIF,"$infile");
+    
+    use v5.14;
+    given($scn)
+    {
+        when(/pwmscan/i)
+        {
+            $line = <MOTIF>;
+            die "\nMotif file (pwmscan) does not appear to have the correct syntax!\n" if ($line !~ /^>/);
+            seek(MOTIF,0,0);
+            while ($line = <MOTIF>)
+            {
+                if ($line =~ /^>/) # Signal to open new file
+                {
+                    $line =~ s/\r|\n$//g;
+                    my $bline = $line;
+                    $line =~ s/^>//g;
+                    $om = $self->create_output_file($infile,$line);
+                    push(@outnames,$om);
+                    local *PWM;
+                    open(PWM,">$om");
+                    $fhs[$c] = *PWM;
+                    $c++;
+                    print PWM $bline."\n";
+                }
+                else 
+                { 
+                    $f = $fhs[$c-1];
+                    print $f $line;
+                }
+            }
+            # Close the split motifs
+            foreach my $fh (@fhs) { close($fh); }
+        }
+        when(/MotifScanner/i)
+        {
+            # Some checking
+            my $fline = <MOTIF>;
+            $fline =~ s/\r|\n$//g;
+            die "\nMotif file (MotifScanner) does not appear to have the correct syntax (line 1)!\n" if ($fline !~ /^#INCLUSive/i);
+            $c = 0; # Reset counter
+            my %motifs;
+            while ($line = <MOTIF>)
+            {
+                $line =~ s/\r|\n$//g;
+                if ($line =~ /^#ID/) # Signal to open new file
+                { 
+                    my @sep = split("=",$line);
+                    $sep[1] =~ s/^\s+|\s+$//g;
+                    my $name = $sep[1];
+                    $om = $self->create_output_file($infile,$name);
+                    push(@outnames,$om);
+                    local *PWM;
+                    open(PWM,">$om");
+                    $fhs[$c] = *PWM;
+                    push(@{$motifs{$c}},$fline);
+                    $c++;
+                }
+                next if ($line =~ /^#W/); # Skip, we will create afterwards...
+                push(@{$motifs{$c-1}},$line);       
+            }
+            foreach my $k (sort { $a <=> $b } keys(%motifs))
+            {
+                my @fileconts = @{$motifs{$k}};
+                my $mw = $#fileconts - 1;
+                splice(@fileconts,2,0,"#W = $mw");
+                $f = $fhs[$k];
+                print $f join("\n",@fileconts);
+                print $f "\n";
+                close($f)
+            }
+        }
+    }
+    
+    return(@outnames);
 }
 
 =head2 construct_MS_background
 
 Construct a set of background sequences, suitable to use with MotifSampler. Internal use.
 
-	$motifscanner->construct_MS_background($backgroundfile);
+    $motifscanner->construct_MS_background($backgroundfile);
 
 =cut
 
 sub construct_MS_background
 {
-	my ($self,$infile) = @_;
-	if (-e "MSmodel.bkg")
-	{
-		$helper->disp("Background model MSmodel.bkg already exists. Proceeding...");
-		return 0;
-	}
-	my ($base,$dir,$ext) = fileparse($infile,'\.[^.]*');
-	my $chkfa = $helper->check_fasta($infile);
-	if ($chkfa && ! -e $dir.$base.".fa")
-	{
-		$helper->disp("Background file $infile does not appear to be in FASTA format...");
-		$helper->disp("Checking if $infile is in tabular format...");
-		my $chktab = $helper->check_tabseq($infile);
-		croak "\nBackground file $infile does not appear to be in tabular format either! Exiting...\n" if ($chktab);
-		$helper->disp("$infile is in tabular format. Converting to FASTA format...");
-		my $converter = HTS::Tools::Convert->new();
-		$converter->tab2fasta($infile);
-	}
-	else { $infile = File::Spec->catfile($dir,$base.".fa"); }
-	$helper->disp("Creating Markov model background from $infile... Output will be written in MSmodel.bkg\n");
-	`./CreateBackgroundModel -f \"$infile\" -b MSmodel.bkg > temp.std `;
-	unlink("temp.std");
-	if (! -e "MSmodel.bkg")
-	{
-		$helper->disp("Markov background model not created!");
-		$helper->disp("Probably program CreateBackgroundModel cannot be located on the system! Exiting...");
-		croak;
-	}
+    my ($self,$infile) = @_;
+    if (-e "MSmodel.bkg")
+    {
+        $helper->disp("Background model MSmodel.bkg already exists. Proceeding...");
+        return 0;
+    }
+    my ($base,$dir,$ext) = fileparse($infile,'\.[^.]*');
+    my $chkfa = $helper->check_fasta($infile);
+    if ($chkfa && ! -e $dir.$base.".fa")
+    {
+        $helper->disp("Background file $infile does not appear to be in FASTA format...");
+        $helper->disp("Checking if $infile is in tabular format...");
+        my $chktab = $helper->check_tabseq($infile);
+        croak "\nBackground file $infile does not appear to be in tabular format either! Exiting...\n" if ($chktab);
+        $helper->disp("$infile is in tabular format. Converting to FASTA format...");
+        my $converter = HTS::Tools::Convert->new();
+        $converter->tab2fasta($infile);
+    }
+    else { $infile = File::Spec->catfile($dir,$base.".fa"); }
+    $helper->disp("Creating Markov model background from $infile... Output will be written in MSmodel.bkg\n");
+    `./CreateBackgroundModel -f \"$infile\" -b MSmodel.bkg > temp.std `;
+    unlink("temp.std");
+    if (! -e "MSmodel.bkg")
+    {
+        $helper->disp("Markov background model not created!");
+        $helper->disp("Probably program CreateBackgroundModel cannot be located on the system! Exiting...");
+        croak;
+    }
 }
 
 =head2 get_random_seq
 
 Get a random sequence from a set of background sequences.
 
-	$motifscanner->get_random_seq($thefile,$itsindex,$howmany,$length,$num);
+    $motifscanner->get_random_seq($thefile,$itsindex,$howmany,$length,$num);
 
 =cut
 
 sub get_random_seq
 {
-	my ($self,$tabfasta,$itsindex,$itslen,$length,$num) = @_;
-	my ($line,$id,$seq,$currlen,$start,$end);
-	my $count = my $safeswitch = 0;
-	my $BIG = 1e+6;
-	srand;
-	my $outfile = $self->create_output_file(" ","sequence");
-	open(RANDSEQ,">$outfile");
-	open(FASTA,"<$tabfasta");
-	open(INDEX,"$itsindex");
-	while ($count < $num && $safeswitch < $BIG)
-	{
-		# Safeswitch in case too many sequences have small lengths, process shouldn't
-		# take forever to complete...
-		$safeswitch++;
-		$line = $self->get_indexed_line(*FASTA,*INDEX,int(rand($itslen)));
-		($id,$seq) = split(/\t/,$line);
-		$currlen = length($seq);
-		next if ($currlen < $length);
-		if ($currlen == $length)
-		{
-			($start,$end) = (1,$length);
-			$id .= "_".$start."-".$end;
-			$self->write_seq(*RANDSEQ,$id,$seq);
-			$count++;
-		}
-		if ($currlen > $length)
-		{
-			# Restrict the random index generation so that we don't go beyond the sequence end
-			$start = int(rand($currlen - $length));
-			$end = $start + $length;
-			$id .= "_".$start."-".$end;
-			$self->write_seq(*RANDSEQ,$id,substr($seq,$start,$length));
-			$count++;
-		}
-	}
-	close(RANDSEQ);
-	close(FASTA);
-	close(INDEX);
-	if ($safeswitch >= $BIG)
-	{
-		$helper->disp("Sequence fetching discontinued... $count sequences fetched in total in $outfile...");
-		$helper->disp("Probably the FASTA file you supplied to get random sequences from contains too many short sequences.");
-		$helper->disp("Try again with larger sequences or smaller length.");
-	}
-	return($outfile);
+    my ($self,$tabfasta,$itsindex,$itslen,$length,$num) = @_;
+    my ($line,$id,$seq,$currlen,$start,$end);
+    my $count = my $safeswitch = 0;
+    my $BIG = 1e+6;
+    srand;
+    my $outfile = $self->create_output_file(" ","sequence");
+    open(RANDSEQ,">$outfile");
+    open(FASTA,"<$tabfasta");
+    open(INDEX,"$itsindex");
+    while ($count < $num && $safeswitch < $BIG)
+    {
+        # Safeswitch in case too many sequences have small lengths, process shouldn't
+        # take forever to complete...
+        $safeswitch++;
+        $line = $self->get_indexed_line(*FASTA,*INDEX,int(rand($itslen)));
+        ($id,$seq) = split(/\t/,$line);
+        $currlen = length($seq);
+        next if ($currlen < $length);
+        if ($currlen == $length)
+        {
+            ($start,$end) = (1,$length);
+            $id .= "_".$start."-".$end;
+            $self->write_seq(*RANDSEQ,$id,$seq);
+            $count++;
+        }
+        if ($currlen > $length)
+        {
+            # Restrict the random index generation so that we don't go beyond the sequence end
+            $start = int(rand($currlen - $length));
+            $end = $start + $length;
+            $id .= "_".$start."-".$end;
+            $self->write_seq(*RANDSEQ,$id,substr($seq,$start,$length));
+            $count++;
+        }
+    }
+    close(RANDSEQ);
+    close(FASTA);
+    close(INDEX);
+    if ($safeswitch >= $BIG)
+    {
+        $helper->disp("Sequence fetching discontinued... $count sequences fetched in total in $outfile...");
+        $helper->disp("Probably the FASTA file you supplied to get random sequences from contains too many short sequences.");
+        $helper->disp("Try again with larger sequences or smaller length.");
+    }
+    return($outfile);
 }
 
 =head2 write_seq
 
 Write a random sequence, randomly from a set of background sequences. Internal use.
 
-	$motifscanner->write_seq($thefile,$theseqid,$theseq);
+    $motifscanner->write_seq($thefile,$theseqid,$theseq);
 
 =cut
 
 sub write_seq
 {
-	my ($self,$file,$id,$seq) = @_;
-	$id = ">".$id if ($id !~ /^>/);
-	print $file "$id\n";
-	while ($seq) # Write sequences of length 100
-	{
-		my $wseq = substr($seq,0,100,"");
-		print $file "$wseq\n";
-	}
+    my ($self,$file,$id,$seq) = @_;
+    $id = ">".$id if ($id !~ /^>/);
+    print $file "$id\n";
+    while ($seq) # Write sequences of length 100
+    {
+        my $wseq = substr($seq,0,100,"");
+        print $file "$wseq\n";
+    }
 }
 
 =head2 convert2bed
@@ -807,105 +807,105 @@ by solving the special case of a 2x2 linear system (since we know several of the
 min(score)*a + b = 0
 max(score)*a + b = 1000
 
-	$motifscanner->convert2bed($file_to_convert);
+    $motifscanner->convert2bed($file_to_convert);
 
 =cut
 
 sub convert2bed
 {
-	my ($self,$f2c,@cntcol) = @_;
-	my %ch = @_;
-	my ($base,$dir) = fileparse($f2c,'\.[^.]*');
-	my ($line,@lines,@scores,@content,@locs,@newcoord);
-	my $bedout = $dir.$base.".bed";
-	# In order to determine the coefficients of linear conversion we have to suck in all
-	# gff file, the hard way...
-	open(F2C,$f2c);
-	while ($line = <F2C>)
-	{
-		$line =~ s/\r|\n$//g;
-		push(@lines,$line);
-		@content = split(/\t/,$line);
-		push(@scores,$content[5]);
-	}
-	close(F2C);
-	# If the scanner was MotifScanner/MotifLocator, there is one xtra line...
-	my $tort = shift @scores if (!$scores[0]);
-	# Get min, max score
-	my ($min,$max) = $helper->minmax(@scores);
-	# Get coefficients
-	my ($a,$b) = $self->naive_solve_two($min,$max);
-	open(BED,">$bedout");
-	if (%ch)
-	{
-		foreach $line (@lines)
-		{
-			@content = split(/\t/,$line);
-			@locs = split(":",$content[0]);
-			if ($#locs == 1) # track2fasta format
-			{
-				my $joined = pop(@locs);
-				my @splitted = split("-",$joined);
-				push(@locs,@splitted);
-			}
-			# Shift coordinates to motif occurence
-			my $strand = "+";
-			$strand = "-" if ($content[6] == -1 || $content[6] eq "R");
-			@newcoord = ($locs[0],
-						 $ch{$content[0]} - $cntcol[2] + $content[3],
-						 $ch{$content[0]} - $cntcol[2] + $content[4],
-						 $content[0],$a*$content[5] + $b,$strand);
-			print BED join("\t",@newcoord),"\n";
-		}
-	}
-	else
-	{
-		foreach $line (@lines)
-		{
-			@content = split(/\t/,$line);
-			@locs = split(":",$content[0]);
-			if ($#locs == 1) # track2fasta format
-			{
-				my $joined = pop(@locs);
-				my @splitted = split("-",$joined);
-				push(@locs,@splitted);
-			}
-			# Shift coordinates to motif occurence
-			my $strand = "+";
-			$strand = "-" if ($content[6] == -1 || $content[6] eq "R");
-			@newcoord = ($locs[0],$locs[1] + $content[3],$locs[1] + $content[4],
-						 $content[0],$a*$content[5] + $b,$strand);
-			print BED join("\t",@newcoord),"\n";
-		}
-	}
-	close(BED);
+    my ($self,$f2c,@cntcol) = @_;
+    my %ch = @_;
+    my ($base,$dir) = fileparse($f2c,'\.[^.]*');
+    my ($line,@lines,@scores,@content,@locs,@newcoord);
+    my $bedout = $dir.$base.".bed";
+    # In order to determine the coefficients of linear conversion we have to suck in all
+    # gff file, the hard way...
+    open(F2C,$f2c);
+    while ($line = <F2C>)
+    {
+        $line =~ s/\r|\n$//g;
+        push(@lines,$line);
+        @content = split(/\t/,$line);
+        push(@scores,$content[5]);
+    }
+    close(F2C);
+    # If the scanner was MotifScanner/MotifLocator, there is one xtra line...
+    my $tort = shift @scores if (!$scores[0]);
+    # Get min, max score
+    my ($min,$max) = $helper->minmax(@scores);
+    # Get coefficients
+    my ($a,$b) = $self->naive_solve_two($min,$max);
+    open(BED,">$bedout");
+    if (%ch)
+    {
+        foreach $line (@lines)
+        {
+            @content = split(/\t/,$line);
+            @locs = split(":",$content[0]);
+            if ($#locs == 1) # track2fasta format
+            {
+                my $joined = pop(@locs);
+                my @splitted = split("-",$joined);
+                push(@locs,@splitted);
+            }
+            # Shift coordinates to motif occurence
+            my $strand = "+";
+            $strand = "-" if ($content[6] == -1 || $content[6] eq "R");
+            @newcoord = ($locs[0],
+                         $ch{$content[0]} - $cntcol[2] + $content[3],
+                         $ch{$content[0]} - $cntcol[2] + $content[4],
+                         $content[0],$a*$content[5] + $b,$strand);
+            print BED join("\t",@newcoord),"\n";
+        }
+    }
+    else
+    {
+        foreach $line (@lines)
+        {
+            @content = split(/\t/,$line);
+            @locs = split(":",$content[0]);
+            if ($#locs == 1) # track2fasta format
+            {
+                my $joined = pop(@locs);
+                my @splitted = split("-",$joined);
+                push(@locs,@splitted);
+            }
+            # Shift coordinates to motif occurence
+            my $strand = "+";
+            $strand = "-" if ($content[6] == -1 || $content[6] eq "R");
+            @newcoord = ($locs[0],$locs[1] + $content[3],$locs[1] + $content[4],
+                         $content[0],$a*$content[5] + $b,$strand);
+            print BED join("\t",@newcoord),"\n";
+        }
+    }
+    close(BED);
 }
 
 =head2 naive_solve_two
 
 Naive solution of a 2x2 system for proportionally scaling motif scores to BED scores. Internal use.
 
-	my ($x,$y) = $motifscanner->naive_solve_two($minscore,$maxscore);
+    my ($x,$y) = $motifscanner->naive_solve_two($minscore,$maxscore);
 
 =cut
 
 sub naive_solve_two
 {
-	my ($self,$min,$max) = @_;
-	my $eps = 0.000001;
-	my $div;
-	(abs($min-$max) < $eps) ? ($div = $eps) : ($div = $max/$min);
-	$min = $eps if (!$min);
-	my $y = 1000/(1-($div));
-	my $x = -$y/$min;
-	return($x,$y);
+    my ($self,$min,$max) = @_;
+    my $eps = 0.000001;
+    my $div;
+    (abs($min-$max) < $eps) ? ($div = $eps) : ($div = $max/$min);
+    $min = $eps if (!$min);
+    my $y = 1000/(1-($div));
+    my $x = -$y/$min;
+    return($x,$y);
 }
 
 =head2 build_index
 
 Index a text file for quick access. Used internally to index the file of background sequences.
 
-	my $index = $motifscanner->build_index(*DATAHANDLE,*INDEXHANDLE);
+    my $index = $motifscanner->build_index(*DATAHANDLE,*INDEXHANDLE);
 
 =cut
 
@@ -925,7 +925,7 @@ sub build_index
 Get the line of an indexed file. Returns line or undef if the requested line is out of range. Internal
 use.
 
-	my $iline = $motifscanner->get_indexed_line(*DATAHANDLE,*INDEXHANDLE,$theline);
+    my $iline = $motifscanner->get_indexed_line(*DATAHANDLE,*INDEXHANDLE,$theline);
 
 =cut
 
@@ -950,71 +950,71 @@ sub get_indexed_line
 
 Automatic creation of the output file name depending on the output type. Internal use.
 
-	my $name = $motifscanner->create_output_file($thefile,$itstype,$itssubtype);
+    my $name = $motifscanner->create_output_file($thefile,$itstype,$itssubtype);
 
 =cut
 
 sub create_output_file
 {
-	my ($self,$in,$type,$subtype) = @_;
-	my $cdir = getcwd;
-	my $date = $helper->now("machine");
-	
-	use v5.14;
-	given($type)
-	{
-		when(/sequence/i)
-		{
-			return(File::Spec->catfile($cdir,"randseq"."$date".".fa"));
-		}
-		when(/stats/i)
-		{
-			return(File::Spec->catfile($cdir,"stats"."$date".".txt"));
-		}
-		when(/log/i)
-		{
-			return(File::Spec->catfile($cdir,"log"."$date".".txt"));
-		}
-		when(/output/i)
-		{
-			my $base = fileparse($in,'\.[^.]*');
-			return(File::Spec->catfile($cdir,$base."_".$subtype.".gff"));
-		}
-		default # Motif file
-		{
-			my ($base,$dir) = fileparse($in,'\.[^.]*');
-			return(File::Spec->catfile($dir,$type."motif.pwm"));
-		}
-	}
+    my ($self,$in,$type,$subtype) = @_;
+    my $cdir = getcwd;
+    my $date = $helper->now("machine");
+    
+    use v5.14;
+    given($type)
+    {
+        when(/sequence/i)
+        {
+            return(File::Spec->catfile($cdir,"randseq"."$date".".fa"));
+        }
+        when(/stats/i)
+        {
+            return(File::Spec->catfile($cdir,"stats"."$date".".txt"));
+        }
+        when(/log/i)
+        {
+            return(File::Spec->catfile($cdir,"log"."$date".".txt"));
+        }
+        when(/output/i)
+        {
+            my $base = fileparse($in,'\.[^.]*');
+            return(File::Spec->catfile($cdir,$base."_".$subtype.".gff"));
+        }
+        default # Motif file
+        {
+            my ($base,$dir) = fileparse($in,'\.[^.]*');
+            return(File::Spec->catfile($dir,$type."motif.pwm"));
+        }
+    }
 }
 
 =head2 get
 
 HTS::Tools::Motifscan object getter.
 
-	my $param_value = $motifscanner->get('param_name')
+    my $param_value = $motifscanner->get('param_name')
 
 =cut
 
 sub get
 {
-	my ($self,$name) = @_;
-	return($self->{$name});
+    my ($self,$name) = @_;
+    return($self->{$name});
 }
 
 =head2 set
 
 HTS::Tools::Motifscan object setter.
 
-	$motifscanner->set('param_name','param_value');
-	
+    $motifscanner->set('param_name','param_value');
+    
 =cut
 
 sub set
 {
-	my ($self,$name,$value) = @_;
-	$self->{$name} = $value;
-	return($self);
+    my ($self,$name,$value) = @_;
+    $self->{$name} = $value;
+    return($self);
 }
 
 =head1 AUTHOR

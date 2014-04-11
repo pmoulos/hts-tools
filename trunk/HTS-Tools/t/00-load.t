@@ -4,7 +4,7 @@ use strict;
 use warnings FATAL => 'all';
 use Test::More;
 
-plan tests => 13;
+plan tests => 16;
 
 BEGIN {
     use_ok( 'HTS::Tools' ) || print "Bail out!\n";
@@ -14,6 +14,9 @@ BEGIN {
     use_ok( 'HTS::Tools::Normalize' ) || print "Bail out!\n";
     use_ok( 'HTS::Tools::Normalize::Bed' ) || print "Bail out!\n";
     use_ok( 'HTS::Tools::Normalize::Bedgraph' ) || print "Bail out!\n";
+    use_ok( 'HTS::Tools::Track' ) || print "Bail out!\n";
+    use_ok( 'HTS::Tools::Track::Signal' ) || print "Bail out!\n";
+    use_ok( 'HTS::Tools::Track::Hub' ) || print "Bail out!\n";
     use_ok( 'HTS::Tools::Intersect' ) || print "Bail out!\n";
     use_ok( 'HTS::Tools::Profile' ) || print "Bail out!\n";
     use_ok( 'HTS::Tools::QC' ) || print "Bail out!\n";
