@@ -154,6 +154,10 @@ sub validate
         {
             $self->validate_queries;
         }
+        when(/track/i)
+        {
+            $self->validate_track;
+        }
     }
 }
 
@@ -360,6 +364,34 @@ sub validate_assign
     }
     
     return($self->{"params"});
+}
+
+=head2 validate_constants
+
+The parameter validator function of the HTS::Constants module. Do not use this directly, use the validate
+function instead
+
+=cut
+
+sub validate_constants
+{
+    my ($self,$params) = @_;
+    my $modname = "HTS::Tools::Constants";
+    my $wrongs = 0; 
+
+    my @accept = ();
+
+    foreach my $c (keys(%{$self->{"params"}}))
+    {
+        $helper->disp("Unrecognized constant : $c   --- Ignoring...") if (!($c ~~ @accept));
+        $wrongs++;
+    }
+    
+    if ($wrongs == scalar keys(%{$self->{"params"}}))
+    {
+        $helper->disp("No valid constant was given for $modname\n");
+        croak "Type perldoc $modname for help in usage.\n\n";
+    }
 }
 
 =head2 validate_convert
@@ -1176,7 +1208,8 @@ sub validate_queries
         "ucsc_canonical_cds",
         "ucsc_alternative_cds",
         "refseq_canonical_cds",
-        "refseq_alternative_cds"
+        "refseq_alternative_cds",
+        "chrom_info"
     );
 
     if (!($query ~~ @accept))
@@ -1186,32 +1219,160 @@ sub validate_queries
     }
 }
 
-=head2 validate_constants
+=head2 validate_track
 
-The parameter validator function of the HTS::Constants module. Do not use this directly, use the validate
+The parameter validator function of the HTS::Track module. Do not use this directly, use the validate
 function instead
 
 =cut
 
-sub validate_constants
+sub validate_track
 {
-    my ($self,$params) = @_;
-    my $modname = "HTS::Tools::Constants";
-    my $wrongs = 0; 
-
-    my @accept = ();
-
-    foreach my $c (keys(%{$self->{"params"}}))
+    my $self = shift @_;
+    my $modname = "HTS::Tools::Track";
+    
+    my @accept = ("type","input");
+    
+    # Check fatal
+    my $stop;
+    $stop .= "--- Please specify input file(s) ---\n" if (!$self->{"params"}->{"input"});
+    $stop .= "--- Please specify track set type ---\n" if (!$self->{"params"}->{"type"});
+    $stop .= "--- File type must be one of \"signal\", \"hub\" ---\n"
+        if ($self->{"params"}->{"type"} ne "signal" && $self->{"params"}->{"type"} ne "hub");
+    
+    if ($stop)
     {
-        $helper->disp("Unrecognized constant : $c   --- Ignoring...") if (!($c ~~ @accept));
-        $wrongs++;
+        $helper->disp("$stop\n");
+        $helper->disp("Type perldoc $modname for help in usage.\n\n");
+        exit;
     }
     
-    if ($wrongs == scalar keys(%{$self->{"params"}}))
+    if ($self->{"params"}->{"type"} eq "signal")
     {
-        $helper->disp("No valid constant was given for $modname\n");
-        croak "Type perldoc $modname for help in usage.\n\n";
+        $self->validate_track_signal;
     }
+    elsif ($self->{"params"}->{"type"} eq "hub")
+    {
+        $self->validate_track_hub;
+    }
+}
+
+=head2 validate_track_signal
+
+The parameter validator function of the HTS::Tools::Track::Signal module. Do not use this directly, use the validate
+function instead
+
+=cut
+
+sub validate_track_signal
+{
+    my $self = shift @_;
+    my $modname = "HTS::Tools::Track::Signal";
+    
+    my @accept = ("input","source","destination","name","description","color","maxheightpixels","urlbase","options");
+    
+    # Check and warn for unrecognized parameters
+    foreach my $p (keys(%{$self->{"params"}}))
+    {
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+    }
+
+    # Check fatal
+    my $stop;
+    $stop .= "--- Please specify input file ---\n" if (!$self->{"params"}->{"input"});
+    $stop .= "--- Please specify source track type ---\n" if (!$self->{"params"}->{"source"});
+    $stop .= "--- Please specify destination track type ---\n" if (!$self->{"params"}->{"destination"});
+    $stop .= "--- Please specify big data url base ---\n"
+        if (($self->{"params"}->{"destination"} eq "bigbed" || $self->{"params"}->{"destination"} eq "bigwig" ||
+            $self->{"params"}->{"destination"} eq "bam") && !$self->{"params"}->{"urlbase"});
+    $stop .= "--- Source track type must be one of \"bigbed\", \"bigwig\", \"wig\", \"bedgraph\" or \"bam\" ---\n"
+        if ($self->{"params"}->{"source"} ne "bigbed" && $self->{"params"}->{"source"} ne "bigwig" &&
+            $self->{"params"}->{"source"} ne "wig" && $self->{"params"}->{"source"} ne "bedgraph" &&
+            $self->{"params"}->{"source"} ne "bam");
+    $stop .= "--- Destination track type must be one of \"bigbed\", \"bigwig\", \"wig\", \"bedgraph\" or \"bam\" ---\n"
+        if ($self->{"params"}->{"destination"} ne "bigbed" && $self->{"params"}->{"destination"} ne "bigwig" &&
+            $self->{"params"}->{"destination"} ne "wig" && $self->{"params"}->{"destination"} ne "bedgraph" &&
+            $self->{"params"}->{"destination"} ne "bam");
+    
+    # We must have some defaults in this case...
+    my $name = $self->{"params"}->{"input"};
+    my $description = $self->{"params"}->{"input"};
+    my $color = "0,0,160";
+    my $maxheightpixels = "128:64:16";
+    my %options;
+    if ($self->{"params"}->{"destination"} eq "bigbed")
+    {
+        %options = (
+            "visibility" => "pack",
+            "colorByStrand" => "255,0,0 0,0,255",
+            "bigDataUrl" => $self->{"params"}->{"urlbase"}
+        )
+    }
+    if ($self->{"params"}->{"destination"} eq "bigwig")
+    {
+        %options = (
+            "visibility" => "full",
+            "bigDataUrl" => $self->{"params"}->{"urlbase"}
+        )
+    }
+    if ($self->{"params"}->{"destination"} eq "bedgraph")
+    {
+        %options = (
+            "visibility" => "full"
+        )
+    }
+    if ($self->{"params"}->{"destination"} eq "wig")
+    {
+        %options = (
+            "visibility" => "dense"
+        )
+    }
+    if ($self->{"params"}->{"destination"} eq "bam")
+    {
+        %options = (
+            "visibility" => "pack",
+            "bigDataUrl" => $self->{"params"}->{"urlbase"},
+            "bamColorMode" => "strand",
+            "bamGrayMode" => "aliQual"
+        )
+    }
+
+    # Define possible pairs
+    my %pairs = (
+        "bigbed2bed" => 1,
+        "bigbed2bigwig" => 1,
+        "bigbed2bedgraph" => 1,
+        "bigbed2bam" => 1,
+        "bigwig2bigbed" => 0,
+        "bigwig2wig" => 1,
+        "bigwig2bedgraph" => 1,
+        "bigwig2bam" => 0
+    );
+
+    return($self->{"params"});
+}
+
+=head2 validate_track
+
+The parameter validator function of the HTS::Tools::Track::Hub module. Do not use this directly, use the validate
+function instead
+
+=cut
+
+sub validate_track_hub
+{
+    my $self = shift @_;
+    my $modname = "HTS::Tools::Track::Hub";
+    
+    my @accept = ();
+    
+    # Check and warn for unrecognized parameters
+    foreach my $p (keys(%{$self->{"params"}}))
+    {
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+    }
+    
+    return($self->{"params"});
 }
 
 =head2 get

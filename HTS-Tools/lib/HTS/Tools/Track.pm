@@ -1,10 +1,10 @@
 =head1 NAME
 
-This module is just a wrapper for the rest of the HTS::Tools::Normalize
+This module is just a wrapper for the rest of the HTS::Tools::Track
 
     use HTS::Tools;
 
-    my $normalizer = HTS::Tools::Normalize->new($what,%params);
+    my $normalizer = HTS::Tools::Track->new($what,%params);
     $normalizer->run;
 
 =head1 VERSION
@@ -17,9 +17,9 @@ Quick summary of what the module does.
 
 Perhaps a little code snippet.
 
-    use HTS::Tools::Normalize;
+    use HTS::Tools::Track;
 
-    my $foo = HTS::Tools::Normalize->new();
+    my $foo = HTS::Tools::Track->new();
     ...
 
 =head1 EXPORT
@@ -31,21 +31,21 @@ if you don't export anything, such as for a purely object-oriented module.
 
 =cut
 
-package HTS::Tools::Normalize;
+package HTS::Tools::Track;
 
-our $MODNAME = "HTS::Tools::Normalize";
+our $MODNAME = "HTS::Tools::Track";
 our $VERSION = '0.01';
 our $AUTHOR = "Panagiotis Moulos";
 our $EMAIL = "moulos\@fleming.gr";
-our $DESC = "Track normalization wrapper for HTS::Tools::Normalize.";
+our $DESC = "Track generation wrapper for HTS::Tools::Track.";
 
 use v5.10;
 use strict;
 use warnings FATAL => 'all';
 
 use Carp;
-use HTS::Tools::Normalize::Bed;
-use HTS::Tools::Normalize::Bedgraph;
+use HTS::Tools::Track::Signal;
+use HTS::Tools::Track::Hub;
 use HTS::Tools::Paramcheck;
 use HTS::Tools::Utils;
 
@@ -60,11 +60,11 @@ BEGIN {
 
 =head2 new
 
-The HTS::Tools::Normalize object constructor. It accepts a set of parameters that are required to run
+The HTS::Tools::Track object constructor. It accepts a set of parameters that are required to run
 the normalizer and get the output.
 
-    my $normalizer = HTS::Tools::Normalize->new({'type' => 'bedgraph','input' => 'myfile.bedGraph',
-        'sumto' => 1000000000});
+    my $trackgen = HTS::Tools::Track->new({'type' => 'signal','input' => 'myfile.bed',
+        'start' => 'bed', 'end' => 'bigwig'});
 
 =cut
 
@@ -83,7 +83,7 @@ sub new
 
     # Validate the input parameters
     my $checker = HTS::Tools::Paramcheck->new();
-    $checker->set("tool","normalize");
+    $checker->set("tool","track");
     $checker->set("params",$params);
     $params = $checker->validate;
 
@@ -96,7 +96,7 @@ sub new
 
 =head2 init($args)
 
-HTS::Tools::Normalize object initialization method. NEVER use this directly, use new instead.
+HTS::Tools::Track object initialization method. NEVER use this directly, use new instead.
 
 =cut
 
@@ -104,20 +104,14 @@ sub init
 {
     my ($self,$args) = @_;
 
-    ## Pass the above global parameters to the parameter structure for each tool. We do it like this
-    ## because each module is supposed to be used also independently of the wrapper.
-    #$args->{"params"}->{"tmpdir"} = $self->get("tmpdir");
-    #$args->{"params"}->{"silent"} = $self->get("silent");
-    #$args->{"params"}->{"log"} = $self->get("log");
-
     # Can't use matching as bed and bedgraph would cause problem
-    if ($args->{"type"} eq "bed")
+    if ($args->{"type"} eq "signal")
     {
-        $self->set("tool",HTS::Tools::Normalize::Bed->new($args));
+        $self->set("tool",HTS::Tools::Track::Signal->new($args));
     }
-    elsif ($args->{"type"} eq "bedgraph")
+    elsif ($args->{"type"} eq "hub")
     {
-        $self->set("tool",HTS::Tools::Normalize::Bedgraph->new($args));
+        $self->set("tool",HTS::Tools::Track::Hub->new($args));
     }
     
     return($self);
@@ -125,7 +119,7 @@ sub init
 
 =head2 run
 
-# The main running function of HTS::Tools::Normalize
+# The main running function of HTS::Tools::Track
 
 =cut
 
@@ -139,7 +133,7 @@ sub run
 
 =head2 get
 
-HTS::Tools::Normalize object getter
+HTS::Tools::Track object getter
 
     my $param_value = $tool->get("param_name")
 =cut
@@ -152,7 +146,7 @@ sub get
 
 =head2 set
 
-HTS::Tools::Normalize object setter
+HTS::Tools::Track object setter
 
     $tool->set("param_name","param_value")
     
@@ -179,7 +173,7 @@ automatically be notified of progress on your bug as I make changes.
 
 You can find documentation for this module with the perldoc command.
 
-    perldoc HTS::Tools::Normalize
+    perldoc HTS::Tools::Track
 
 
 You can also look for information at:
@@ -251,4 +245,4 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =cut
 
-1; # End of HTS::Tools::Normalize
+1; # End of HTS::Tools::Track

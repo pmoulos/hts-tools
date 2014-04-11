@@ -11,20 +11,20 @@ Version 0.01
 This module initiates a set of standard parameters that can be used from HTS::Tools like paths to external
 tools, local and remote database hosts, usernames, passwords, number of cores to use etc. A full list of
 possible constants will be provided soon...
-		
-	# Just load the module so that constants can be used
+        
+    # Just load the module so that constants can be used
     use HTS::Tools::Constants;
     my $const->HTS::Tools::Constants->new();
     # Load constants from external YAML file
     my $const->HTS::Tools::Constants->new({'file' => 'my_constans.yml'});
-	# Change constant
+    # Change constant
     $const->set('BEDTOOLS_HOME','/opt/BEDTools');
     # Massively set new constants
     my %new_constants = (
-		'BEDTOOLS_HOME' => '/opt/BEDTools',
-		'SAMTOOLS_HOME' => '/opt/SAMTools',
-		'MAX_CORES' => 8
-	)
+        'BEDTOOLS_HOME' => '/opt/BEDTools',
+        'SAMTOOLS_HOME' => '/opt/SAMTools',
+        'MAX_CORES' => 8
+    )
     $const->change_constants(\%new_constants);
     # Get constant
     $const->get('MAX_CORES');
@@ -49,10 +49,10 @@ use HTS::Tools::Utils;
 use vars qw($helper);
 
 BEGIN {
-	$helper = HTS::Tools::Utils->new();
-	select(STDOUT);
-	$|=1;
-	$SIG{INT} = sub { $helper->catch_cleanup; }
+    $helper = HTS::Tools::Utils->new();
+    select(STDOUT);
+    $|=1;
+    $SIG{INT} = sub { $helper->catch_cleanup; }
 }
 
 =head2 new
@@ -63,11 +63,11 @@ Constructor for HTS::Tools::Constants
 
 sub new
 {
-	my ($class,$params) = shift @_;
-	my $self = {};
-	bless($self,$class);
-	$self->init($params);
-	return($self);
+    my ($class,$params) = shift @_;
+    my $self = {};
+    bless($self,$class);
+    $self->init($params);
+    return($self);
 }
 
 =head2 init
@@ -78,185 +78,191 @@ HTS::Tools::Constants object initialization method. NEVER use this directly, use
 
 sub init
 {
-	my ($self,$params) = @_;
-	my ($constants,$userdef,$loaded,$checker);
-	
-	# First load the defaults as the external file might not be full
-	$constants = $self->load_default_constants;
-	# Then check the YAML file and validate
-	if (defined($params->{"file"}))
-	{
-		($userdef,$loaded) = $self->load_user_constants($params->{"file"});
-		# In the case that an external file has succesfully loaded, we have to validate, else, no need
-		# as the defaults are loaded, which are error-free of course! 
-		if ($loaded)
-		{
-			$checker = HTS::Tools::Paramcheck->new({"tool" => "constants","params" => $external});
-			$userdef = $checker->validate;
-			$self->change_constants($external,"skip");
-		}
-	}
-	
-	return($self);
+    my ($self,$params) = @_;
+    my ($constants,$userdef,$loaded,$checker);
+    
+    # First load the defaults as the external file might not be full
+    $constants = $self->load_default_constants;
+    # Then check the YAML file and validate
+    if (defined($params->{"file"}))
+    {
+        ($userdef,$loaded) = $self->load_user_constants($params->{"file"});
+        # In the case that an external file has succesfully loaded, we have to validate, else, no need
+        # as the defaults are loaded, which are error-free of course! 
+        if ($loaded)
+        {
+            $checker = HTS::Tools::Paramcheck->new({"tool" => "constants","params" => $external});
+            $userdef = $checker->validate;
+            $self->change_constants($external,"skip");
+        }
+    }
+    else
+    {
+        $self->change_constants($constants,"skip");
+    }
+    
+    return($self);
 }
 
 =head2 load_constants
 
 Load constants from an external YAML file.
 
-	$const->load_constants($yaml_file)
+    $const->load_constants($yaml_file)
 
 =cut
 
 sub load_user_constants
 {
-	my ($self,$file) = @_;
-	my ($pfh,$phref,$hasloaded);
-	use YAML qw(LoadFile Dump);
-	eval
-	{
-		open($pfh,"<",$file);
-		$phref = LoadFile($pfh);
-		close($pfh);
-		$hasloaded = 1;
-	};
-	if ($@)
-	{
-		$helper->disp("Bad constants file! Ignoring...");
-		$phref = $self->load_default_constants;
-		$hasloaded = 0;
-	}
-	return($phref,$hasloaded);
+    my ($self,$file) = @_;
+    my ($pfh,$phref,$hasloaded);
+    use YAML qw(LoadFile Dump);
+    eval
+    {
+        open($pfh,"<",$file);
+        $phref = LoadFile($pfh);
+        close($pfh);
+        $hasloaded = 1;
+    };
+    if ($@)
+    {
+        $helper->disp("Bad constants file! Ignoring...");
+        $phref = $self->load_default_constants;
+        $hasloaded = 0;
+    }
+    return($phref,$hasloaded);
 }
 
 =head2 load_default_constants
 
 Load default constants in the absence of an external YAML file.
 
-	$const->load_default_constants({'BEDTOOLS_HOME' => '/opt/BEDTools','SAMTOOLS_HOME' => '/opt/SAMTools'})
+    $const->load_default_constants({'BEDTOOLS_HOME' => '/opt/BEDTools','SAMTOOLS_HOME' => '/opt/SAMTools'})
 
 =cut
 
 sub load_default_constants
-{	
-	my $self = shift @_;
-	
-	my ($pfh,$phref);
-	use YAML qw(LoadFile Dump);
-	
-	my ($vol,$dir) = File::Spec->splitpath($INC{'HTS/Tools.pm'});
-	if (-f File::Spec->catfile($vol,$dir,"config.yml"))
-	{
-		eval
-		{
-			open($pfh,"<",File::Spec->catfile($vol,$dir,"config.yml"));
-			$phref = LoadFile($pfh);
-			close($pfh);
-		};
-		if ($@)
-		{
-			$helper->disp("Error loading constants file! Falling back to minimums...");
-			$phref = $self->load_hard_constants;
-		}
-	}
-	else
-	{
-		$helper->disp("Constants configuration file does not exist! Falling back to minimums...");
-		$phref = $self->load_hard_constants;
-	}
-	
-	return($phref);
+{   
+    my $self = shift @_;
+    
+    my ($pfh,$phref);
+    use YAML qw(LoadFile Dump);
+    
+    my ($vol,$dir) = File::Spec->splitpath($INC{'HTS/Tools.pm'});
+    if (-f File::Spec->catfile($vol,$dir,"config.yml"))
+    {
+        eval
+        {
+            open($pfh,"<",File::Spec->catfile($vol,$dir,"config.yml"));
+            $phref = LoadFile($pfh);
+            close($pfh);
+        };
+        if ($@)
+        {
+            $helper->disp("Error loading constants file! Falling back to minimums...");
+            $phref = $self->load_hard_constants;
+        }
+    }
+    else
+    {
+        $helper->disp("Constants configuration file does not exist! Falling back to minimums...");
+        $phref = $self->load_hard_constants;
+    }
+    
+    return($phref);
 }
 
 =head2 load_hard_constants
 
 Load hard coded constants as a last resort. There must be a default fallback with very basic constants.
 
-	$const->load_hard_constants;
+    $const->load_hard_constants;
 
 =cut
 
 sub load_hard_constants
 {
-	my $self = shift @_;
-	
-	my $constants = {
-		"LOCAL_HOST" => "localhost",
-		"LOCAL_USER" => "user",
-		"LOCAL_PASS" => "password",
-		"BIOMART_PATH" => "http://www.biomart.org/biomart/martservice?",
-		"REMOTE_HOST" => "genome-mysql.cse.ucsc.edu",
-		"REMOTE_USER" => "genome",
-		"BEDTOOLS_HOME" => "/opt/NGSTools/BEDTools/bin",
-		"SAMTOOLS_HOME" => "/opt/NGSTools/SAMTools",
-		"GENOMICTOOLS_HOME" => "/opt/NGSTools/GenomicTools",
-		"MAX_CORES" => 12,
-		"MACS_HOME" => "/usr/bin/macs14",
-		"MACS2_HOME" => "/usr/local/bin/macs2",
-		"SICER_HOME" => "/opt/NGSTools/SICER",
-		"RSEG_HOME" => "/opt/NGSTools/rseg",
-		"GIMMEMOTIFS_HOME" => "/usr/bin",
-		"MOTIFSCANNER_HOME" => "",
-		"LOCAL_GENOMES" => "/opt/genomes"
-	};
-	
-	return($constants);
+    my $self = shift @_;
+    
+    my $constants = {
+        "LOCAL_HOST" => "localhost",
+        "LOCAL_USER" => "user",
+        "LOCAL_PASS" => "password",
+        "BIOMART_PATH" => "http://www.biomart.org/biomart/martservice?",
+        "REMOTE_HOST" => "genome-mysql.cse.ucsc.edu",
+        "REMOTE_USER" => "genome",
+        "BEDTOOLS_HOME" => "/opt/NGSTools/BEDTools/bin",
+        "SAMTOOLS_HOME" => "/opt/NGSTools/SAMTools",
+        "GENOMICTOOLS_HOME" => "/opt/NGSTools/GenomicTools",
+        "KENTBIN_HOME" => "/opt/NGSTools/ucsc_bin",
+        "MAX_CORES" => 12,
+        "MACS_HOME" => "/usr/bin/macs14",
+        "MACS2_HOME" => "/usr/local/bin/macs2",
+        "SICER_HOME" => "/opt/NGSTools/SICER",
+        "RSEG_HOME" => "/opt/NGSTools/rseg",
+        "GIMMEMOTIFS_HOME" => "/usr/bin",
+        "MOTIFSCANNER_HOME" => "",
+        "IGENOMES_HOME" => "/opt/iGenomes",
+        "LOCAL_GENOMES" => "/opt/genomes"
+    };
+    
+    return($constants);
 }
 
 =head2 change_constants
 
 Massively change the parameters of an HTS::Tools::Constants object.
 
-	$const->change_constants({'BEDTOOLS_HOME' => '/opt/BEDTools','SAMTOOLS_HOME' => '/opt/SAMTools'})
+    $const->change_constants({'BEDTOOLS_HOME' => '/opt/BEDTools','SAMTOOLS_HOME' => '/opt/SAMTools'})
 
 =cut
 
 sub change_constants
 {
-	my ($self,$params,$check) = @_;
-	$check = "do" unless($check);
-	
-	if ($check eq "do") # Validate the new parameters
-	{
-		my $checker = HTS::Tools::Paramcheck->new({"tool" => "constants","params" => $params});
-		$params = $checker->validate;
-	}
-	
-	# If validator does not complain or if we are loading the defaults, change/set the constants
-	while (my ($name,$value) = each(%$params))
-	{
-		$self->set($name,$value);
-	}
-	return($self);
+    my ($self,$params,$check) = @_;
+    $check = "do" unless($check);
+    
+    if ($check eq "do") # Validate the new parameters
+    {
+        my $checker = HTS::Tools::Paramcheck->new({"tool" => "constants","params" => $params});
+        $params = $checker->validate;
+    }
+    
+    # If validator does not complain or if we are loading the defaults, change/set the constants
+    while (my ($name,$value) = each(%$params))
+    {
+        $self->set($name,$value);
+    }
+    return($self);
 }
 
 =head2 get
 
 HTS::Tools::Constants object getter.
 
-	my $param_value = $const->get('param_name')
+    my $param_value = $const->get('param_name')
 
 =cut
 
 sub get
 {
-	my ($self,$name) = @_;
-	return($self->{$name});
+    my ($self,$name) = @_;
+    return($self->{$name});
 }
 
 =head2 set
 
 HTS::Tools::Constants object setter.
 
-	$const->set('param_name','param_value');
-	
+    $const->set('param_name','param_value');
+    
 =cut
 
 sub set
 {
-	my ($self,$name,$value) = @_;
-	$self->{$name} = $value;
-	return($self);
+    my ($self,$name,$value) = @_;
+    $self->{$name} = $value;
+    return($self);
 }
 
 =head1 AUTHOR
@@ -350,8 +356,8 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #$status = eval { $helper->try_module("YAML") };
 #if ($status)
 #{
-#	$helper->disp("Module YAML is required to read an external constants file! Will try with the defaults...");
-#	$self->load_default_constants;
+#   $helper->disp("Module YAML is required to read an external constants file! Will try with the defaults...");
+#   $self->load_default_constants;
 #}
 #else
 #{ }
