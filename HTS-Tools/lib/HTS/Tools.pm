@@ -124,6 +124,9 @@ sub init
         when(/qc/i) {
             $self->set("tool",HTS::Tools::QC->new($args->{"params"}));
         }
+        when(/track/i) {
+            $self->set("tool",HTS::Tools::Track->new($args->{"params"}));
+        }
     }
 
     return($self);

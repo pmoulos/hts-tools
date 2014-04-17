@@ -175,7 +175,7 @@ sub validate_assign
     my $status;
     
     my @accept = ("input","region","background","span","idstrand","idmode","test","pvalue","outformat",
-        "source","splicing","expression","log","silent","tmpdir");
+        "source","splicing","expression","gversion","log","silent","tmpdir");
     
     # Check fatal
     my $stop;
@@ -317,6 +317,7 @@ sub validate_assign
         my %sources = ("ucsc" => "UCSC","refseq" => "RefSeq","ensembl" => "Ensembl");
         my $source = $self->{"params"}->{"source"};
         my $splicing = $self->{"params"}->{"splicing"};
+        my $gversion = $self->{"params"}->{"gversion"};
         if ($source)
         {
             $source = lc($source);
@@ -359,6 +360,78 @@ sub validate_assign
             {
                 $helper->disp("Splicing is not supported for Ensembl!");
                 delete $self->{"params"}->{"splicing"};
+            }
+        }
+        if ($gversion)
+        {
+            $gversion = lc($gversion);
+            if ($self->{"params"}->{"region"} =~ m/human/i)
+            {
+                if ($gversion ne "hg18" && $gversion ne "hg19")
+                {
+                    $helper->disp("Human genome version wrong or not supported! Using default for human (hg19)...");
+                    $self->{"params"}->{"gversion"} = "hg19";
+                }
+            }
+            if ($self->{"params"}->{"region"} =~ m/mouse/i)
+            {
+                if ($gversion ne "mm10" && $gversion ne "mm9")
+                {
+                    $helper->disp("Mouse genome version wrong or not supported! Using default for mouse (mm10)...");
+                    $self->{"params"}->{"gversion"} = "mm10";
+                }
+            }
+            if ($self->{"params"}->{"region"} =~ m/rat/i)
+            {
+                if ($gversion ne "rn5")
+                {
+                    $helper->disp("Rat genome version wrong or not supported! Using default for rat (rn5)...");
+                    $self->{"params"}->{"gversion"} = "rn5";
+                }
+            }
+            if ($self->{"params"}->{"region"} =~ m/fly/i)
+            {
+                if ($gversion ne "dm3")
+                {
+                    $helper->disp("Fruitfly genome version wrong or not supported! Using default for fruitfly (dm3)...");
+                    $self->{"params"}->{"gversion"} = "dm3";
+                }
+            }
+            if ($self->{"params"}->{"region"} =~ m/zebrafish/i)
+            {
+                if ($gversion ne "danrer7")
+                {
+                    $helper->disp("Zebrafish genome version wrong or not supported! Using default for zebrafish (danRer7)...");
+                    $self->{"params"}->{"gversion"} = "danRer7";
+                }
+            }
+        }
+        else
+        {
+            if ($self->{"params"}->{"region"} =~ m/human/i)
+            {
+                $helper->disp("Human genome version not given! Using default for human (hg19)...");
+                $self->{"params"}->{"gversion"} = "hg19";
+            }
+            if ($self->{"params"}->{"region"} =~ m/mouse/i)
+            {
+                $helper->disp("Mouse genome version not given! Using default for mouse (mm10)...");
+                $self->{"params"}->{"gversion"} = "mm10";
+            }
+            if ($self->{"params"}->{"region"} =~ m/rat/i)
+            {
+                $helper->disp("Rat genome version not given! Using default for rat (rn5)...");
+                $self->{"params"}->{"gversion"} = "rn5";
+            }
+            if ($self->{"params"}->{"region"} =~ m/fly/i)
+            {
+                $helper->disp("Fruitfly genome version not given! Using default for fruitfly (dm3)...");
+                $self->{"params"}->{"gversion"} = "dm3";
+            }
+            if ($self->{"params"}->{"region"} =~ m/zebrafish/i)
+            {
+                $helper->disp("Zebrafish genome version not given! Using default for zebrafish (danRer7)...");
+                $self->{"params"}->{"gversion"} = "danRer7";
             }
         }
     }
@@ -431,7 +504,7 @@ sub validate_count
     my $status;
 
     my @accept = ("input","region","sort","percent","lscore","escore","constant","small","split","nbins",
-        "stats","output","ncore","source","splicing","keeporder","log","silent","tmpdir");
+        "stats","output","ncore","source","gversion","splicing","keeporder","log","silent","tmpdir");
 
     # Check fatal
     my $stop;
@@ -510,6 +583,7 @@ sub validate_count
         my %sources = ("ucsc" => "UCSC","refseq" => "RefSeq","ensembl" => "Ensembl");
         my $source = $self->{"params"}->{"source"};
         my $splicing = $self->{"params"}->{"splicing"};
+        my $gversion = $self->{"params"}->{"gversion"};
         if ($source)
         {
             $source = lc($source);
@@ -555,6 +629,78 @@ sub validate_count
             {
                 $helper->disp("Splicing for template region files required but not defined! Using default (canonical)...");
                 $self->{"params"}->{"splicing"} = "canonical";
+            }
+        }
+        if ($gversion)
+        {
+            $gversion = lc($gversion);
+            if ($self->{"params"}->{"region"} =~ m/human/i)
+            {
+                if ($gversion ne "hg18" && $gversion ne "hg19")
+                {
+                    $helper->disp("Human genome version wrong or not supported! Using default for human (hg19)...");
+                    $self->{"params"}->{"gversion"} = "hg19";
+                }
+            }
+            if ($self->{"params"}->{"region"} =~ m/mouse/i)
+            {
+                if ($gversion ne "mm10" && $gversion ne "mm9")
+                {
+                    $helper->disp("Mouse genome version wrong or not supported! Using default for mouse (mm10)...");
+                    $self->{"params"}->{"gversion"} = "mm10";
+                }
+            }
+            if ($self->{"params"}->{"region"} =~ m/rat/i)
+            {
+                if ($gversion ne "rn5")
+                {
+                    $helper->disp("Rat genome version wrong or not supported! Using default for rat (rn5)...");
+                    $self->{"params"}->{"gversion"} = "rn5";
+                }
+            }
+            if ($self->{"params"}->{"region"} =~ m/fly/i)
+            {
+                if ($gversion ne "dm3")
+                {
+                    $helper->disp("Fruitfly genome version wrong or not supported! Using default for fruitfly (dm3)...");
+                    $self->{"params"}->{"gversion"} = "dm3";
+                }
+            }
+            if ($self->{"params"}->{"region"} =~ m/zebrafish/i)
+            {
+                if ($gversion ne "danrer7")
+                {
+                    $helper->disp("Zebrafish genome version wrong or not supported! Using default for zebrafish (danRer7)...");
+                    $self->{"params"}->{"gversion"} = "danRer7";
+                }
+            }
+        }
+        else
+        {
+            if ($self->{"params"}->{"region"} =~ m/human/i)
+            {
+                $helper->disp("Human genome version not given! Using default for human (hg19)...");
+                $self->{"params"}->{"gversion"} = "hg19";
+            }
+            if ($self->{"params"}->{"region"} =~ m/mouse/i)
+            {
+                $helper->disp("Mouse genome version not given! Using default for mouse (mm10)...");
+                $self->{"params"}->{"gversion"} = "mm10";
+            }
+            if ($self->{"params"}->{"region"} =~ m/rat/i)
+            {
+                $helper->disp("Rat genome version not given! Using default for rat (rn5)...");
+                $self->{"params"}->{"gversion"} = "rn5";
+            }
+            if ($self->{"params"}->{"region"} =~ m/fly/i)
+            {
+                $helper->disp("Fruitfly genome version not given! Using default for fruitfly (dm3)...");
+                $self->{"params"}->{"gversion"} = "dm3";
+            }
+            if ($self->{"params"}->{"region"} =~ m/zebrafish/i)
+            {
+                $helper->disp("Zebrafish genome version not given! Using default for zebrafish (danRer7)...");
+                $self->{"params"}->{"gversion"} = "danRer7";
             }
         }
     }
@@ -1235,10 +1381,12 @@ sub validate_track
     
     # Check fatal
     my $stop;
+    use Data::Dumper;
+    print Dumper(\$self);
     $stop .= "--- Please specify input file(s) ---\n" if (!$self->{"params"}->{"input"});
     $stop .= "--- Please specify track set type ---\n" if (!$self->{"params"}->{"type"});
     $stop .= "--- File type must be one of \"signal\", \"hub\" ---\n"
-        if ($self->{"params"}->{"type"} ne "signal" && $self->{"params"}->{"type"} ne "hub");
+        if (!$self->{"params"}->{"type"} || ($self->{"params"}->{"type"} ne "signal" && $self->{"params"}->{"type"} ne "hub"));
     
     if ($stop)
     {
@@ -1269,7 +1417,7 @@ sub validate_track_signal
     my $self = shift @_;
     my $modname = "HTS::Tools::Track::Signal";
     
-    my @accept = ("input","source","destination","name","description","color","maxheightpixels","urlbase","options");
+    my @accept = ("type","input","source","destination","dir","urlbase","org","gversion","options");
     
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
@@ -1284,25 +1432,34 @@ sub validate_track_signal
     $stop .= "--- Please specify destination track type ---\n" if (!$self->{"params"}->{"destination"});
     $stop .= "--- Please specify big data url base ---\n"
         if (($self->{"params"}->{"destination"} eq "bigbed" || $self->{"params"}->{"destination"} eq "bigwig" ||
-            $self->{"params"}->{"destination"} eq "bam") && !$self->{"params"}->{"urlbase"});
+            $self->{"params"}->{"destination"} eq "bam" || $self->{"params"}->{"destination"} eq "sam") &&
+            !$self->{"params"}->{"urlbase"});
+    $stop .= "--- Please specify organism ---\n"
+        if (($self->{"params"}->{"destination"} eq "bigbed" || $self->{"params"}->{"destination"} eq "bigwig" ||
+            $self->{"params"}->{"destination"} eq "bedgraph" || $self->{"params"}->{"destination"} eq "wig") &&
+            !$self->{"params"}->{"org"});
+    $stop .= "--- Please specify genome version ---\n"
+        if (($self->{"params"}->{"destination"} eq "bigbed" || $self->{"params"}->{"destination"} eq "bigwig" ||
+            $self->{"params"}->{"destination"} eq "bedgraph" || $self->{"params"}->{"destination"} eq "wig") &&
+            !$self->{"params"}->{"gversion"});
     $stop .= "--- Source track type must be one of \"bigbed\", \"bigwig\", \"wig\", \"bedgraph\" or \"bam\" ---\n"
         if ($self->{"params"}->{"source"} ne "bigbed" && $self->{"params"}->{"source"} ne "bigwig" &&
             $self->{"params"}->{"source"} ne "wig" && $self->{"params"}->{"source"} ne "bedgraph" &&
-            $self->{"params"}->{"source"} ne "bam");
+            $self->{"params"}->{"source"} ne "bam" && $self->{"params"}->{"source"} ne "sam");
     $stop .= "--- Destination track type must be one of \"bigbed\", \"bigwig\", \"wig\", \"bedgraph\" or \"bam\" ---\n"
         if ($self->{"params"}->{"destination"} ne "bigbed" && $self->{"params"}->{"destination"} ne "bigwig" &&
             $self->{"params"}->{"destination"} ne "wig" && $self->{"params"}->{"destination"} ne "bedgraph" &&
-            $self->{"params"}->{"destination"} ne "bam");
+            $self->{"params"}->{"destination"} ne "bam" && $self->{"params"}->{"source"} ne "sam");
     
     # We must have some defaults in this case...
-    my $name = $self->{"params"}->{"input"};
-    my $description = $self->{"params"}->{"input"};
-    my $color = "0,0,160";
-    my $maxheightpixels = "128:64:16";
     my %options;
     if ($self->{"params"}->{"destination"} eq "bigbed")
     {
         %options = (
+            "name" => $self->{"params"}->{"input"},
+            "description" => $self->{"params"}->{"input"},
+            "color" => "0,0,160",
+            "maxHeightPixels" => "128:64:16",
             "visibility" => "pack",
             "colorByStrand" => "255,0,0 0,0,255",
             "bigDataUrl" => $self->{"params"}->{"urlbase"}
@@ -1311,6 +1468,10 @@ sub validate_track_signal
     if ($self->{"params"}->{"destination"} eq "bigwig")
     {
         %options = (
+            "name" => $self->{"params"}->{"input"},
+            "description" => $self->{"params"}->{"input"},
+            "color" => "0,0,160",
+            "maxHeightPixels" => "128:64:16",
             "visibility" => "full",
             "bigDataUrl" => $self->{"params"}->{"urlbase"}
         )
@@ -1318,18 +1479,30 @@ sub validate_track_signal
     if ($self->{"params"}->{"destination"} eq "bedgraph")
     {
         %options = (
+            "name" => $self->{"params"}->{"input"},
+            "description" => $self->{"params"}->{"input"},
+            "color" => "0,0,160",
+            "maxHeightPixels" => "128:64:16",
             "visibility" => "full"
         )
     }
     if ($self->{"params"}->{"destination"} eq "wig")
     {
         %options = (
+            "name" => $self->{"params"}->{"input"},
+            "description" => $self->{"params"}->{"input"},
+            "color" => "0,0,160",
+            "maxHeightPixels" => "128:64:16",
             "visibility" => "dense"
         )
     }
-    if ($self->{"params"}->{"destination"} eq "bam")
+    if ($self->{"params"}->{"destination"} eq "bam" || $self->{"params"}->{"destination"} eq "sam")
     {
         %options = (
+            "name" => $self->{"params"}->{"input"},
+            "description" => $self->{"params"}->{"input"},
+            "color" => "0,0,160",
+            "maxHeightPixels" => "128:64:16",
             "visibility" => "pack",
             "bigDataUrl" => $self->{"params"}->{"urlbase"},
             "bamColorMode" => "strand",
@@ -1339,15 +1512,140 @@ sub validate_track_signal
 
     # Define possible pairs
     my %pairs = (
-        "bigbed2bed" => 1,
-        "bigbed2bigwig" => 1,
-        "bigbed2bedgraph" => 1,
+        "bam2bedgraph" => 1,
+        "bam2bigbed" => 1,
+        "bam2bigwig" => 1,
+        "bam2wig" => 1,
+        "bed2bam" => 1,
+        "bed2bedgraph" => 1,
+        "bed2bigbed" => 1,
+        "bed2bigwig" => 1,
+        "bed2wig" => 1,
+        "bedgraph2bam" => 0,
+        "bedgraph2bigbed" => 0,
+        "bedgraph2bigwig" => 1,
+        "bedgraph2wig" => 1,
         "bigbed2bam" => 1,
+        "bigbed2bed" => 1,
+        "bigbed2bedgraph" => 1,
+        "bigbed2bigwig" => 1,
+        "bigwig2bam" => 0,
+        "bigwig2bedgraph" => 1,
         "bigwig2bigbed" => 0,
         "bigwig2wig" => 1,
-        "bigwig2bedgraph" => 1,
-        "bigwig2bam" => 0
+        "wig2bigbed" => 0,
+        "wig2bigwig" => 1,
+        "wig2bedgraph" => 1,
+        "wig2bam" => 0,
+        "sam2bedgraph" => 1,
+        "sam2bigbed" => 1,
+        "sam2bigwig" => 1,
+        "sam2wig" => 1
     );
+
+    if (!$self->{"params"}->{"dir"})
+    {
+        $helper->disp("No output directory specified! The input directory will be used...");
+        my ($base,$dir,$ext) = fileparse($self->{"params"}->{"input"},'\.[^.]*');
+        $self->{"params"}->{"dir"} = $dir;
+    }
+    if (!$self->{"params"}->{"options"})
+    {
+        $helper->disp("No additional options specified! The defaults will be used according to track types...");
+        $self->{"params"}->{"options"} = %options;
+    }
+    else
+    {
+        $helper->disp("No track name specified! The file name will be used...")
+            if (!$self->{"params"}->{"options"}->{"name"});
+        $helper->disp("No track description specified! The track name will be used...")
+            if (!$self->{"params"}->{"options"}->{"description"});
+        $helper->disp("No track color specified! The default will be used (0,0,160)...")
+            if (!$self->{"params"}->{"options"}->{"color"});
+        $helper->disp("No default track height area specified! The default used (128:64:16)...")
+            if (!$self->{"params"}->{"options"}->{"maxheightpixels"});
+    }
+
+    my $gversion = $self->{"params"}->{"gversion"};
+    if ($gversion)
+    {
+        $gversion = lc($gversion);
+        if ($self->{"params"}->{"org"} =~ m/human/i)
+        {
+            if ($gversion ne "hg18" && $gversion ne "hg19")
+            {
+                $helper->disp("Human genome version wrong or not supported! Using default for human (hg19)...");
+                $self->{"params"}->{"gversion"} = "hg19";
+            }
+        }
+        if ($self->{"params"}->{"org"} =~ m/mouse/i)
+        {
+            if ($gversion ne "mm10" && $gversion ne "mm9")
+            {
+                $helper->disp("Mouse genome version wrong or not supported! Using default for mouse (mm10)...");
+                $self->{"params"}->{"gversion"} = "mm10";
+            }
+        }
+        if ($self->{"params"}->{"org"} =~ m/rat/i)
+        {
+            if ($gversion ne "rn5")
+            {
+                $helper->disp("Rat genome version wrong or not supported! Using default for rat (rn5)...");
+                $self->{"params"}->{"gversion"} = "rn5";
+            }
+        }
+        if ($self->{"params"}->{"org"} =~ m/fly/i)
+        {
+            if ($gversion ne "dm3")
+            {
+                $helper->disp("Fruitfly genome version wrong or not supported! Using default for fruitfly (dm3)...");
+                $self->{"params"}->{"gversion"} = "dm3";
+            }
+        }
+        if ($self->{"params"}->{"org"} =~ m/zebrafish/i)
+        {
+            if ($gversion ne "danrer7")
+            {
+                $helper->disp("Zebrafish genome version wrong or not supported! Using default for zebrafish (danRer7)...");
+                $self->{"params"}->{"gversion"} = "danRer7";
+            }
+        }
+    }
+    else
+    {
+        if ($self->{"params"}->{"org"} =~ m/human/i)
+        {
+            $helper->disp("Human genome version not given! Using default for human (hg19)...");
+            $self->{"params"}->{"gversion"} = "hg19";
+        }
+        if ($self->{"params"}->{"org"} =~ m/mouse/i)
+        {
+            $helper->disp("Mouse genome version not given! Using default for mouse (mm10)...");
+            $self->{"params"}->{"gversion"} = "mm10";
+        }
+        if ($self->{"params"}->{"org"} =~ m/rat/i)
+        {
+            $helper->disp("Rat genome version not given! Using default for rat (rn5)...");
+            $self->{"params"}->{"gversion"} = "rn5";
+        }
+        if ($self->{"params"}->{"org"} =~ m/fly/i)
+        {
+            $helper->disp("Fruitfly genome version not given! Using default for fruitfly (dm3)...");
+            $self->{"params"}->{"gversion"} = "dm3";
+        }
+        if ($self->{"params"}->{"org"} =~ m/zebrafish/i)
+        {
+            $helper->disp("Zebrafish genome version not given! Using default for zebrafish (danRer7)...");
+            $self->{"params"}->{"gversion"} = "danRer7";
+        }
+    }
+
+    # Check combination
+    my $source = $self->{"params"}->{"source"};
+    my $dest = $self->{"params"}->{"destination"};
+    my $conv = $source."2".$dest;
+    croak "The requested conversion from $source to $dest is not possible! Please select another conversion..."
+        if (!$pairs{$conv});
 
     return($self->{"params"});
 }
@@ -1364,7 +1662,7 @@ sub validate_track_hub
     my $self = shift @_;
     my $modname = "HTS::Tools::Track::Hub";
     
-    my @accept = ();
+    my @accept = ("type");
     
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))

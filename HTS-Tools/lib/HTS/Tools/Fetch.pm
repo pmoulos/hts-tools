@@ -383,8 +383,8 @@ or 'alternative', $db_source can be 'ucsc' or 'refseq'.
 
 sub fetch_ucsc_genes
 {
-    my ($self,$org,$type,$source) = @_;
-    my $sp = $self->format_species($org,$source);
+    my ($self,$org,$ver,$type,$source) = @_;
+    my $sp = $self->format_species($org,$ver,$source);
     my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
     my $regs = File::Spec->catfile($tmpdir,"regions.txt");
     my ($q,$data);
@@ -446,8 +446,8 @@ or 'alternative', $db_source can be 'ucsc' or 'refseq'.
 
 sub fetch_ucsc_exons
 {
-    my ($self,$org,$type,$source) = @_;
-    my $sp = $self->format_species($org,$source);
+    my ($self,$org,$ver,$type,$source) = @_;
+    my $sp = $self->format_species($org,$ver,$source);
     my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
     my $regs = File::Spec->catfile($tmpdir,"regions.txt");
     my ($q,$data,$i);
@@ -522,8 +522,8 @@ or 'alternative', $db_source can be 'ucsc' or 'refseq'. $utr can be 5 or 3.
 
 sub fetch_ucsc_utr
 {
-    my ($self,$org,$type,$source,$utr) = @_;
-    my $sp = $self->format_species($org,$source);
+    my ($self,$org,$ver,$type,$source,$utr) = @_;
+    my $sp = $self->format_species($org,$ver,$source);
     my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
     my $regs = File::Spec->catfile($tmpdir,"regions.txt");
     my ($q,$data);
@@ -618,8 +618,8 @@ or 'alternative', $db_source can be 'ucsc' or 'refseq'.
 
 sub fetch_ucsc_cds
 {
-    my ($self,$org,$type,$source) = @_;
-    my $sp = $self->format_species($org,$source);
+    my ($self,$org,$ver,$type,$source) = @_;
+    my $sp = $self->format_species($org,$ver,$source);
     my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
     my $regs = File::Spec->catfile($tmpdir,"regions.txt");
     my ($q,$data);
@@ -680,8 +680,9 @@ For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count.
 
 sub fetch_chrom_info
 {
-    my ($self,$org) = @_;
-    my $sp = $self->format_species($org,"ucsc");
+    my ($self,$org,$ver) = @_;
+    my $sp = $self->format_species($org,$ver,"ucsc");
+    print "\n\n$org\n\n$ver\n\n$sp\n\n";
     my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
     my $chrinfo = File::Spec->catfile($tmpdir,"chrom_info_$org.txt");
     my ($q,$data);
@@ -845,18 +846,50 @@ For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count. $sourc
 sub format_species
 {
     use v5.14;
-    my ($self,$org,$source) = @_;
+    my ($self,$org,$ver,$source) = @_;
     given($source)
     {
         when(/ucsc|refseq/)
         {
             given($org)
             {
-                when(/human/) { return("hg19"); }
-                when(/mouse/) { return("mm10"); }
-                when(/rat/) { return("rn5"); }
-                when(/fly/) { return("dm3"); }
-                when(/zebrafish/) { return("danRer7"); }
+                when(/human/)
+                {
+                    given($ver)
+                    {
+                        when(/hg19/) { return("hg19"); }
+                        when(/hg18/) { return("hg18"); }
+                    }
+                }
+                when(/mouse/)
+                {
+                    given($ver)
+                    {
+                        when(/mm10/) { return("mm10"); }
+                        when(/mm9/) { return("mm9"); }
+                    }
+                }
+                when(/rat/)
+                {
+                    given($ver)
+                    {
+                        when(/rn5/) { return("rn5"); }
+                    }
+                }
+                when(/fly/)
+                {
+                    given($ver)
+                    {
+                        when(/dm3/) { return("dm3"); }
+                    }
+                }
+                when(/zebrafish/)
+                {
+                    given($ver)
+                    {
+                        when(/danrer7/i) { return("danRer7"); }
+                    }
+                }
             }
         }
         when(/ensembl/)
