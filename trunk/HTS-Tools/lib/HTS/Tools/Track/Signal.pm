@@ -1,6 +1,6 @@
 =head1 NAME
 
-HTS::Tools::Track::Signal - A massive motif scanner (not finder!) for short genomic regions
+HTS::Tools::Track::Signal - Conver among several NGS track formats with visualization purposes.
 
 =head1 VERSION
 
@@ -385,7 +385,14 @@ sub bed2bigbed
     ($fail) ? (return(0)) : ($track = $output);
 
     # Construct track header
+    $options->{"bigDataUrl"} = $options->{"bigDataUrl"}."/".$basename.".bigBed";
+    $header = "track type=bigBed";
+	while ($key,$value) = each (%{$options})
+	{
+		$header .= " ".$key."=".$value;
+    }
     
+    return($track,$header);
 }
 
 =head2 bed2bigwig

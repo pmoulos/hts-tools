@@ -1,6 +1,6 @@
 =head1 NAME
 
-HTS::Tools::Normalize::Bed - The great new HTS::Tools::Normalize::Bed!
+HTS::Tools::Normalize::Bed - Normalize UCSC BED files by read downsampling
 
 =head1 VERSION
 
@@ -8,19 +8,53 @@ Version 0.01
 
 =head1 SYNOPSIS
 
-Quick summary of what the module does.
-
-Perhaps a little code snippet.
+A perl module to normalize reads across several samples from compensate for differences 
+in sequencing depths by random downsampling. The downsampling can be performed based on
+the sample with the lowest reads or down to a given number of reads (e.g. 10000000).Can 
+run on Linux or Windows.
 
     use HTS::Tools::Normalize::Bed;
+    my %params = (
+        'input' => ['normal_rnaseq_1.bed','normal_rnaseq_2.bed',
+			'disease_rnaseq_1.bed','disease_rnaseq_2.bed'],
+        'rand' => '20000000'
+    )
+    my $bed = HTS::Tools::Normalize::Bed->new(\%params);
+    $bed->run;
 
-    my $foo = HTS::Tools::Normalize::Bed->new();
-    ...
+The acceptable parameters are as follows:
 
-=head1 EXPORT
+=over 4
 
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
+=item input B<(required)>
+
+Input bed file(s). Please be careful as there is little checking whether the input
+file(s) are indeed bed files. They should contain 3 or 6 columns. Input files can
+be sorted or unsorted. Sorted are prefered to maintain uniformity.
+
+=item rand B<(optional)>
+
+The method of random removal of sequences. Use "generate" to generate random numbers 
+between 1..#tags and remove as many as to reach the minimum tag length, "permute" to 
+randomly permute the tags and then remove as many as required to reach the minimum 
+tag length or an integer. denoting how many tags should be left. If a sample has less
+than this number, it is not touched. Defaults to "generate".
+
+=item savrem B<(optional)>
+
+Use this option if you wish to save the tags that are removed in a different file. 
+The file will be named "filename_removed_tags.sav".
+
+=item sort B<(optional)>
+
+Use this option if you wish to sort the input files first. The algorithmic results 
+of the method will not change.
+
+=item silent B<optional>
+
+Do not display verbose messages.
+
+=back
 
 =head1 SUBROUTINES/METHODS
 
@@ -381,9 +415,7 @@ L<http://search.cpan.org/dist/HTS-Tools/>
 
 =back
 
-
 =head1 ACKNOWLEDGEMENTS
-
 
 =head1 LICENSE AND COPYRIGHT
 
