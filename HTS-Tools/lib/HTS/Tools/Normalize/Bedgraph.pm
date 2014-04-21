@@ -1,6 +1,6 @@
 =head1 NAME
 
-HTS::Tools::Normalize::Bedgraph - The great new HTS::Tools::Normalize::Bedgraph!
+HTS::Tools::Normalize::Bedgraph - Normalize UCSC BedGraph files to a total signal
 
 =head1 VERSION
 
@@ -8,19 +8,83 @@ Version 0.01
 
 =head1 SYNOPSIS
 
-Quick summary of what the module does.
-
-Perhaps a little code snippet.
+This module normalized a UCSC BedGraph signal file either to a total signal summed over the
+entire genome or using some externally calculated normalization factors (e.g. from software
+like DESeq or edgeR). This is a different normalization approach than read count downsampling
+as it also takes into account read lenghts (downsampling read counts is not safe when there
+are read of variable length as the removal of longer reads destroyes the uniformity of the 
+process). The process is either to normalized the total signal sum over the genome to a given
+constant (e.g. normalize signals of 1.2e+10 and 9.8e+8 to 1e+9) or use externally calculated
+normalization factors such as the ones returned by the calcNormFactors function of the egdeR
+Bioconductor package. The input is a set of BedGraph files and the output is the same set of
+BedGraph files with normalized signal.
 
     use HTS::Tools::Normalize::Bedgraph;
+    my %params = (
+        'input' => ['normal_rnaseq_1.bedGraph','normal_rnaseq_2.bedGraph',
+			'disease_rnaseq_1.bedGraph','disease_rnaseq_2.bedGraph'],
+        'sumto' => '10000000000',
+        'exportfactors' => 'normfactors.txt'
+    )
+    my $bg = HTS::Tools::Normalize::Bedgraph->new(\%params);
+    $bg->run;
+    
+The acceptable parameters are as follows:
 
-    my $foo = HTS::Tools::Normalize::Bedgraph->new();
-    ...
+=over 4
 
-=head1 EXPORT
+=item input B<(required)>
 
-A list of functions that can be exported.  You can delete this section
-if you don't export anything, such as for a purely object-oriented module.
+Input bedgraph file(s). Please be careful as there is checking whether the input
+file(s) are indeed bedgraph files. It's ok if they contain more than 4 columns
+but the first four must be bedgraph (chromosome, start, end, signal separated by
+tabs). Input files need not to be sorted.
+
+=item output B<(optional)>
+
+Output file names. It can be "stdout" for exporting to STDOUT, a set of file
+names equal to the number of input files or nothing for the files to be
+auto-generated.
+
+=item sumto B<(optional)>
+
+Normalize to --sumto total wig signal. Defaults to 1000000000. It is mutually
+exclusive with --extnorm with --extnorm in precedence.
+
+=item extnorm B<(optional)>
+
+A set of external normalization factors (e.g. calculated from DESeq or edgeR).
+It is mutually exclusive with --sumto with --extnorm in precedence.
+
+=item exportfactors B<(optional)>
+
+Export normalization factors and signal sums to a file specified by the parameter.
+
+=item perlonly B<(optional)>
+
+Use pure Perl to run the script, otherwise, uses Linux awk. Useful for e.g.
+Windows systems but slower.
+
+=item prerun B<(optional)>
+
+If this switch is turned on, the script just counts the total wiggle signal in
+the input files and prints it on the screen. This is useful in order for example
+to determine the total normalization signal (sumto).
+
+=item prerunlog B<(optional)>
+
+Writes the output of prerun option to a file specified by prerunlog. If only the
+prerunlog is specified, prerun is assumed and executed automatically.
+
+=item silent B<optional>
+
+Do not display verbose messages.
+
+=back
+
+=head1 OUTPUT
+
+BedGraph files with normalized signal.
 
 =head1 SUBROUTINES/METHODS
 

@@ -1218,7 +1218,7 @@ sub validate_normalize_bedgraph
     # Check signal summarization
     if (!$self->{"params"}->{"sumto"})
     {
-        $helper->disp("The normalization mode not given! Using default(1000000000)...");
+        $helper->disp("The normalization total signal not given! Using default(1000000000)...");
         $self->{"params"}->{"sumto"} = 1000000000;
     }
     if ($self->{"params"}->{"sumto"} !~ m/^[1-9]\d*$/ || $self->{"params"}->{"sumto"} <= 0)
@@ -1556,15 +1556,31 @@ sub validate_track_signal
     }
     else
     {
-        $helper->disp("No track name specified! The file name will be used...")
-            if (!$self->{"params"}->{"options"}->{"name"});
-        $helper->disp("No track description specified! The track name will be used...")
-            if (!$self->{"params"}->{"options"}->{"description"});
-        $helper->disp("No track color specified! The default will be used (0,0,160)...")
-            if (!$self->{"params"}->{"options"}->{"color"});
-        $helper->disp("No default track height area specified! The default used (128:64:16)...")
-            if (!$self->{"params"}->{"options"}->{"maxheightpixels"});
+        if (!$self->{"params"}->{"options"}->{"name"})
+        {
+			$helper->disp("No track name specified! The file name will be used...");
+			$self->{"params"}->{"options"}->{"name"} = $self->{"params"}->{"input"};
+		}
+        if (!$self->{"params"}->{"options"}->{"description"})
+        {
+			$helper->disp("No track description specified! The track name will be used...");
+			$self->{"params"}->{"options"}->{"description"} = $self->{"params"}->{"name"};
+		}
+		if (!$self->{"params"}->{"options"}->{"color"})
+		{
+			$helper->disp("No track color specified! The default will be used (0,0,160)...");
+			$self->{"params"}->{"options"}->{"color"} = "0,0,160";
+        }
+        if (!$self->{"params"}->{"options"}->{"maxHeightPixels"})
+        {
+			$helper->disp("No default track height area specified! The default used (128:64:16)...");
+			$self->{"params"}->{"options"}->{"maxHeightPixels"} = "128:64:16";
+		}
     }
+    
+    # In every case, we add quotes to name and description
+    $self->{"params"}->{"options"}->{"name"} = "\"".$self->{"params"}->{"options"}->{"name"}."\"";
+    $self->{"params"}->{"options"}->{"description"} = "\"".$self->{"params"}->{"options"}->{"description"}."\"";
 
     my $gversion = $self->{"params"}->{"gversion"};
     if ($gversion)

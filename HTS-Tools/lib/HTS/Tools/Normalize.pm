@@ -1,11 +1,6 @@
 =head1 NAME
 
-This module is just a wrapper for the rest of the HTS::Tools::Normalize
-
-    use HTS::Tools;
-
-    my $normalizer = HTS::Tools::Normalize->new($what,%params);
-    $normalizer->run;
+HTS::Tools::Normalize - Normalization of some UCSC track formats.
 
 =head1 VERSION
 
@@ -13,14 +8,12 @@ Version 0.01
 
 =head1 SYNOPSIS
 
-Quick summary of what the module does.
+This module is just a wrapper for the rest of the HTS::Tools::Normalize
 
-Perhaps a little code snippet.
+    use HTS::Tools;
 
-    use HTS::Tools::Normalize;
-
-    my $foo = HTS::Tools::Normalize->new();
-    ...
+    my $normalizer = HTS::Tools::Normalize->new($what,%params);
+    $normalizer->run;
 
 =head1 EXPORT
 

@@ -40,6 +40,7 @@ my $tool = HTS::Tools->new({
         "params" => {
             "input" => \@bglist,
             "type" => "bedgraph",
+            "sumto" => $sumto,
             "output" => \@output,
             "extnorm" => \@extnorm,
             "exportfactors" => $exportfacs,
