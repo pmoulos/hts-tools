@@ -90,7 +90,7 @@ sub check_inputs
         "silent|s" => \$silent,
         "help|h" => \$help
     );
-    if (!@ARGV || $help)
+    if ($help)
     {
         &program_usage;
         exit;

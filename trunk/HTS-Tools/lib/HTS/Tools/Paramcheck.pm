@@ -1381,8 +1381,6 @@ sub validate_track
     
     # Check fatal
     my $stop;
-    use Data::Dumper;
-    print Dumper(\$self);
     $stop .= "--- Please specify input file(s) ---\n" if (!$self->{"params"}->{"input"});
     $stop .= "--- Please specify track set type ---\n" if (!$self->{"params"}->{"type"});
     $stop .= "--- File type must be one of \"signal\", \"hub\" ---\n"
@@ -1461,7 +1459,7 @@ sub validate_track_signal
             "color" => "0,0,160",
             "maxHeightPixels" => "128:64:16",
             "visibility" => "pack",
-            "colorByStrand" => "255,0,0 0,0,255",
+            "colorByStrand" => "\"255,0,0 0,0,255\"",
             "bigDataUrl" => $self->{"params"}->{"urlbase"}
         )
     }
@@ -1496,6 +1494,17 @@ sub validate_track_signal
             "visibility" => "dense"
         )
     }
+    if ($self->{"params"}->{"destination"} eq "bed")
+    {
+        %options = (
+            "name" => $self->{"params"}->{"input"},
+            "description" => $self->{"params"}->{"input"},
+            "color" => "0,0,160",
+            "colorByStrand" => "\"255,0,0 0,0,255\"",
+            "maxHeightPixels" => "128:64:16",
+            "visibility" => "pack"
+        )
+    }
     if ($self->{"params"}->{"destination"} eq "bam" || $self->{"params"}->{"destination"} eq "sam")
     {
         %options = (
@@ -1509,6 +1518,7 @@ sub validate_track_signal
             "bamGrayMode" => "aliQual"
         )
     }
+    $self->{"params"}->{"options"} = \%options;
 
     # Define possible pairs
     my %pairs = (
@@ -1558,24 +1568,24 @@ sub validate_track_signal
     {
         if (!$self->{"params"}->{"options"}->{"name"})
         {
-			$helper->disp("No track name specified! The file name will be used...");
-			$self->{"params"}->{"options"}->{"name"} = $self->{"params"}->{"input"};
-		}
+            $helper->disp("No track name specified! The file name will be used...");
+            $self->{"params"}->{"options"}->{"name"} = $self->{"params"}->{"input"};
+        }
         if (!$self->{"params"}->{"options"}->{"description"})
         {
-			$helper->disp("No track description specified! The track name will be used...");
-			$self->{"params"}->{"options"}->{"description"} = $self->{"params"}->{"name"};
-		}
-		if (!$self->{"params"}->{"options"}->{"color"})
-		{
-			$helper->disp("No track color specified! The default will be used (0,0,160)...");
-			$self->{"params"}->{"options"}->{"color"} = "0,0,160";
+            $helper->disp("No track description specified! The track name will be used...");
+            $self->{"params"}->{"options"}->{"description"} = $self->{"params"}->{"name"};
+        }
+        if (!$self->{"params"}->{"options"}->{"color"})
+        {
+            $helper->disp("No track color specified! The default will be used (0,0,160)...");
+            $self->{"params"}->{"options"}->{"color"} = "0,0,160";
         }
         if (!$self->{"params"}->{"options"}->{"maxHeightPixels"})
         {
-			$helper->disp("No default track height area specified! The default used (128:64:16)...");
-			$self->{"params"}->{"options"}->{"maxHeightPixels"} = "128:64:16";
-		}
+            $helper->disp("No default track height area specified! The default used (128:64:16)...");
+            $self->{"params"}->{"options"}->{"maxHeightPixels"} = "128:64:16";
+        }
     }
     
     # In every case, we add quotes to name and description
@@ -1629,27 +1639,27 @@ sub validate_track_signal
     }
     else
     {
-        if ($self->{"params"}->{"org"} =~ m/human/i)
+        if ($self->{"params"}->{"org"} && $self->{"params"}->{"org"} =~ m/human/i)
         {
             $helper->disp("Human genome version not given! Using default for human (hg19)...");
             $self->{"params"}->{"gversion"} = "hg19";
         }
-        if ($self->{"params"}->{"org"} =~ m/mouse/i)
+        if ($self->{"params"}->{"org"} && $self->{"params"}->{"org"} =~ m/mouse/i)
         {
             $helper->disp("Mouse genome version not given! Using default for mouse (mm10)...");
             $self->{"params"}->{"gversion"} = "mm10";
         }
-        if ($self->{"params"}->{"org"} =~ m/rat/i)
+        if ($self->{"params"}->{"org"} && $self->{"params"}->{"org"} =~ m/rat/i)
         {
             $helper->disp("Rat genome version not given! Using default for rat (rn5)...");
             $self->{"params"}->{"gversion"} = "rn5";
         }
-        if ($self->{"params"}->{"org"} =~ m/fly/i)
+        if ($self->{"params"}->{"org"} && $self->{"params"}->{"org"} =~ m/fly/i)
         {
             $helper->disp("Fruitfly genome version not given! Using default for fruitfly (dm3)...");
             $self->{"params"}->{"gversion"} = "dm3";
         }
-        if ($self->{"params"}->{"org"} =~ m/zebrafish/i)
+        if ($self->{"params"}->{"org"} && $self->{"params"}->{"org"} =~ m/zebrafish/i)
         {
             $helper->disp("Zebrafish genome version not given! Using default for zebrafish (danRer7)...");
             $self->{"params"}->{"gversion"} = "danRer7";

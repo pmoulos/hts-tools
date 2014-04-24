@@ -169,7 +169,7 @@ sub fetch_ensembl_genes
 {
     my ($self,$org) = @_;
     my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
-    my $sp = $self->format_species($org,"ensembl");
+    my $sp = $self->format_species($org,"","ensembl");
     my $xml = $self->get_xml_genes_query($sp);
     my $path = BIOMART_PATH;
     my $request = HTTP::Request->new("POST",$path,HTTP::Headers->new(),'query='.$xml."\n");
@@ -222,7 +222,7 @@ sub fetch_ensembl_exons
 {
     my ($self,$org) = @_;
     my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
-    my $sp = $self->format_species($org,"ensembl");
+    my $sp = $self->format_species($org,"","ensembl");
     my $xml = $self->get_xml_exons_query($sp);
     my $path = BIOMART_PATH;
     my $request = HTTP::Request->new("POST",$path,HTTP::Headers->new(),'query='.$xml."\n");
@@ -275,7 +275,7 @@ sub fetch_ensembl_utr
 {
     my ($self,$org,$utr) = @_;
     my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
-    my $sp = $self->format_species($org,"ensembl");
+    my $sp = $self->format_species($org,"","ensembl");
     my $xml = $self->get_xml_utr_query($sp,$utr);
     my $path = BIOMART_PATH;
     my $request = HTTP::Request->new("POST",$path,HTTP::Headers->new(),'query='.$xml."\n");
@@ -329,7 +329,7 @@ sub fetch_ensembl_cds
 {
     my ($self,$org) = @_;
     my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
-    my $sp = $self->format_species($org,"ensembl");
+    my $sp = $self->format_species($org,"","ensembl");
     my $xml = $self->get_xml_cds_query($sp);
     my $path = BIOMART_PATH;
     my $request = HTTP::Request->new("POST",$path,HTTP::Headers->new(),'query='.$xml."\n");

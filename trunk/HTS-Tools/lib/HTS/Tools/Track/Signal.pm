@@ -225,7 +225,7 @@ sub run
         }
         when(/bigbed2bed/i)
         {
-            ($track,$header) = $self->bigbed2bed($input,$dir,$org,$options);
+            ($track,$header) = $self->bigbed2bed($input,$dir,$options);
         }
         when(/bigbed2bedgraph/i)
         {
@@ -387,10 +387,14 @@ sub bed2bigbed
     # Construct track header
     $options->{"bigDataUrl"} = $options->{"bigDataUrl"}."/".$basename.".bigBed";
     $header = "track type=bigBed";
-	while ($key,$value) = each (%{$options})
-	{
-		$header .= " ".$key."=".$value;
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
     }
+    my $outheader = File::Spec->catfile($dir,$basename.".bbh");
+    open(HEADER,">$outheader");
+    print HEADER $header,"\n";
+    close(HEADER);
     
     return($track,$header);
 }
@@ -477,6 +481,37 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bigbed2bed
 {
+    my ($self,$input,$dir,$options) = @_;
+    my ($track,$header,$tracktmp);
+
+    # Construct file
+    my $kenthome = $const->get("KENTBIN_HOME");
+    my $bigbed2bed = File::Spec->catfile($kenthome,"bigBedToBed");
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output = File::Spec->catfile($dir,$basename.".tmpbed");
+    my $fail = system($bigbed2bed." ".$input." ".$output);
+    ($fail) ? (return(0)) : ($tracktmp = $output);
+
+    # Construct track header
+    $header = "track type=bed";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+    my $outfinal = File::Spec->catfile($dir,$basename.".bed");
+    open(OUTPUT,$output);
+    open(OUTFINAL,">$outfinal");
+    print OUTFINAL $header,"\n";
+    while (<OUTPUT>)
+    {
+        print OUTFINAL $_;
+    }
+    close(OUTPUT);
+    close(OUTFINAL);
+    unlink($output);
+    $track = $outfinal;
+    
+    return($track);
 }
 
 =head2 bigbed2bedgraph
