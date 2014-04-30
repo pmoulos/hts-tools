@@ -1415,7 +1415,7 @@ sub validate_track_signal
     my $self = shift @_;
     my $modname = "HTS::Tools::Track::Signal";
     
-    my @accept = ("type","input","source","destination","dir","urlbase","org","gversion","options");
+    my @accept = ("type","input","source","destination","dir","urlbase","org","gversion","cleanlevel","sort","options");
     
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
@@ -1448,7 +1448,14 @@ sub validate_track_signal
         if ($self->{"params"}->{"destination"} ne "bigbed" && $self->{"params"}->{"destination"} ne "bigwig" &&
             $self->{"params"}->{"destination"} ne "wig" && $self->{"params"}->{"destination"} ne "bedgraph" &&
             $self->{"params"}->{"destination"} ne "bam" && $self->{"params"}->{"source"} ne "sam");
-    
+
+    if ($stop)
+    {
+        $helper->disp("$stop\n");
+        $helper->disp("Type perldoc $modname for help in usage.\n\n");
+        exit;
+    }
+
     # We must have some defaults in this case...
     my %options;
     if ($self->{"params"}->{"destination"} eq "bigbed")
@@ -1558,6 +1565,20 @@ sub validate_track_signal
         $helper->disp("No output directory specified! The input directory will be used...");
         my ($base,$dir,$ext) = fileparse($self->{"params"}->{"input"},'\.[^.]*');
         $self->{"params"}->{"dir"} = $dir;
+    }
+    if (!$self->{"params"}->{"cleanlevel"})
+    {
+        $helper->disp("No clean level specified! Using default (2: Removal of unlocalized/random chromosome regions and mitochondrial DNA)...");
+        $self->{"params"}->{"cleanlevel"} = 2;
+    }
+    if (!$self->{"params"}->{"sort"})
+    {
+        $helper->disp("No co-rdinate sorting specified! If source track is not sorted, some conversions might crash...");
+        $self->{"params"}->{"sort"} = 0;
+    }
+    else
+    {
+        $self->{"params"}->{"sort"} = 1;
     }
     if (!$self->{"params"}->{"options"})
     {

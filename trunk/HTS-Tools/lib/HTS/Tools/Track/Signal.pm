@@ -45,19 +45,33 @@ In altis montibus
 
 =item I<urlbase> B<(required when destination is bigbed, bigwig, bam)>
 
-Ipse deus
+Et subitas
 
 =item I<org> B<(required when destination is bigbed, bigwig, wig, bedgraph)>
 
-Nudus nudos
+Concipit
 
 =item I<gversion> B<(required when destination is bigbed, bigwig, wig, bedgraph)>
 
-Iubet ire
+Ipse fugas
+
+=item I<cleanlevel> B<(optional)>
+
+The cleanlevel parameter controls what filtering will be applied to the raw reads so as to produce
+the signal track. It can have three values: 0 for not cleaning anything (reporting reads as they
+are, no unique and no removal of unlocalized regions and mitochondrial DNA reads), 1 for removing
+unlocalized regions (chrU, hap, random etc.), 2 for removing reads of level 1 plus mitochondrial
+reads (chrM) and 3 for removing reads of level 2 plus returning unique reads only. The default is
+level 1.
+
+=item  I<sort> B<(optional)>
+
+Sort the BAM or BED files according to co-ordinates. This process is required for some conversions
+so if you do not supply this parameter, make sure that the source tracks are sorted.
 
 =item  I<options> B<(optional)>
 
-Ministrus
+Ipse Deus
 
 =item I<silent> B<(optional)>
 
@@ -176,6 +190,8 @@ sub run
     my $dir = $self->get("dir");
     my $org = $self->get("org");
     my $ver = $self->get("gversion");
+    my $clevel = $self->get("cleanlevel");
+    my $sort = $self->get("sort");
     my $options = $self->get("options");
 
     # Check the existence of propoer Constants
@@ -188,9 +204,11 @@ sub run
     {
         when(/bam2bedgraph/i)
         {
+            ($track,$header) = $self->bam2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
         }
         when(/bam2bigbed/i)
         {
+            ($track,$header) = $self->bam2bigbed($input,$dir,$org,$ver,$clevel,$sort,$options);
         }
         when(/bam2bigwig/i)
         {
@@ -206,7 +224,7 @@ sub run
         }
         when (/bed2bigbed/i)
         {
-             ($track,$header) = $self->bed2bigbed($input,$dir,$org,$ver,$options);
+             ($track,$header) = $self->bed2bigbed($input,$dir,$org,$ver,$clevel,$sort,$options);
         }
         when (/bed2bigwig/i)
         {
@@ -275,6 +293,49 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bam2bedgraph
 {
+    my ($self,$input,$dir,$org,$ver,$clevel,$sort,$options) = @_;
+    my ($track,$header);
+
+    my $chromsize = $self->get_chrom_size($org,$ver);
+    my $bedtoolshome = $const->get("BEDTOOLS_HOME");
+    my $bam2bed = File::Spec->catfile($bedtoolshome,"bedtools bamtobed -split -i");
+    my $genomecov = File::Spec->catfile($bedtoolshome,"bedtools genomecov -bg -i");
+
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output1 = File::Spec->catfile($dir,$basename.".bed");
+    
+    $helper->disp("Converting to bed...");
+    my $fail1 = system($bam2bed." ".$input." > ".$output1);
+    return(0) if ($fail1);
+
+    my $output2 = File::Spec->catfile($dir,$basename.".tmp");
+    my $sorted = $self->clean_bedstar($output1,$clevel,$sort);
+    
+    $helper->disp("Converting to bedgraph...\n");
+    my $fail2 = system($genomecov." ".$sorted." -g ".$chromsize." > ".$output2);
+    ($fail2) ? (return(0)) : ($track = $output2);
+
+    $header = "track type=bedGraph";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+
+    my $outfinal = File::Spec->catfile($dir,$basename.".bedGraph");
+    open(OUTPUT,$output2);
+    open(OUTFINAL,">$outfinal");
+    print OUTFINAL $header,"\n";
+    while (<OUTPUT>)
+    {
+        print OUTFINAL $_;
+    }
+    close(OUTPUT);
+    close(OUTFINAL);
+    unlink($output1);
+    unlink($output2);
+    $track = $outfinal;
+    
+    return($track,$header);
 }
 
 =head2 bam2bigbed
@@ -289,6 +350,40 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bam2bigbed
 {
+    my ($self,$input,$dir,$org,$ver,$clevel,$sort,$options) = @_;
+    my ($track,$header);
+
+    my $chromsize = $self->get_chrom_size($org,$ver);
+    my $bedtoolshome = $const->get("BEDTOOLS_HOME");
+    my $kenthome = $const->get("KENTBIN_HOME");
+    my $bam2bed = File::Spec->catfile($bedtoolshome,"bedtools bamtobed -split -i");
+    my $bed2bigbed = File::Spec->catfile($kenthome,"bedToBigBed");
+    
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output1 = File::Spec->catfile($dir,$basename.".bed");
+    $helper->disp("Converting to bed...");
+    my $fail1 = system($bam2bed." ".$input." > ".$output1);
+    return(0) if ($fail1);
+
+    my $output2 = File::Spec->catfile($dir,$basename.".bigBed");
+    my $sorted = $self->clean_bedstar($output1,$clevel,$sort);
+    $helper->disp("Converting to bigbed...");
+    my $fail2 = system($bed2bigbed." ".$sorted." ".$chromsize." ".$output2);
+    ($fail2) ? (return(0)) : ($track = $output2);
+
+    # Construct track header
+    $options->{"bigDataUrl"} = $options->{"bigDataUrl"}."/".$basename.".bigBed";
+    $header = "track type=bigBed";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+    my $outheader = File::Spec->catfile($dir,$basename.".bbh");
+    open(HEADER,">$outheader");
+    print HEADER $header,"\n";
+    close(HEADER);
+    
+    return($track,$header);
 }
 
 =head2 bam2bigwig
@@ -303,6 +398,17 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bam2bigwig
 {
+    my ($self,$input,$dir,$org,$ver,$clevel,$sort,$options) = @_;
+    my ($track,$header);
+
+    my $chromsize = $self->get_chrom_size($org,$ver);
+    my $bedtoolshome = $const->get("BEDTOOLS_HOME");
+    my $kenthome = $const->get("KENTBIN_HOME");
+    my $bam2bed = File::Spec->catfile($bedtoolshome,"bedtools bamtobed -split -i");
+    my $genomecov = File::Spec->catfile($bedtoolshome,"bedtools genomecov -bg -i");
+    my $bedgraph2bigwig = File::Spec->catfile($kenthome,"bedGraphToBigWig");
+    
+    return($track,$header);
 }
 
 =head2 bam2wig
@@ -359,28 +465,18 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bed2bigbed
 {
-    my ($self,$input,$dir,$org,$ver,$options) = @_;
+    my ($self,$input,$dir,$org,$ver,$clevel,$sort,$options) = @_;
     my ($track,$header);
 
-    # Construct file
-    my $chromsize;
-    if ($const->get("IGENOMES_HOME") && $const->get("REMOTE_HOST"))
-    {
-        $chromsize = $self->format_igenomes_chrom_size($org,$ver);
-    }
-    elsif ($const->get("IGENOMES_HOME") && !$const->get("REMOTE_HOST"))
-    {
-        $chromsize = $self->format_igenomes_chrom_size($org,$ver);
-    }
-    elsif (!$const->get("IGENOMES_HOME") && $const->get("REMOTE_HOST"))
-    {
-        $chromsize = $fetcher->fetch_chrom_info($org);
-    }
+    my $chromsize = $self->get_chrom_size($org,$ver);
     my $kenthome = $const->get("KENTBIN_HOME");
     my $bed2bigbed = File::Spec->catfile($kenthome,"bedToBigBed");
+    
     my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
     my $output = File::Spec->catfile($dir,$basename.".bigBed");
-    my $sorted = $self->sort_bedstar($input);
+    my $sorted = $self->clean_bedstar($input,$clevel,$sort);
+
+    $helper->disp("Converting to bigbed...\n");
     my $fail = system($bed2bigbed." ".$sorted." ".$chromsize." ".$output);
     ($fail) ? (return(0)) : ($track = $output);
 
@@ -484,11 +580,12 @@ sub bigbed2bed
     my ($self,$input,$dir,$options) = @_;
     my ($track,$header,$tracktmp);
 
-    # Construct file
     my $kenthome = $const->get("KENTBIN_HOME");
     my $bigbed2bed = File::Spec->catfile($kenthome,"bigBedToBed");
     my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
     my $output = File::Spec->catfile($dir,$basename.".tmpbed");
+    
+    $helper->disp("Converting to bed...\n");
     my $fail = system($bigbed2bed." ".$input." ".$output);
     ($fail) ? (return(0)) : ($tracktmp = $output);
 
@@ -511,7 +608,7 @@ sub bigbed2bed
     unlink($output);
     $track = $outfinal;
     
-    return($track);
+    return($track,$header);
 }
 
 =head2 bigbed2bedgraph
@@ -842,44 +939,179 @@ sub check_constants
     }
 }
 
-=head2 sort_bedstar
+=head2 clean_bedstar
 
-Helper sorting function for BED-like files (bed, bedgraph). Internal use.
+Helper cleaning/sorting function for BED-like files (bed, bedgraph). Internal use.
 
-    $track->sort_bedstar($file);
+    $track->sort_bedstar($file,$cleanlevel,$sort);
     
 =cut
 
-sub sort_bedstar
+sub clean_bedstar
 {
-    my ($self,$infile) = @_;
+    my ($self,$infile,$clevel,$sort) = @_;
     my $tmpdir = $self->get("tmpdir");
     my $tmpfile;
-    
-    if ($^O !~ /MSWin/) # Case of linux, easy sorting
+    my ($lev1,%seen); # Vars for pure Perl cleaning on Windows
+
+    if ($sort)
     {
-        $helper->disp("Sorting bed-like file $infile...");
-        $tmpfile = File::Spec->catfile($tmpdir,"temp.in$$");
-        `sort -k1,1 -k2g,2 $infile > $tmpfile `;
-        $infile = $tmpfile;
-    }
-    else # We are in Windows... package required
-    {
-        $helper->try_module("File::Sort","sort_file");
-        eval "use File::Sort qw(sort_file)"; # Like this or interpreter complains
-        $helper->disp("Sorting file $infile...");
-        $tmpfile = File::Spec->catfile($tmpdir,"temp.tmp");
-        sort_file(
+        if ($^O !~ /MSWin/) # Case of linux, easy sorting
         {
-            I => $infile,
-            o => $tmpfile,
-            k => ['1,1','2n,2'],
-            t => "\t"
-        });
-        $infile = $tmpfile;
+            $helper->disp("Cleaning and sorting bed-like file $infile...");
+            $tmpfile = File::Spec->catfile($tmpdir,"temp.in$$");
+            if ($clevel == 0)
+            {
+                `sort -k1,1 -k2g,2 -k3g,3 $infile > $tmpfile `;
+            }
+            elsif ($clevel == 1)
+            {
+                `grep -vP 'chrU|rand|hap' $infile | sort -k1,1 -k2g,2 -k3g,3  > $tmpfile `;
+            }
+            elsif ($clevel == 2)
+            {
+                `grep -vP 'chrM|chrU|rand|hap' $infile | sort -k1,1 -k2g,2 -k3g,3  > $tmpfile `;
+            }
+            elsif ($clevel == 3)
+            {
+                `grep -vP 'chrM|chrU|rand|hap' $infile | sort -k1,1 -k2g,2 -k3g,3 -u  > $tmpfile `;
+            }
+            $infile = $tmpfile;
+        }
+        else # We are in Windows... package required
+        {
+            $helper->try_module("File::Sort","sort_file");
+            eval "use File::Sort qw(sort_file)"; # Like this or interpreter complains
+            $helper->disp("Cleaning and sorting file $infile...");
+            $tmpfile = File::Spec->catfile($tmpdir,"temp.tmp");
+            if ($clevel != 0)
+            {
+                $lev1 = File::Spec->catfile($tmpdir,"lev1.tmp");
+                open(LEV1INPUT,$infile);
+                open(LEV1OUTPUT,">$lev1");
+                if ($clevel != 3)
+                {
+                    while (<LEV1INPUT>)
+                    {
+                        next if ($_ =~ m/chrU|rand|hap/i && $clevel == 1);
+                        next if ($_ =~ m/chrM|chrU|rand|hap/i && $clevel == 2);
+                        print LEV1OUTPUT $_;
+                    }
+                }
+                else
+                {
+                    while (my $line = <LEV1INPUT>)
+                    {
+                        my @cols = split(/\t/,$line);
+                        next if ($line =~ m/chrM|chrU|rand|hap/i && $seen{join("\t",@cols[0..2])});
+                        $seen{join("\t",@cols[0..2])}++;
+                        print LEV1OUTPUT $line;
+                    }
+                }
+                close(LEV1INPUT);
+                close(LEV1OUTPUT);
+                $infile = $lev1;
+            }
+            sort_file({
+                I => $infile,
+                o => $tmpfile,
+                k => ['1,1','2n,2','3n,3'],
+                t => "\t"
+            }); 
+            $infile = $tmpfile;
+        }
+    }
+    else
+    {
+        if ($^O !~ /MSWin/)
+        {
+            $helper->disp("Cleaning bed-like file $infile...");
+            $tmpfile = File::Spec->catfile($tmpdir,"temp.in$$");
+            if ($clevel == 0)
+            {
+                $tmpfile = $infile;
+            }
+            elsif ($clevel == 1)
+            {
+                `grep -vP 'chrU|rand|hap' $infile > $tmpfile `;
+            }
+            elsif ($clevel == 2)
+            {
+                `grep -vP 'chrM|chrU|rand|hap' $infile > $tmpfile `;
+            }
+            elsif ($clevel == 3) # In this case, sorting is forced...
+            {
+                `grep -vP 'chrM|chrU|rand|hap' $infile | sort -k1,1 -k2g,2 -k3g,3 -u  > $tmpfile `;
+            }
+            $infile = $tmpfile;
+        }
+        else # We are in Windows... package required
+        {
+            $helper->disp("Cleaning file $infile...");
+            $tmpfile = File::Spec->catfile($tmpdir,"temp.tmp");
+            if ($clevel != 0)
+            {
+                $lev1 = File::Spec->catfile($tmpdir,"lev1.tmp");
+                open(LEV1INPUT,$infile);
+                open(LEV1OUTPUT,">$lev1");
+                if ($clevel != 3)
+                {
+                    while (<LEV1INPUT>)
+                    {
+                        next if ($_ =~ m/chrU|rand|hap/i && $clevel == 1);
+                        next if ($_ =~ m/chrM|chrU|rand|hap/i && $clevel == 2);
+                        print LEV1OUTPUT $_;
+                    }
+                }
+                else
+                {
+                    while (my $line = <LEV1INPUT>)
+                    {
+                        my @cols = split(/\t/,$line);
+                        next if ($line =~ m/chrM|chrU|rand|hap/i && $seen{join("\t",@cols[0..2])});
+                        $seen{join("\t",@cols[0..2])}++;
+                        print LEV1OUTPUT $line;
+                    }
+                }
+                close(LEV1INPUT);
+                close(LEV1OUTPUT);
+                $infile = $lev1;
+            }
+            else
+            {
+                $tmpfile = $infile;
+            }
+            $infile = $tmpfile;
+        }
     }
 
     return($infile);
+}
+
+=head2 get_chrom_size
+
+Fetch/find in path a file containing the size of each chromosome, according to the requested organism
+and genome version.
+
+    $track->get_chrom_size($organism,$version);
+
+=cut
+
+sub get_chrom_size
+{
+    my ($self,$org,$ver) = @_;
+    if ($const->get("IGENOMES_HOME") && $const->get("REMOTE_HOST"))
+    {
+        return($self->format_igenomes_chrom_size($org,$ver));
+    }
+    elsif ($const->get("IGENOMES_HOME") && !$const->get("REMOTE_HOST"))
+    {
+        return($self->format_igenomes_chrom_size($org,$ver));
+    }
+    elsif (!$const->get("IGENOMES_HOME") && $const->get("REMOTE_HOST"))
+    {
+        return($fetcher->fetch_chrom_info($org));
+    }
 }
 
 =head2 format_igenomes
