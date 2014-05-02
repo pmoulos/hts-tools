@@ -1440,14 +1440,16 @@ sub validate_track_signal
         if (($self->{"params"}->{"destination"} eq "bigbed" || $self->{"params"}->{"destination"} eq "bigwig" ||
             $self->{"params"}->{"destination"} eq "bedgraph" || $self->{"params"}->{"destination"} eq "wig") &&
             !$self->{"params"}->{"gversion"});
-    $stop .= "--- Source track type must be one of \"bigbed\", \"bigwig\", \"wig\", \"bedgraph\" or \"bam\" ---\n"
+    $stop .= "--- Source track type must be one of \"bigbed\", \"bigwig\", \"wig\", \"bedgraph\", \"bed\" or \"bam\" ---\n"
         if ($self->{"params"}->{"source"} ne "bigbed" && $self->{"params"}->{"source"} ne "bigwig" &&
             $self->{"params"}->{"source"} ne "wig" && $self->{"params"}->{"source"} ne "bedgraph" &&
-            $self->{"params"}->{"source"} ne "bam" && $self->{"params"}->{"source"} ne "sam");
-    $stop .= "--- Destination track type must be one of \"bigbed\", \"bigwig\", \"wig\", \"bedgraph\" or \"bam\" ---\n"
+            $self->{"params"}->{"source"} ne "bed" && $self->{"params"}->{"source"} ne "bam" &&
+            $self->{"params"}->{"source"} ne "sam");
+    $stop .= "--- Destination track type must be one of \"bigbed\", \"bigwig\", \"wig\", \"bedgraph\", \"bed\" or \"bam\" ---\n"
         if ($self->{"params"}->{"destination"} ne "bigbed" && $self->{"params"}->{"destination"} ne "bigwig" &&
             $self->{"params"}->{"destination"} ne "wig" && $self->{"params"}->{"destination"} ne "bedgraph" &&
-            $self->{"params"}->{"destination"} ne "bam" && $self->{"params"}->{"source"} ne "sam");
+            $self->{"params"}->{"destination"} ne "bed" && $self->{"params"}->{"destination"} ne "bam" &&
+            $self->{"params"}->{"source"} ne "sam");
 
     if ($stop)
     {
@@ -1525,7 +1527,7 @@ sub validate_track_signal
             "bamGrayMode" => "aliQual"
         )
     }
-    $self->{"params"}->{"options"} = \%options;
+    #$self->{"params"}->{"options"} = \%options;
 
     # Define possible pairs
     my %pairs = (
@@ -1583,7 +1585,7 @@ sub validate_track_signal
     if (!$self->{"params"}->{"options"})
     {
         $helper->disp("No additional options specified! The defaults will be used according to track types...");
-        $self->{"params"}->{"options"} = %options;
+        $self->{"params"}->{"options"} = \%options;
     }
     else
     {
@@ -1595,7 +1597,9 @@ sub validate_track_signal
         if (!$self->{"params"}->{"options"}->{"description"})
         {
             $helper->disp("No track description specified! The track name will be used...");
-            $self->{"params"}->{"options"}->{"description"} = $self->{"params"}->{"name"};
+            ($self->{"params"}->{"options"}->{"name"}) ?
+            ($self->{"params"}->{"options"}->{"description"} = $self->{"params"}->{"options"}->{"name"}) :
+            ($self->{"params"}->{"options"}->{"description"} = $self->{"params"}->{"input"});
         }
         if (!$self->{"params"}->{"options"}->{"color"})
         {
@@ -1607,8 +1611,15 @@ sub validate_track_signal
             $helper->disp("No default track height area specified! The default used (128:64:16)...");
             $self->{"params"}->{"options"}->{"maxHeightPixels"} = "128:64:16";
         }
+        if (!$self->{"params"}->{"options"}->{"bigDataUrl"} && ($self->{"params"}->{"destination"} eq "bigbed" ||
+            $self->{"params"}->{"destination"} eq "bigwig" || $self->{"params"}->{"destination"} eq "bam" ||
+            $self->{"params"}->{"destination"} eq "sam"))
+        {
+            $helper->disp("No different big data url specified! Using default from input...");
+            $self->{"params"}->{"options"}->{"bigDataUrl"} = $self->{"params"}->{"urlbase"};
+        }
     }
-    
+
     # In every case, we add quotes to name and description
     $self->{"params"}->{"options"}->{"name"} = "\"".$self->{"params"}->{"options"}->{"name"}."\"";
     $self->{"params"}->{"options"}->{"description"} = "\"".$self->{"params"}->{"options"}->{"description"}."\"";
