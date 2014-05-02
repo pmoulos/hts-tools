@@ -202,77 +202,90 @@ sub run
     use v5.14;
     given($source."2".$destination)
     {
-        when(/bam2bedgraph/i)
+        when(/^bam2bedgraph$/i)
         {
             ($track,$header) = $self->bam2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
         }
-        when(/bam2bigbed/i)
+        when(/^bam2bigbed$/i)
         {
             ($track,$header) = $self->bam2bigbed($input,$dir,$org,$ver,$clevel,$sort,$options);
         }
-        when(/bam2bigwig/i)
+        when(/^bam2bigwig$/i)
         {
+            ($track,$header) = $self->bam2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
         }
-        when(/bam2wig/i)
+        when(/^bam2wig$/i)
         {
+            ($track,$header) = $self->bam2wig($input,$dir,$org,$ver,$clevel,$sort,$options);
         }
-        when (/bed2bam/i)
+        when (/^bed2bam$/i)
         {
+            ($track,$header) = $self->bed2bam($input,$dir,$org,$ver,$clevel,$sort,$options);
         }
-        when (/bed2bedgraph/i)
+        when (/^bed2bedgraph$/i)
         {
+            ($track,$header) = $self->bed2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
         }
-        when (/bed2bigbed/i)
+        when (/^bed2bigbed$/i)
         {
              ($track,$header) = $self->bed2bigbed($input,$dir,$org,$ver,$clevel,$sort,$options);
         }
-        when (/bed2bigwig/i)
+        when (/^bed2bigwig$/i)
         {
+            ($track,$header) = $self->bed2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
         }
-        when (/bed2wig/i)
+        when (/^bed2wig$/i)
         {
+            ($track,$header) = $self->bed2wig($input,$dir,$org,$ver,$clevel,$sort,$options);
         }
-        when(/bedgraph2bigwig/i)
+        when(/^bedgraph2bigwig$/i)
         {
+            ($track,$header) = $self->bedgraph2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
         }
-        when(/bedgraph2wig/i)
+        when(/^bedgraph2wig$/i)
         {
+            ($track,$header) = $self->bedgraph2wig($input,$dir,$org,$ver,$clevel,$sort,$options);
         }
-        when(/bigbed2bam/i)
+        when(/^bigbed2bam$/i)
         {
+            ($track,$header) = $self->bigbed2bam($input,$dir,$org,$ver,$clevel,$sort,$options);
         }
-        when(/bigbed2bed/i)
+        when(/^bigbed2bed$/i)
         {
             ($track,$header) = $self->bigbed2bed($input,$dir,$options);
         }
-        when(/bigbed2bedgraph/i)
+        when(/^bigbed2bedgraph$/i)
+        {
+            ($track,$header) = $self->bigbed2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
+        }
+        when(/^bigbed2bigwig$/i)
+        {
+            ($track,$header) = $self->bigbed2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
+        }
+        when(/^bigwig2bedgraph$/i)
+        {
+            ($track,$header) = $self->bigwig2bedgraph($input,$dir,$options);
+        }
+        when(/^bigwig2wig$/i)
+        {
+            ($track,$header) = $self->bigwig2wig($input,$dir,$options);
+        }
+        when(/^wig2bigwig$/i)
         {
         }
-        when(/bigbed2bigwig/i)
+        when(/^wig2bedgraph$/i)
         {
         }
-        when(/bigwig2wig/i)
+        when(/^sam2bedgraph$/i)
         {
         }
-        when(/bigwig2bedgraph/i)
+        when(/^sam2bigbed$/i)
         {
         }
-        when(/wig2bigwig/i)
+        when(/^sam2bigwig$/i)
         {
         }
-        when(/wig2bedgraph/i)
-        {
-        }
-        when(/sam2bedgraph/i)
-        {
-        }
-        when(/sam2bigbed/i)
-        {
-        }
-        when(/sam2bigwig/i)
-        {
-        }
-        when(/sam2wig/i)
+        when(/^sam2wig$/i)
         {
         }
     }
@@ -303,14 +316,12 @@ sub bam2bedgraph
 
     my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
     my $output1 = File::Spec->catfile($dir,$basename.".bed");
-    
     $helper->disp("Converting to bed...");
     my $fail1 = system($bam2bed." ".$input." > ".$output1);
     return(0) if ($fail1);
 
     my $output2 = File::Spec->catfile($dir,$basename.".tmp");
     my $sorted = $self->clean_bedstar($output1,$clevel,$sort);
-    
     $helper->disp("Converting to bedgraph...\n");
     my $fail2 = system($genomecov." ".$sorted." -g ".$chromsize." > ".$output2);
     ($fail2) ? (return(0)) : ($track = $output2);
@@ -371,7 +382,6 @@ sub bam2bigbed
     my $fail2 = system($bed2bigbed." ".$sorted." ".$chromsize." ".$output2);
     ($fail2) ? (return(0)) : ($track = $output2);
 
-    # Construct track header
     $options->{"bigDataUrl"} = $options->{"bigDataUrl"}."/".$basename.".bigBed";
     $header = "track type=bigBed";
     while (my ($key,$value) = each (%{$options}))
@@ -382,6 +392,7 @@ sub bam2bigbed
     open(HEADER,">$outheader");
     print HEADER $header,"\n";
     close(HEADER);
+    unlink($output1);
     
     return($track,$header);
 }
@@ -407,6 +418,36 @@ sub bam2bigwig
     my $bam2bed = File::Spec->catfile($bedtoolshome,"bedtools bamtobed -split -i");
     my $genomecov = File::Spec->catfile($bedtoolshome,"bedtools genomecov -bg -i");
     my $bedgraph2bigwig = File::Spec->catfile($kenthome,"bedGraphToBigWig");
+
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output1 = File::Spec->catfile($dir,$basename.".bed");
+    $helper->disp("Converting to bed...");
+    my $fail1 = system($bam2bed." ".$input." > ".$output1);
+    return(0) if ($fail1);
+
+    my $output2 = File::Spec->catfile($dir,$basename.".bedGraph");
+    my $sorted = $self->clean_bedstar($output1,$clevel,$sort);
+    $helper->disp("Converting to bedgraph...");
+    my $fail2 = system($genomecov." ".$sorted." -g ".$chromsize." > ".$output2);
+    return(0) if ($fail2);
+
+    my $output3 = File::Spec->catfile($dir,$basename.".bigWig");
+    $helper->disp("Converting to bigwig...\n");
+    my $fail3 = system($bedgraph2bigwig." ".$output2." ".$chromsize." ".$output3);
+    ($fail3) ? (return(0)) : ($track = $output3);
+
+    $options->{"bigDataUrl"} = $options->{"bigDataUrl"}."/".$basename.".bigWig";
+    $header = "track type=bigWig";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+    my $outheader = File::Spec->catfile($dir,$basename.".bwh");
+    open(HEADER,">$outheader");
+    print HEADER $header,"\n";
+    close(HEADER);
+    unlink($output1);
+    unlink($output2);
     
     return($track,$header);
 }
@@ -423,6 +464,62 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bam2wig
 {
+    my ($self,$input,$dir,$org,$ver,$clevel,$sort,$options) = @_;
+    my ($track,$header);
+
+    my $chromsize = $self->get_chrom_size($org,$ver);
+    my $bedtoolshome = $const->get("BEDTOOLS_HOME");
+    my $kenthome = $const->get("KENTBIN_HOME");
+    my $bam2bed = File::Spec->catfile($bedtoolshome,"bedtools bamtobed -split -i");
+    my $genomecov = File::Spec->catfile($bedtoolshome,"bedtools genomecov -bg -i");
+    my $bedgraph2bigwig = File::Spec->catfile($kenthome,"bedGraphToBigWig");
+    my $bigwig2wig = File::Spec->catfile($kenthome,"bigWigToWig");
+
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output1 = File::Spec->catfile($dir,$basename.".bed");
+    $helper->disp("Converting to bed...");
+    my $fail1 = system($bam2bed." ".$input." > ".$output1);
+    return(0) if ($fail1);
+
+    my $output2 = File::Spec->catfile($dir,$basename.".bedGraph");
+    my $sorted = $self->clean_bedstar($output1,$clevel,$sort);
+    $helper->disp("Converting to bedgraph...");
+    my $fail2 = system($genomecov." ".$sorted." -g ".$chromsize." > ".$output2);
+    return(0) if ($fail2);
+
+    my $output3 = File::Spec->catfile($dir,$basename.".bigWig");
+    $helper->disp("Converting to bigwig...");
+    my $fail3 = system($bedgraph2bigwig." ".$output2." ".$chromsize." ".$output3);
+    return(0) if ($fail3);
+
+    my $output4 = File::Spec->catfile($dir,$basename.".tmp");
+    $helper->disp("Converting to wig...\n");
+    my $fail4 = system($bigwig2wig." ".$output3." ".$output4);
+    return(0) if ($fail4);
+
+    $header = "track type=wiggle_0";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+
+    my $outfinal = File::Spec->catfile($dir,$basename.".wig");
+    open(OUTPUT,$output4);
+    open(OUTFINAL,">$outfinal");
+    print OUTFINAL $header,"\n";
+    while (<OUTPUT>)
+    {
+        print OUTFINAL $_;
+    }
+    close(OUTPUT);
+    close(OUTFINAL);
+    unlink($output1);
+    unlink($output2);
+    unlink($output3);
+    unlink($output4);
+    $track = $outfinal;
+
+    return($track,$header);
 }
 
 =head2 bed2bam
@@ -437,6 +534,38 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bed2bam
 {
+    my ($self,$input,$dir,$org,$ver,$clevel,$sort,$options) = @_;
+    my ($track,$header);
+
+    my $chromsize = $self->get_chrom_size($org,$ver);
+    my $bedtoolshome = $const->get("BEDTOOLS_HOME");
+    my $samtoolshome = $const->get("SAMTOOLS_HOME");
+    my $bed2bam = File::Spec->catfile($bedtoolshome,"bedtools bedtobam -i");
+    my $samtoolsindex = File::Spec->catfile($samtoolshome,"samtools index");
+    
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output = File::Spec->catfile($dir,$basename.".bam");
+    my $sorted = $self->clean_bedstar($input,$clevel,$sort);
+    $helper->disp("Converting to bam...");
+    my $fail = system($bed2bam." ".$sorted." -g ".$chromsize." > ".$output);
+    ($fail) ? (return(0)) : ($track = $output);
+
+    $helper->disp("Indexing the bam...\n");
+    my $fi = system($samtoolsindex." ".$track);
+    return(0) if ($fi);
+
+    $options->{"bigDataUrl"} = $options->{"bigDataUrl"}."/".$basename.".bam";
+    $header = "track type=bam";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+    my $outheader = File::Spec->catfile($dir,$basename.".bmh");
+    open(HEADER,">$outheader");
+    print HEADER $header,"\n";
+    close(HEADER);
+    
+    return($track,$header);
 }
 
 =head2 bed2bedgraph
@@ -451,6 +580,40 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bed2bedgraph
 {
+    my ($self,$input,$dir,$org,$ver,$clevel,$sort,$options) = @_;
+    my ($track,$header);
+
+    my $chromsize = $self->get_chrom_size($org,$ver);
+    my $bedtoolshome = $const->get("BEDTOOLS_HOME");
+    my $genomecov = File::Spec->catfile($bedtoolshome,"bedtools genomecov -bg -i");
+
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output = File::Spec->catfile($dir,$basename.".tmp");
+    my $sorted = $self->clean_bedstar($input,$clevel,$sort);
+    $helper->disp("Converting to bedgraph...\n");
+    my $fail = system($genomecov." ".$sorted." -g ".$chromsize." > ".$output);
+    ($fail) ? (return(0)) : ($track = $output);
+
+    $header = "track type=bedGraph";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+
+    my $outfinal = File::Spec->catfile($dir,$basename.".bedGraph");
+    open(OUTPUT,$output);
+    open(OUTFINAL,">$outfinal");
+    print OUTFINAL $header,"\n";
+    while (<OUTPUT>)
+    {
+        print OUTFINAL $_;
+    }
+    close(OUTPUT);
+    close(OUTFINAL);
+    unlink($output);
+    $track = $outfinal;
+    
+    return($track,$header);
 }
 
 =head2 bed2bigbed
@@ -507,6 +670,40 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bed2bigwig
 {
+    my ($self,$input,$dir,$org,$ver,$clevel,$sort,$options) = @_;
+    my ($track,$header);
+
+    my $chromsize = $self->get_chrom_size($org,$ver);
+    my $bedtoolshome = $const->get("BEDTOOLS_HOME");
+    my $kenthome = $const->get("KENTBIN_HOME");
+    my $genomecov = File::Spec->catfile($bedtoolshome,"bedtools genomecov -bg -i");
+    my $bedgraph2bigwig = File::Spec->catfile($kenthome,"bedGraphToBigWig");
+
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output1 = File::Spec->catfile($dir,$basename.".bedGraph");
+    my $sorted = $self->clean_bedstar($output1,$clevel,$sort);
+    $helper->disp("Converting to bedgraph...");
+    my $fail1 = system($genomecov." ".$sorted." -g ".$chromsize." > ".$output1);
+    return(0) if ($fail1);
+
+    my $output2 = File::Spec->catfile($dir,$basename.".bigWig");
+    $helper->disp("Converting to bigwig...\n");
+    my $fail2 = system($bedgraph2bigwig." ".$output1." ".$chromsize." ".$output2);
+    ($fail2) ? (return(0)) : ($track = $output2);
+
+    $options->{"bigDataUrl"} = $options->{"bigDataUrl"}."/".$basename.".bigWig";
+    $header = "track type=bigWig";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+    my $outheader = File::Spec->catfile($dir,$basename.".bwh");
+    open(HEADER,">$outheader");
+    print HEADER $header,"\n";
+    close(HEADER);
+    unlink($output1);
+    
+    return($track,$header);
 }
 
 =head2 bed2wig
@@ -521,6 +718,55 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bed2wig
 {
+    my ($self,$input,$dir,$org,$ver,$clevel,$sort,$options) = @_;
+    my ($track,$header);
+
+    my $chromsize = $self->get_chrom_size($org,$ver);
+    my $bedtoolshome = $const->get("BEDTOOLS_HOME");
+    my $kenthome = $const->get("KENTBIN_HOME");
+    my $genomecov = File::Spec->catfile($bedtoolshome,"bedtools genomecov -bg -i");
+    my $bedgraph2bigwig = File::Spec->catfile($kenthome,"bedGraphToBigWig");
+    my $bigwig2wig = File::Spec->catfile($kenthome,"bigWigToWig");
+
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output1 = File::Spec->catfile($dir,$basename.".bedGraph");
+    my $sorted = $self->clean_bedstar($input,$clevel,$sort);
+    $helper->disp("Converting to bedgraph...");
+    my $fail1 = system($genomecov." ".$sorted." -g ".$chromsize." > ".$output1);
+    return(0) if ($fail1);
+
+    my $output2 = File::Spec->catfile($dir,$basename.".bigWig");
+    $helper->disp("Converting to bigwig...");
+    my $fail2 = system($bedgraph2bigwig." ".$output1." ".$chromsize." ".$output2);
+    return(0) if ($fail2);
+
+    my $output3 = File::Spec->catfile($dir,$basename.".tmp");
+    $helper->disp("Converting to wig...\n");
+    my $fail3 = system($bigwig2wig." ".$output2." ".$output3);
+    return(0) if ($fail3);
+
+    $header = "track type=wiggle_0";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+
+    my $outfinal = File::Spec->catfile($dir,$basename.".wig");
+    open(OUTPUT,$output3);
+    open(OUTFINAL,">$outfinal");
+    print OUTFINAL $header,"\n";
+    while (<OUTPUT>)
+    {
+        print OUTFINAL $_;
+    }
+    close(OUTPUT);
+    close(OUTFINAL);
+    unlink($output1);
+    unlink($output2);
+    unlink($output3);
+    $track = $outfinal;
+
+    return($track,$header);
 }
 
 =head2 bedgraph2bigwig
@@ -535,6 +781,32 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bedgraph2bigwig
 {
+    my ($self,$input,$dir,$org,$ver,$clevel,$sort,$options) = @_;
+    my ($track,$header);
+
+    my $chromsize = $self->get_chrom_size($org,$ver);
+    my $kenthome = $const->get("KENTBIN_HOME");
+    my $bedgraph2bigwig = File::Spec->catfile($kenthome,"bedGraphToBigWig");
+
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output = File::Spec->catfile($dir,$basename.".bigWig");
+    my $sorted = $self->clean_bedstar($input,$clevel,$sort);
+    $helper->disp("Converting to bigWig...\n");
+    my $fail = system($bedgraph2bigwig." ".$sorted." ".$chromsize." ".$output);
+    ($fail) ? (return(0)) : ($track = $output);
+
+    $options->{"bigDataUrl"} = $options->{"bigDataUrl"}."/".$basename.".bigWig";
+    $header = "track type=bigWig";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+    my $outheader = File::Spec->catfile($dir,$basename.".bwh");
+    open(HEADER,">$outheader");
+    print HEADER $header,"\n";
+    close(HEADER);
+    
+    return($track,$header);
 }
 
 =head2 bedgraph2wig
@@ -549,6 +821,47 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bedgraph2wig
 {
+    my ($self,$input,$dir,$org,$ver,$clevel,$sort,$options) = @_;
+    my ($track,$header);
+
+    my $chromsize = $self->get_chrom_size($org,$ver);
+    my $kenthome = $const->get("KENTBIN_HOME");
+    my $bedgraph2bigwig = File::Spec->catfile($kenthome,"bedGraphToBigWig");
+    my $bigwig2wig = File::Spec->catfile($kenthome,"bigWigToWig");
+
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output1 = File::Spec->catfile($dir,$basename.".bigWig");
+    my $sorted = $self->clean_bedstar($input,$clevel,$sort);
+    $helper->disp("Converting to bigwig...");
+    my $fail1 = system($bedgraph2bigwig." ".$sorted." ".$chromsize." ".$output1);
+    return(0) if ($fail1);
+
+    my $output2 = File::Spec->catfile($dir,$basename.".tmp");
+    $helper->disp("Converting to wig...\n");
+    my $fail2 = system($bigwig2wig." ".$output1." ".$output2);
+    return(0) if ($fail2);
+
+    $header = "track type=wiggle_0";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+
+    my $outfinal = File::Spec->catfile($dir,$basename.".wig");
+    open(OUTPUT,$output2);
+    open(OUTFINAL,">$outfinal");
+    print OUTFINAL $header,"\n";
+    while (<OUTPUT>)
+    {
+        print OUTFINAL $_;
+    }
+    close(OUTPUT);
+    close(OUTFINAL);
+    unlink($output1);
+    unlink($output2);
+    $track = $outfinal;
+
+    return($track,$header);
 }
 
 =head2 bigbed2bam
@@ -563,6 +876,47 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bigbed2bam
 {
+    my ($self,$input,$dir,$org,$ver,$clevel,$sort,$options) = @_;
+    my ($track,$header);
+
+    my $chromsize = $self->get_chrom_size($org,$ver);
+    my $kenthome = $const->get("KENTBIN_HOME");
+    my $bedtoolshome = $const->get("BEDTOOLS_HOME");
+    my $samtoolshome = $const->get("SAMTOOLS_HOME");
+    my $bigbed2bed = File::Spec->catfile($kenthome,"bigBedToBed");
+    my $bed2bam = File::Spec->catfile($bedtoolshome,"bedtools bedtobam -i");
+    my $samtoolsindex = File::Spec->catfile($samtoolshome,"samtools index");
+
+    print "\n\n$input\n\n";
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output1 = File::Spec->catfile($dir,$basename.".bed");
+    $helper->disp("Converting to bed...");
+    my $fail1 = system($bigbed2bed." ".$input." ".$output1);
+    return(0) if ($fail1);
+
+    my $output2 = File::Spec->catfile($dir,$basename.".bam");
+    my $sorted = $self->clean_bedstar($output1,$clevel,$sort);
+    $helper->disp("Converting to bam...");
+    my $fail2 = system($bed2bam." ".$sorted." -g ".$chromsize." > ".$output2);
+    ($fail2) ? (return(0)) : ($track = $output2);
+
+    $helper->disp("Indexing the bam...\n");
+    my $fi = system($samtoolsindex." ".$track);
+    return(0) if ($fi);
+
+    $options->{"bigDataUrl"} = $options->{"bigDataUrl"}."/".$basename.".bam";
+    $header = "track type=bam";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+    my $outheader = File::Spec->catfile($dir,$basename.".bmh");
+    open(HEADER,">$outheader");
+    print HEADER $header,"\n";
+    close(HEADER);
+    unlink($output1);
+    
+    return($track,$header);
 }
 
 =head2 bigbed2bed
@@ -623,6 +977,48 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bigbed2bedgraph
 {
+    my ($self,$input,$dir,$org,$ver,$clevel,$sort,$options) = @_;
+    my ($track,$header);
+
+    my $chromsize = $self->get_chrom_size($org,$ver);
+    my $kenthome = $const->get("KENTBIN_HOME");
+    my $bedtoolshome = $const->get("BEDTOOLS_HOME");
+    my $bigbed2bed = File::Spec->catfile($kenthome,"bigBedToBed");
+    my $genomecov = File::Spec->catfile($bedtoolshome,"bedtools genomecov -bg -i");
+    
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output1 = File::Spec->catfile($dir,$basename.".bed");
+    $helper->disp("Converting to bed...");
+    my $fail1 = system($bigbed2bed." ".$input." ".$output1);
+    return(0) if ($fail1);
+
+    my $output2 = File::Spec->catfile($dir,$basename.".tmp");
+    my $sorted = $self->clean_bedstar($output1,$clevel,$sort);
+    $helper->disp("Converting to bedgraph...\n");
+    my $fail2 = system($genomecov." ".$sorted." -g ".$chromsize." > ".$output2);
+    return(0) if ($fail2);
+
+    $header = "track type=bedGraph";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+
+    my $outfinal = File::Spec->catfile($dir,$basename.".bedGraph");
+    open(OUTPUT,$output2);
+    open(OUTFINAL,">$outfinal");
+    print OUTFINAL $header,"\n";
+    while (<OUTPUT>)
+    {
+        print OUTFINAL $_;
+    }
+    close(OUTPUT);
+    close(OUTFINAL);
+    unlink($output1);
+    unlink($output2);
+    $track = $outfinal;
+
+    return($track,$header);
 }
 
 =head2 bigbed2bigwig
@@ -637,6 +1033,47 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bigbed2bigwig
 {
+    my ($self,$input,$dir,$org,$ver,$clevel,$sort,$options) = @_;
+    my ($track,$header);
+
+    my $chromsize = $self->get_chrom_size($org,$ver);
+    my $kenthome = $const->get("KENTBIN_HOME");
+    my $bedtoolshome = $const->get("BEDTOOLS_HOME");
+    my $bigbed2bed = File::Spec->catfile($kenthome,"bigBedToBed");
+    my $genomecov = File::Spec->catfile($bedtoolshome,"bedtools genomecov -bg -i");
+    my $bedgraph2bigwig = File::Spec->catfile($kenthome,"bedGraphToBigWig");
+    
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output1 = File::Spec->catfile($dir,$basename.".bed");
+    $helper->disp("Converting to bed...");
+    my $fail1 = system($bigbed2bed." ".$input." ".$output1);
+    return(0) if ($fail1);
+
+    my $output2 = File::Spec->catfile($dir,$basename.".bedGraph");
+    my $sorted = $self->clean_bedstar($output1,$clevel,$sort);
+    $helper->disp("Converting to bedgraph...");
+    my $fail2 = system($genomecov." ".$sorted." -g ".$chromsize." > ".$output2);
+    return(0) if ($fail2);
+
+    my $output3 = File::Spec->catfile($dir,$basename.".bigWig");
+    $helper->disp("Converting to bigWig...\n");
+    my $fail3 = system($bedgraph2bigwig." ".$output2." ".$chromsize." ".$output3);
+    ($fail3) ? (return(0)) : ($track = $output3);
+
+    $options->{"bigDataUrl"} = $options->{"bigDataUrl"}."/".$basename.".bigWig";
+    $header = "track type=bigWig";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+    my $outheader = File::Spec->catfile($dir,$basename.".bwh");
+    open(HEADER,">$outheader");
+    print HEADER $header,"\n";
+    close(HEADER);
+    unlink($output1);
+    unlink($output2);
+    
+    return($track,$header);
 }
 
 =head2 bigwig2bedgraph
@@ -651,6 +1088,37 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bigwig2bedgraph
 {
+    my ($self,$input,$dir,$options) = @_;
+    my ($track,$header);
+
+    my $kenthome = $const->get("KENTBIN_HOME");
+    my $bigwig2bedgraph = File::Spec->catfile($kenthome,"bigWigToBedGraph");
+    
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output = File::Spec->catfile($dir,$basename.".tmpbedgraph");
+    $helper->disp("Converting to bedgraph...\n");
+    my $fail = system($bigwig2bedgraph." ".$input." ".$output);
+    return(0) if ($fail);
+
+    $header = "track type=bedGraph";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+    my $outfinal = File::Spec->catfile($dir,$basename.".bedGraph");
+    open(OUTPUT,$output);
+    open(OUTFINAL,">$outfinal");
+    print OUTFINAL $header,"\n";
+    while (<OUTPUT>)
+    {
+        print OUTFINAL $_;
+    }
+    close(OUTPUT);
+    close(OUTFINAL);
+    unlink($output);
+    $track = $outfinal;
+    
+    return($track,$header);
 }
 
 =head2 bigwig2wig
@@ -665,6 +1133,37 @@ The subroutine outputs the filename of the new track and its header when needed.
 
 sub bigwig2wig
 {
+    my ($self,$input,$dir,$options) = @_;
+    my ($track,$header);
+
+    my $kenthome = $const->get("KENTBIN_HOME");
+    my $bigwig2wig = File::Spec->catfile($kenthome,"bigWigToWig");
+    
+    my ($basename,$dirname,$ext) = fileparse($input,'\.[^.]*');
+    my $output = File::Spec->catfile($dir,$basename.".tmpwig");
+    $helper->disp("Converting to wig...\n");
+    my $fail = system($bigwig2wig." ".$input." ".$output);
+    return(0) if ($fail);
+
+    $header = "track type=wiggle_0";
+    while (my ($key,$value) = each (%{$options}))
+    {
+        $header .= " ".$key."=".$value;
+    }
+    my $outfinal = File::Spec->catfile($dir,$basename.".wig");
+    open(OUTPUT,$output);
+    open(OUTFINAL,">$outfinal");
+    print OUTFINAL $header,"\n";
+    while (<OUTPUT>)
+    {
+        print OUTFINAL $_;
+    }
+    close(OUTPUT);
+    close(OUTFINAL);
+    unlink($output);
+    $track = $outfinal;
+    
+    return($track,$header);
 }
 
 =head2 sam2bedgraph
