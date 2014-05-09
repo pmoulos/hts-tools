@@ -77,7 +77,7 @@ sub check_inputs
                "log|l" => \$log,
                "silent|s" => \$silent,
                "help|h" => \$help);
-    if (!@ARGV || $help)
+    if ($help)
     {
         &program_usage;
         exit;

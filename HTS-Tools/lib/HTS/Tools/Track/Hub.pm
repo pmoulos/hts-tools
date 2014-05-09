@@ -8,118 +8,128 @@ Version 0.01
 
 =head1 SYNOPSIS
 
-This module is a wrapper and significance threshold optimizer for several sequence motif scanners. At the
-present point, the scanners supported are pwmscan from the GimmeMotifs suite (van Heeringen and Veenstra, 2010)
-and MotifScanner (Thijs et al., 2001). Thus, the installation of these 3rd party tools in the system that
-uses HTS::Tools::Track::Hub is necessary (or at least of one of them). Then, the module runs a workflow which
-which massively scan the input fasta files (e.g. a set of sequences corresponding to ChIP-Seq peaks) for
-the motifs given in the motif file in the form of positional weight matrices (e.g. motifs that have been
-characterized as significant during a de novo motif search in the same set of peaks). This workflow determines
-an optimal significance threshold based on a set of random background sequences selected from the background
-fasta file provided and on the false postive rate (fpr) provided. The module provides three basic outputs:
-a simple file with the number of hits of each motif in each input file, gff files with the hits and bed
-files with the hits, including also a significance score of the scan hit in the 5th column of the bed file.
+This module constructs a UCSC track hub using either a set of basic track hub parameters (e.g. the hub
+base, the hub name and description etc.) together with a text tab delimited file with the tracks to be
+generated and their properties (some are required, see HTS::Tools::Track::Signal), or with the use of
+a single YAML file containing all the parameters required to build the hub
 
     use HTS::Tools::Track::Hub;
     my %params = (
-        'input' => ['normal_nfkb_peaks.fa','cancer_nfkb_peaks.fa','mock_peaks.fa']
-        'motif' => 'my_motif_matrices.pwm',
-        'scanner' => 'pwmscan',
-        'background' => 'background_sequences.tab',
-        'range' => 0.1:0.1:1,
-        'fpr' => 0.05,
-        'times' => 10,
-        'length' => 400,
-        'output' => ['gff','bed','stats']
+        'config' => 'trackhub.yml'
     )
-    my $motifscanner = HTS::Tools::Track::Hub->new(\%params);
-    $motifscanner->run;
+    my $huber = HTS::Tools::Track::Hub->new(\%params);
+    $huber->run;
+
+    # OR
+
+    %params = (
+        'hubid' => 'test_hub',
+        'hubname' => 'A test hub',
+        'hubdesc' => 'A hub demonstrating HTS::Tools::Track::Hub',
+        'hubmail' => hub_admin@trackhubs.org,
+        'hubbase' => '/the/public/html/directory/you/store/hubs',
+        'tracks' => '/the/tab/delimited/file/describing/tracks/and/options'
+    )
+    my $huber2 = HTS::Tools::Track::Hub->new(\%params);
+    $huber2->run;
 
 The acceptable parameters are as follows:
 
 =over 4
 
-=item I<input> B<(required)>
+=item I<config> B<(required)>
 
-A set of input FASTA file(s) that will be used for matching of the motifs contained in I<motif> file. Each 
-of these files will be scanned using the scanner defined by I<scanner> and the hits will be reported either
-as a simple tab-delimited stats file, a gff file, or a bed file under conditions (see below).
+A YAML file with the parameters of hub creation. It can look like the following:
 
-=item I<motif> B<(required)>
+HUB_ID: test_hub
+HUB_NAME: The first test hub
+HUB_DESCRIPTION: This is the first hub made with HTS::Tools::Track::Hub module
+HUB_BASE: /media/raid/tracks/test
+HUB_MAIL: moulos@fleming.gr
+TRACKS:
+ TCF4:
+  filename: /media/HD4/Fleming/play/trackhub_play/TCF4.bed
+  source: bed
+  destination: bigwig
+  name: TCF4
+  urlbase: http://epigenomics.fleming.gr/tracks/test
+  description: TCF4 ChIP-Seq signal
+  color: 0,0,160
+  maxHeightPixels: 128:64:16
+  visibility: full
+  boxedCfg: on
+  autoScale: on
+  group: user
+  priority: auto
+ TCF4_peaks:
+  filename: /media/HD4/Fleming/play/trackhub_play/TCF4_peaks.bed
+  source: bed
+  destination: bigbed
+  name: TCF4 peaks
+  urlbase: http://epigenomics.fleming.gr/tracks/test
+  description: TCF4 ChIP-Seq peaks
+  color: 0,0,160
+  maxHeightPixels: 128:64:16
+  visibility: dense
+  boxedCfg: on
+  autoScale: on
+  group: user
+  priority: auto
+ CON_BR1:
+  filename: /media/HD4/Fleming/play/trackhub_play/CON_BR1.bam
+  source: bam
+  destination: bigwig
+  name: CON BR1
+  urlbase: http://epigenomics.fleming.gr/tracks/test
+  description: CON RNA-Seq signal replicate 1
+  color: 120,120,120
+  maxHeightPixels: 128:64:16
+  visibility: full
+  boxedCfg: on
+  autoScale: on
+  group: user
+  priority: auto
+ DOX_BR1:
+  filename: /media/HD4/Fleming/play/trackhub_play/DOX_BR1.bam
+  source: bam
+  destination: bigwig
+  name: DOX BR1
+  urlbase: http://epigenomics.fleming.gr/tracks/test
+  description: DOX RNA-Seq signal replicate 1
+  color: 0,160,0
+  maxHeightPixels: 128:64:16
+  visibility: full
+  boxedCfg: on
+  autoScale: on
+  group: user
+  priority: auto
 
-A file containing several motifs in the Position Weight Matrix (PWM) format. The file will be decomposed
-in several motifs and each motif will be matched against each input FASTA file.
+If config is given, no other parameters are required and if given, will be ignored.
 
-=item I<background> B<(optional)>
+=item I<hubid> B<(required)>
 
-A FASTA file containing background sequences (must be at least the same length as the input sequences)
-that will be used for random sampling to define a score cutoff for motif matching significance based on
-I<fpr>. It is required if the option I<justscan> is not activated.
+The unique identifier of the hub to be created.
 
-=item I<scanner> B<(optional)>
+=item I<hubname> B<(optional)>
 
-A scanning algorithm to use. Currently, two algorithms are supported: the pwmscan algorithm (van Heeringen
-and Veenstra, 2010) and MotifScanner (Thijs et al., 2001).
+A short name for the hub to be created.
 
-=item I<range> B<(optional)>
+=item I<hubdesc> B<(optional)>
 
-A range of cutoffs that will be used to determine the final matching score cutoff corresponding to I<fpr>.
-The range can be given in the form a:b or a:x:b where x is an increment step. If the format a:b is chosen,
-the default increment is 1. However, in the latest versions of pwmscan, the matching score is normalized
-to one, so this notation will be eventually deprecated.
+A longer description for the hub to be created.
 
-=item I<fpr> B<(optional)>
+=item I<hubmail> B<(required)>
 
-The desired False Positive Rate (FPR), that is the percentage of motif matches found in the background
-sequences. Defaults to 0.05.
+The track hub admin e-mail.
 
-=item  I<times> B<(optional)>
+=item  I<hubbase> B<(required)>
 
-How many times should the background set of sequences that will be used for the determination of the cutoff
-score from I<range>, be larger than the input set? It default to 10, which means that if an input FASTA file
-contains 100 sequences, the background will contain 1000 random sequences.
+The public html directory where the hub will live.
 
-=item I<length> B<(optional)>
+=item I<tracks> B<(required)>
 
-The length of the background sequences. Generally, it should be larger than the length of input sequences.
-It defaults to 400.
-
-=item I<output> B<(optional)>
-
-The output types that the user wished to get. It can be one or more of "stats" for a simple delimited
-file containing the hits for each motif and input file, "gff" for the gff output of pwmscan or a related
-file from MotifScanner, containing the actual hits and positions in the input sequences, or "bed" for an
-output BED file containing the motif matches locations and a score to be used for coloring. The "bed"
-output is available only if a set of peak files is given so as to determine the relative location of the
-match inside the peak and construct proper bed lines.
-
-=item  I<besthit> B<(optional)>
-
-The number of best hits to be retrieved when I<scanner> is "pwmscan". Defaults to 1.
-
-=item I<uniquestats> B<(optional)>
-
-If the number of besthits is greater than 1, the specifying I<uniquestats> to 1 will cause the output
-"stats" file to contain unique hits. Like this you can avoid paradoxes like having more hits than input
-FASTA sequences. However, in some situations you might actually want to retrieve multiple hits.
-
-=item I<justscan> B<(optional)>
-
-Set this to 1, to just scan the input sequences for the motifs without defining an FPR. Useful if you
-have a very limited number of input sequences (e.g. just one).
-
-=item I<center> B<(optional)>
-
-A set of genomic regions (e.g. peaks) with the SAME IDs as the input FASTA sequences (or a superset of
-these) which will be used to assign peak regions to FASTA files in order to determine the proper coordinates 
-for the generation of BED output. It is optional, however, if BED output is requested, these files are 
-not given, and the FASTA sequence length does not correspond to the length that can be extracted by the 
-FASTA ID, the coordinates will be inaccurate.
-
-=item I<colext> B<(optional)>
-
-A vector of length 3, containing the column numbers of peak ID and peak summit, and the length of the 
-(possible) extension upstream and downstream of the peak summit. For example I<colext> 4 5 75.
+A text tab-delimited file containing information for the tracks that will be included in the track hub.
+See also HTS::Tools::Track::Signal for details.
 
 =item I<silent> B<(optional)>
 
@@ -127,9 +137,8 @@ Use this parameter if you want to turn informative messages off.
 
 =head1 OUTPUT
 
-The output of the module is a set of GFF files containing the hits for each motif and each input set of
-sequences, a statistics file with the number of hits for each motif and input set of sequences and a set
-of BED files with the motif matches that can be used for display in a genome browser.
+The output of the module is the track hub directory, properly structured and ready to be loaded in an
+instance of the UCSC Genome Browser, as long as the hub base is public.
 
 =head1 SUBROUTINES/METHODS
 
@@ -144,10 +153,10 @@ use warnings FATAL => 'all';
 use Carp;
 use Cwd;
 use File::Basename;
+use File::Path qw(make_path remove_tree);
 use File::Temp;
 use File::Spec;
 
-use HTS::Tools::Constants;
 use HTS::Tools::Paramcheck;
 use HTS::Tools::Utils;
 
@@ -157,11 +166,10 @@ our $MODNAME = "HTS::Tools::Track::Hub";
 our $VERSION = '0.01';
 our $AUTHOR = "Panagiotis Moulos";
 our $EMAIL = "moulos\@fleming.gr";
-our $DESC = "Create an NGS signal track using 3rd party tools.";
+our $DESC = "Create a UCSC Genome Browser track hub.";
 
 BEGIN {
     $helper = HTS::Tools::Utils->new();
-    $const = HTS::Tools::Constants->new();
     select(STDOUT);
     $|=1;
     $SIG{INT} = sub { $helper->catch_cleanup; }
@@ -172,8 +180,7 @@ BEGIN {
 The HTS::Tools::Track::Hub object constructor. It accepts a set of parameters that are required to run the
 motifscanner and get the output.
 
-    my $motifscanner = HTS::Tools::Track::Hub->new({'input' => ['peaks_1.fa','peaks_2.fa'],'motif' => 'my_motifs.pwm',
-        'scanner' => 'pwmscan','justscan' => 1});
+    my $huber = HTS::Tools::Track::Hub->new({'config' => 'myhub.yml'});
 
 =cut
 
@@ -225,7 +232,7 @@ sub init
 The HTS::Tools::Track::Hub run subroutine. It runs the motifscanner with the given parameters in the 
 constructor.
 
-    $signaler->run;
+    $huber->run;
     
 =cut
 
@@ -234,17 +241,134 @@ sub run
     my $self = shift @_;
     
     # Copy some memory-less variables to avoid rewriting the whole thing...
+    my ($hubid,$hubname,$hubdesc,$hubmail,$hubbase,$hubtracks);
+    if ($self->get("config"))
+    {
+        my ($opts,$tracks) = $self->read_yaml($self->get("config"));
+        croak "Corrupted or not valid configuration file" if (!$opts);
+        $hubid = $opts->{"hubid"};
+        $hubname = $opts->{"hubname"};
+        $hubdesc = $opts->{"hubdesc"};
+        $hubmail = $opts->{"hubmail"};
+        $hubbase = $opts->{"hubbase"};
+        $hubtracks = $tracks;
+    }
+    else
+    {
+        $hubid = $self->get("hubid");
+        $hubname = $self->get("hubname");
+        $hubdesc = $self->get("hubdesc");
+        $hubmail = $self->get("hubmail");
+        $hubbase = $self->get("hubbase");
+        $hubtracks = $self->get("tracks");
+    }
+    
+    # And implement the workflow
+    my $hubdir = $self->create_hub_tree($hubbase,$hubtracks);
+    my $hubfile = $self->create_hub_file($hubdir);
+    my $genomefile = $self->create_genomes_file($hubdir,$hubtracks);
+    my @signals = $self->create_signals;
 }
 
-=head2 fun2
+=head2 read_yaml
 
-Parse a file of PWMs and construct different files, specific for the scanner in use. Internal use.
+Read the YAML file with all configurations for the hub creation.
 
-    $signaler->;
+    my $config = $huber->read_yaml($configfile);
 
 =cut
 
-sub fun2 {}
+sub read_yaml
+{
+    my ($self,$file) = @_;
+    my ($yfh,$yaml);
+    use YAML qw(LoadFile Dump);
+    eval
+    {
+        open($yfh,"<",$file);
+        $yaml = LoadFile($yfh);
+        close($yfh);
+        $hasloaded = 1;
+    };
+    
+    croak "Bad YAML hub parameters file! Commiting suicide..." if ($@);
+    return($yaml);
+}
+
+=head2 read_tab
+
+Read the tab-delimited file with all details regarding the tracks in the track hub.
+
+    my $config = $huber->read_yaml($configfile);
+
+=cut
+
+sub read_tab
+{
+    # This function should return a hash with track such as if it was generated
+    # by reading the YAML
+}
+
+=head2 create_hub_tree
+
+Create the hub tree directory structure.
+
+    my $file = $huber->create_hub_tree($hubbase,$hubid);
+
+=cut
+
+sub create_hub_tree {}
+
+=head2 create_hub_file
+
+Create the hub description file.
+
+    my $file = $huber->create_hub_file($hubbase,$hubid,$hubname,$hubdesc,$hubmail);
+
+=cut
+
+sub create_hub_file {}
+
+=head2 create_genomes_file
+
+Create the hub genomes file.
+
+    my $file = $huber->create_genomes_file($hubbase,$hubgenomes);
+
+=cut
+
+sub create_genomes_file {}
+
+=head2 parse_track_line
+
+Parse a track line and create the corresponding trackDb elements.
+
+    my %trackopts = $huber->parse_track_line($header);
+
+=cut
+
+sub parse_track_line {}
+
+=head2 convert_genome
+
+Convert between genomes (of the same organism) to create tracks for different genome versions. The
+genome versions are the ones supported by HTS::Tools::Fetch.
+
+    my $file = $huber->convert_genomes($track,$from,$to);
+
+=cut
+
+sub convert_genome {}
+
+=head2 create_track
+
+Create the hub tracks using HTS::Tools::Track::Signal.
+
+    my ($track,$header) = $huber->create_track($opts);
+
+=cut
+
+sub create_track {}
 
 =head2 get
 

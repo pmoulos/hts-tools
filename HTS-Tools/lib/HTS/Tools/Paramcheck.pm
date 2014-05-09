@@ -181,7 +181,7 @@ sub validate_assign
     my $stop;
     $stop .= "--- Please specify input query region file(s) ---\n" if (!@{$self->{"params"}->{"input"}});
     $stop .= "--- Please specify significant region file ---\n" if (!$self->{"params"}->{"region"});
-    $stop .= "--- Please specify background region file ---\n" if (!$self->{"params"}->{"background"} && $self->{"params"}->{"test"} ne "none");
+    $stop .= "--- Please specify background region file ---\n" if (!$self->{"params"}->{"background"} && $self->{"params"}->{"test"} && $self->{"params"}->{"test"} ne "none");
     $stop .= "--- The supported genomes for the region parameter are organism-type, where organism is human, mouse, rat, fly or zebrafish and type is gene, exon, 5utr, 3utr or cds! Alternatively, it must be a file ---\n"
         if ( ! -f $self->{"params"}->{"region"}
             && $self->{"params"}->{"region"} !~ m/human-(gene|exon|(5|3)utr|cds)|mouse-(gene|exon|(5|3)utr|cds)|rat-(gene|exon|(5|3)utr|cds)|fly-(gene|exon|(5|3)utr|cds)|zebrafish-(gene|exon|(5|3)utr|cds)/i);
@@ -1440,12 +1440,12 @@ sub validate_track_signal
         if (($self->{"params"}->{"destination"} eq "bigbed" || $self->{"params"}->{"destination"} eq "bigwig" ||
             $self->{"params"}->{"destination"} eq "bedgraph" || $self->{"params"}->{"destination"} eq "wig") &&
             !$self->{"params"}->{"gversion"});
-    $stop .= "--- Source track type must be one of \"bigbed\", \"bigwig\", \"wig\", \"bedgraph\", \"bed\" or \"bam\" ---\n"
+    $stop .= "--- Source track type must be one of \"bigbed\", \"bigwig\", \"wig\", \"bedgraph\", \"bed\", \"sam\" or \"bam\" ---\n"
         if ($self->{"params"}->{"source"} ne "bigbed" && $self->{"params"}->{"source"} ne "bigwig" &&
             $self->{"params"}->{"source"} ne "wig" && $self->{"params"}->{"source"} ne "bedgraph" &&
             $self->{"params"}->{"source"} ne "bed" && $self->{"params"}->{"source"} ne "bam" &&
             $self->{"params"}->{"source"} ne "sam");
-    $stop .= "--- Destination track type must be one of \"bigbed\", \"bigwig\", \"wig\", \"bedgraph\", \"bed\" or \"bam\" ---\n"
+    $stop .= "--- Destination track type must be one of \"bigbed\", \"bigwig\", \"wig\", \"bedgraph\", \"bed\", \"sam\" or \"bam\" ---\n"
         if ($self->{"params"}->{"destination"} ne "bigbed" && $self->{"params"}->{"destination"} ne "bigwig" &&
             $self->{"params"}->{"destination"} ne "wig" && $self->{"params"}->{"destination"} ne "bedgraph" &&
             $self->{"params"}->{"destination"} ne "bed" && $self->{"params"}->{"destination"} ne "bam" &&
@@ -1531,6 +1531,7 @@ sub validate_track_signal
 
     # Define possible pairs
     my %pairs = (
+        "bam2bed" => 1,
         "bam2bedgraph" => 1,
         "bam2bigbed" => 1,
         "bam2bigwig" => 1,
@@ -1556,6 +1557,7 @@ sub validate_track_signal
         "wig2bigwig" => 1,
         "wig2bedgraph" => 1,
         "wig2bam" => 0,
+        "sam2bam" => 1,
         "sam2bedgraph" => 1,
         "sam2bigbed" => 1,
         "sam2bigwig" => 1,
@@ -1708,7 +1710,7 @@ sub validate_track_signal
     return($self->{"params"});
 }
 
-=head2 validate_track
+=head2 validate_track_hub
 
 The parameter validator function of the HTS::Tools::Track::Hub module. Do not use this directly, use the validate
 function instead
@@ -1720,12 +1722,72 @@ sub validate_track_hub
     my $self = shift @_;
     my $modname = "HTS::Tools::Track::Hub";
     
-    my @accept = ("type");
+    my @accept = ("type","config","hubid","hubname","hubdesc","hubgenomes","hubmail","hubbase","tracks");
     
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
     {
         $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+    }
+
+    # Check fatal
+    my $stop;
+    $stop .= "--- Please specify configuration YAML or the rest of required parameters ---\n"
+        if (!$self->{"params"}->{"config"} && !$self->{"params"}->{"hubid"} && !$self->{"params"}->{"hubmail"}
+            && !$self->{"params"}->{"hubbase"} && !$self->{"params"}->{"tracks"});
+    $stop .= "--- Please specify track hub unique identification ---\n"
+        if (!$self->{"params"}->{"config"} && !$self->{"params"}->{"hubid"});
+    $stop .= "--- Please specify track hub administrator e-mail ---\n"
+        if (!$self->{"params"}->{"config"} && !$self->{"params"}->{"hubmail"});
+    $stop .= "--- Please specify track hub public html base directory ---\n"
+        if (!$self->{"params"}->{"config"} && !$self->{"params"}->{"hubbase"});
+    $stop .= "--- Please specify track hub tracks file ---\n"
+        if (!$self->{"params"}->{"config"} && !$self->{"params"}->{"tracks"});
+
+    if ($stop)
+    {
+        $helper->disp("$stop\n");
+        $helper->disp("Type perldoc $modname for help in usage.\n\n");
+        exit;
+    }
+
+    if ($self->{"params"}->{"config"} && ($self->{"params"}->{"hubid"} || !$self->{"params"}->{"hubmail"}
+        || !$self->{"params"}->{"hubbase"} || !$self->{"params"}->{"tracks"}))
+    {
+        $helper->disp("Both YAML configuration file and manual parameters given! Will use only YAML file...");
+        delete($self->{"params"}->{"hubid"}) if ($self->{"params"}->{"hubid"});
+        delete($self->{"params"}->{"hubname"}) if ($self->{"params"}->{"hubname"});
+        delete($self->{"params"}->{"hubdesc"}) if ($self->{"params"}->{"hubdesc"});
+        delete($self->{"params"}->{"hubbase"}) if ($self->{"params"}->{"hubbase"});
+        delete($self->{"params"}->{"hubmail"}) if ($self->{"params"}->{"hubmail"});
+    }
+
+    my $status;
+    if ($self->{"params"}->{"config"})
+    {
+        $status = eval { $helper->try_module("YAML") };
+        if ($status)
+        {
+            croak "Module YAML is required to continue with the track hub creation! Otherwise, specify the run parameters individually...";
+        }
+        else { use YAML; }
+    }
+
+    my $testval;
+    if (!$self->{"params"}->{"config"})
+    {
+        if ($self->{"params"}->{"hubid"})
+        {
+            $testval = $self->{"params"}->{"hubid"};
+            if ($testval =~ m/\s/g)
+            {
+                $helper->disp("The hub unique identifier cannot contain spaces! Collapsing...");
+                $testval =~ s/\s/_/g;
+                $self->{"params"}->{"hubid"} = $testval;
+            }
+        }
+        $self->{"params"}->{"hubname"} = $self->{"params"}->{"hubid"} if (!$self->{"params"}->{"hubid"});
+        $self->{"params"}->{"hubdesc"} = $self->{"params"}->{"hubid"} if (!$self->{"params"}->{"hubdesc"});
     }
     
     return($self->{"params"});
