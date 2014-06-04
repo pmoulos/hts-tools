@@ -288,7 +288,6 @@ sub read_yaml
         open($yfh,"<",$file);
         $yaml = LoadFile($yfh);
         close($yfh);
-        $hasloaded = 1;
     };
     
     croak "Bad YAML hub parameters file! Commiting suicide..." if ($@);
@@ -299,14 +298,25 @@ sub read_yaml
 
 Read the tab-delimited file with all details regarding the tracks in the track hub.
 
-    my $config = $huber->read_yaml($configfile);
+    my $tracks = $huber->read_tab($trackfile);
 
 =cut
 
 sub read_tab
 {
-    # This function should return a hash with track such as if it was generated
-    # by reading the YAML
+    my ($self,$file) = @_;
+    my $tracks;
+    my $line;
+    my @cols;
+    open(TRACKS,$file) or croak "$file does not exist! Commiting suicide...";
+    my $header = <TRACKS>;
+    $header =~ s/\r|\n$//g;
+    # Header should determine the structure of the file and validation checks
+    while ($line = <TRACKS>)
+    {
+        $line =~ s/\r|\n$//g;
+        @cols = split(/\t/,$line);
+    }
 }
 
 =head2 create_hub_tree
