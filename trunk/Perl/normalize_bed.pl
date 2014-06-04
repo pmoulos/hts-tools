@@ -8,6 +8,7 @@
 
 use strict;
 use Getopt::Long;
+use Pod::Usage;
 
 use HTS::Tools;
 
@@ -24,6 +25,7 @@ our $sort;
 our $log;
 our $silent;
 our $help;
+our $man;
 
 # Check inputs
 &check_inputs;

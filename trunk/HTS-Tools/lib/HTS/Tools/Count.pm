@@ -830,8 +830,10 @@ sub count_reads_multi
     {
         chomp $_;
         ($bedchr,$bedstart,$bedend,$bedrest) = split(/\t/,$_);
-        
-        $overstru = $chromosome->{$bedchr}->find($bedstart,$bedend);
+
+        ($chromosome->{$bedchr}) ?
+        ($overstru = $chromosome->{$bedchr}->find($bedstart,$bedend)) :
+        (next);
 
         # If overlap found, check conditions that satisfy our parameters
         if ($overstru)
