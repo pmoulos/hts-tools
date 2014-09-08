@@ -127,6 +127,26 @@ sub now
     (return($year.$month.$day.$hour.$min.$sec));
 }
 
+=head2 smatch($format)
+
+Check for the presence of a scalar (s) in an array. Added this function because of the
+instability of the smart match (~~) operator among Perl versions. Caution! Case sensitive!
+
+    my $s = "something";
+    my @a = ("something","something_else")
+    my $found = $helper->smatch($s,@a);
+
+=cut
+
+sub smatch
+{
+    my ($self,$s,@a) = @_;
+    if (grep(/^$s$/,@a)) {
+        return(1);
+    }
+    return(0);
+}
+
 =head2 unique(@array)
 
 Returns a hash whose keys are the unique elements of an array

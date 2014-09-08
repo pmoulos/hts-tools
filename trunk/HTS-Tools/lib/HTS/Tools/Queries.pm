@@ -58,205 +58,201 @@ sub get_query
     $self->check($what);
     my $q;
 
-    use v5.14;
-    given($what)
+    if ($what =~ m/ucsc_canonical_genes/i)
     {
-        when(/ucsc_canonical_genes/i)
-        {
-            $q = "SELECT knownCanonical.chrom AS `chrom`, `chromStart`, `chromEnd`, `transcript`, knownGene.exonCount AS `exonCount`, knownGene.strand AS `strand`, `geneName` ".
-                "FROM `knownCanonical` INNER JOIN `knownGene` ON knownCanonical.transcript=knownGene.name ".
-                "INNER JOIN `knownToRefSeq` ON knownCanonical.transcript=knownToRefSeq.name ".
-                "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name GROUP BY `transcript` ORDER BY `chrom`, `chromStart`";
-        }
-        when(/ucsc_alternative_genes/i)
-        {
-            $q = "SELECT knownGene.chrom AS chrom, knownGene.txStart, knownGene.txEnd, knownGene.name, knownGene.exonCount, knownGene.strand, `geneName` ".
-                "FROM `knownGene` INNER JOIN `knownToRefSeq` ON knownGene.name=knownToRefSeq.name ".
-                "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
-                "WHERE knownGene.name NOT IN (SELECT `transcript` FROM knownCanonical) ".
-                "GROUP BY `name` ORDER BY `chrom`, `txStart`";
-        }
-        when(/refseq_canonical_genes/i)
-        {
-            $q = "SELECT  refFlat.chrom, refFlat.txStart, refFlat.txEnd, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
-                "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
-                "INNER JOIN knownCanonical ON knownToRefSeq.name=knownCanonical.transcript ".
-                "GROUP BY `name` ORDER BY `chrom`, `txStart`";
-        }
-        when(/refseq_alternative_genes/i)
-        {
-            $q = "SELECT  refFlat.chrom, refFlat.txStart, refFlat.txEnd, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
-                "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
-                "WHERE knownToRefSeq.value NOT IN (SELECT `transcript` FROM knownCanonical) ".
-                "GROUP BY `name` ORDER BY `chrom`, `txStart`";
-        }
-        when(/ucsc_canonical_exons/i)
-        {
-            $q = "SELECT knownGene.chrom, knownGene.exonStarts, knownGene.exonEnds, `name`, `exonCount`, knownGene.strand, `transcript` ".
-                "FROM `knownGene` INNER JOIN `knownCanonical` ON knownGene.name=knownCanonical.transcript GROUP BY `name` ORDER BY `chrom`, `exonStarts`";
-        }
-        when(/ucsc_alternative_exons/i)
-        {
-            $q = "SELECT knownGene.chrom, knownGene.exonStarts, knownGene.exonEnds, knownGene.name, knownGene.exonCount, knownGene.strand, `name` AS `transcript` ".
-                "FROM `knownGene` WHERE `name` NOT IN (SELECT `transcript` FROM knownCanonical)".
-                "GROUP BY `name` ORDER BY `chrom`, `exonStarts`";
-        }
-        when(/refseq_canonical_exons/i)
-        {
-            $q = "SELECT refFlat.chrom, refFlat.exonStarts, refFlat.exonEnds, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` AS `transcript` ".
-                "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
-                "INNER JOIN knownCanonical ON knownToRefSeq.name=knownCanonical.transcript ".
-                "GROUP BY `name` ORDER BY `chrom`, `txStart`";
-        }
-        when(/refseq_alternative_exons/i)
-        {
-            $q = "SELECT  refFlat.chrom, refFlat.exonStarts, refFlat.exonEnds, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` AS `transcript` ".
-                "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
-                "WHERE knownToRefSeq.value NOT IN (SELECT `transcript` FROM knownCanonical) ".
-                "GROUP BY `name` ORDER BY `chrom`, `txStart`";
-        }
-        when(/ucsc_canonical_5utr/i)
-        {
-            $q = "SELECT knownGene.chrom AS `chrom`, knownGene.txStart AS `start`, knownGene.cdsStart AS `end`, `transcript`, knownGene.exonCount, knownGene.strand, `geneName` ".
-                "FROM `knownCanonical` INNER JOIN `knownGene` ON knownCanonical.transcript=knownGene.name ".
-                "INNER JOIN `knownToRefSeq` ON knownCanonical.transcript=knownToRefSeq.name ".
-                "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
-                "WHERE knownGene.strand = \"+\"  AND knownGene.txStart <> knownGene.cdsStart UNION ".
-                "SELECT knownGene.chrom AS `chrom`, knownGene.cdsEnd AS `start`, knownGene.txEnd AS `end`, `transcript`, knownGene.exonCount, knownGene.strand, `geneName` ".
-                "FROM `knownCanonical` INNER JOIN `knownGene` ON knownCanonical.transcript=knownGene.name ".
-                "INNER JOIN `knownToRefSeq` ON knownCanonical.transcript=knownToRefSeq.name ".
-                "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
-                "WHERE knownGene.strand = \"-\" AND knownGene.txEnd <> knownGene.cdsEnd ".
-                "GROUP BY `transcript` ORDER BY `chrom`, `start`";
-        }
-        when(/ucsc_alternative_5utr/i)
-        {
-            $q = "SELECT knownGene.chrom AS `chrom`, knownGene.txStart AS `start`, knownGene.cdsStart AS `end`, knownGene.name, knownGene.exonCount, knownGene.strand, `geneName` ".
-                "FROM `knownGene` INNER JOIN `knownToRefSeq` ON knownGene.name=knownToRefSeq.name ".
-                "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
-                "WHERE knownGene.strand = \"+\" AND knownGene.txStart <> knownGene.cdsStart ".
-                "AND knownGene.name NOT IN (SELECT `transcript` FROM knownCanonical) UNION ".
-                "SELECT knownGene.chrom AS `chrom`, knownGene.cdsEnd AS `start`, knownGene.txEnd AS `end`, knownGene.name, knownGene.exonCount, knownGene.strand, `geneName` ".
-                "FROM `knownGene` INNER JOIN `knownToRefSeq` ON knownGene.name=knownToRefSeq.name ".
-                "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
-                "WHERE knownGene.strand = \"-\" AND knownGene.txEnd <> knownGene.cdsEnd ".
-                "AND knownGene.name NOT IN (SELECT `transcript` FROM knownCanonical) ".
-                "GROUP BY `name` ORDER BY `chrom`, `start`";
-        }
-        when(/ucsc_canonical_3utr/i)
-        {
-            $q = "SELECT knownGene.chrom AS `chrom`, knownGene.cdsEnd AS `start`, knownGene.txEnd AS `end`, `transcript`, knownGene.exonCount, knownGene.strand, `geneName` ".
-                "FROM `knownCanonical` INNER JOIN `knownGene` ON knownCanonical.transcript=knownGene.name ".
-                "INNER JOIN `knownToRefSeq` ON knownCanonical.transcript=knownToRefSeq.name ".
-                "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
-                "WHERE knownGene.strand = \"+\" AND knownGene.cdsEnd <> knownGene.txEnd UNION ".
-                "SELECT knownGene.chrom AS `chrom`, knownGene.txStart AS `start`, knownGene.cdsStart AS `end`, `transcript`, knownGene.exonCount, knownGene.strand, `geneName` ".
-                "FROM `knownCanonical` INNER JOIN `knownGene` ON knownCanonical.transcript=knownGene.name ".
-                "INNER JOIN `knownToRefSeq` ON knownCanonical.transcript=knownToRefSeq.name ".
-                "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
-                "WHERE knownGene.strand = \"-\" AND knownGene.txStart <> knownGene.cdsStart ".
-                "GROUP BY `transcript` ORDER BY `chrom`, `start`";
-        }
-        when(/ucsc_alternative_3utr/i)
-        {
-            $q = "SELECT knownGene.chrom AS `chrom`, knownGene.cdsEnd AS `start`, knownGene.txEnd AS `end`, knownGene.name, knownGene.exonCount, knownGene.strand, `geneName` ".
-                "FROM `knownGene` INNER JOIN `knownToRefSeq` ON knownGene.name=knownToRefSeq.name ".
-                "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
-                "WHERE knownGene.strand = \"+\" AND knownGene.cdsEnd <> knownGene.txEnd ".
-                "AND knownGene.name NOT IN (SELECT `transcript` FROM knownCanonical) UNION ".
-                "SELECT knownGene.chrom AS `chrom`, knownGene.txStart AS `start`, knownGene.cdsStart AS `end`, knownGene.name, knownGene.exonCount, knownGene.strand, `geneName` ".
-                "FROM `knownGene` INNER JOIN `knownToRefSeq` ON knownGene.name=knownToRefSeq.name ".
-                "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
-                "WHERE knownGene.strand = \"-\"  knownGene.txStart <> knownGene.cdsStart ".
-                "AND knownGene.name NOT IN (SELECT `transcript` FROM knownCanonical) ".
-                "GROUP BY `name` ORDER BY `chrom`, `start`";
-        }
-        when(/refseq_canonical_5utr/i)
-        {
-            $q = "SELECT refFlat.chrom AS `chrom`, refFlat.txStart AS `start`, refFlat.cdsStart AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
-                "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
-                "INNER JOIN knownCanonical ON knownToRefSeq.name=knownCanonical.transcript ".
-                "WHERE refFlat.strand = \"+\" AND refFlat.txStart <> refFlat.cdsStart UNION ".
-                "SELECT refFlat.chrom AS `chrom`, refFlat.cdsEnd AS `start`, refFlat.txEnd AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
-                "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
-                "INNER JOIN knownCanonical ON knownToRefSeq.name=knownCanonical.transcript ".
-                "WHERE refFlat.strand = \"-\" AND refFlat.txEnd <> refFlat.cdsEnd ".
-                "GROUP BY `name` ORDER BY `chrom`, `start`";
-        }
-        when(/refseq_alternative_5utr/i)
-        {
-            $q = "SELECT refFlat.chrom AS `chrom`, refFlat.txStart AS `start`, refFlat.cdsStart AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
-                "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
-                "WHERE refFlat.strand = \"+\" AND refFlat.txStart <> refFlat.cdsStart ".
-                "AND knownToRefSeq.value NOT IN (SELECT `transcript` FROM knownCanonical) UNION ".
-                "SELECT refFlat.chrom AS `chrom`, refFlat.cdsEnd AS `start`, refFlat.txEnd AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
-                "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
-                "WHERE refFlat.strand = \"-\" AND refFlat.txEnd <> refFlat.cdsEnd ".
-                "AND knownToRefSeq.value NOT IN (SELECT `transcript` FROM knownCanonical) ".
-                "GROUP BY `name` ORDER BY `chrom`, `start`";
-        }
-        when(/refseq_canonical_3utr/i)
-        {
-            $q = "SELECT refFlat.chrom AS `chrom`, refFlat.cdsEnd AS `start`, refFlat.txEnd AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
-                "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
-                "INNER JOIN knownCanonical ON knownToRefSeq.name=knownCanonical.transcript ".
-                "WHERE refFlat.strand = \"+\" AND refFlat.cdsEnd <> refFlat.txEnd UNION ".
-                "SELECT refFlat.chrom AS `chrom`, refFlat.txStart AS `start`, refFlat.cdsStart AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
-                "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
-                "INNER JOIN knownCanonical ON knownToRefSeq.name=knownCanonical.transcript ".
-                "WHERE refFlat.strand = \"-\" AND refFlat.txStart <> refFlat.cdsStart ".
-                "GROUP BY `name` ORDER BY `chrom`, `start`";
-        }
-        when(/refseq_alternative_3utr/i)
-        {
-            $q = "SELECT refFlat.chrom AS `chrom`, refFlat.cdsEnd AS `start`, refFlat.txEnd AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
-                "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
-                "WHERE refFlat.strand = \"+\" AND refFlat.cdsEnd <> refFlat.txEnd ".
-                "AND knownToRefSeq.value NOT IN (SELECT `transcript` FROM knownCanonical) UNION ".
-                "SELECT refFlat.chrom AS `chrom`, refFlat.txStart AS `start`, refFlat.cdsStart AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
-                "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
-                "WHERE refFlat.strand = \"-\" AND refFlat.txStart <> refFlat.cdsStart ".
-                "AND knownToRefSeq.value NOT IN (SELECT `transcript` FROM knownCanonical) ".
-                "GROUP BY `name` ORDER BY `chrom`, `start`";
-        }
-        when(/ucsc_canonical_cds/i)
-        {
-            $q = "SELECT knownCanonical.chrom AS chrom, knownGene.cdsStart, knownGene.cdsEnd, `transcript`, knownGene.exonCount, knownGene.strand, `geneName` ".
-                "FROM `knownCanonical` INNER JOIN `knownGene` ON knownCanonical.transcript=knownGene.name ".
-                "INNER JOIN `knownToRefSeq` ON knownCanonical.transcript=knownToRefSeq.name ".
-                "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
-                "WHERE knownGene.cdsStart <> knownGene.cdsEnd ".
-                "GROUP BY `transcript` ORDER BY `chrom`, `cdsStart`";
-        }
-        when(/ucsc_alternative_cds/i)
-        {
-            $q = "SELECT knownGene.chrom AS chrom, knownGene.cdsStart, knownGene.cdsEnd, knownGene.name, knownGene.exonCount, knownGene.strand, `geneName` ".
-                "FROM `knownGene` INNER JOIN `knownToRefSeq` ON knownGene.name=knownToRefSeq.name ".
-                "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
-                "WHERE knownGene.cdsStart <> knownGene.cdsEnd AND knownGene.name NOT IN ".
-                "(SELECT `transcript` FROM knownCanonical) ".
-                "GROUP BY `name` ORDER BY `chrom`, `cdsStart`";
-        }
-        when(/refseq_canonical_cds/i)
-        {
-            $q = "SELECT  refFlat.chrom, refFlat.cdsStart, refFlat.cdsEnd, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
-                "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
-                "INNER JOIN knownCanonical ON knownToRefSeq.name=knownCanonical.transcript ".
-                "WHERE refFlat.cdsStart <> refFlat.cdsEnd ".
-                "GROUP BY `name` ORDER BY `chrom`, `cdsStart`";
-        }
-        when(/refseq_alternative_cds/i)
-        {
-            $q = "SELECT  refFlat.chrom, refFlat.txStart, refFlat.txEnd, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
-                "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
-                "WHERE refFlat.cdsStart <> refFlat.cdsEnd AND knownToRefSeq.value NOT IN ".
-                "(SELECT `transcript` FROM knownCanonical) ".
-                "GROUP BY `name` ORDER BY `chrom`, `cdsStart`";
-        }
-        when(/chrom_info/i)
-        {
-            $q = "SELECT `chrom`, `size` FROM `chromInfo` ORDER BY `size` DESC";
-        }
+        $q = "SELECT knownCanonical.chrom AS `chrom`, `chromStart`, `chromEnd`, `transcript`, knownGene.exonCount AS `exonCount`, knownGene.strand AS `strand`, `geneName` ".
+            "FROM `knownCanonical` INNER JOIN `knownGene` ON knownCanonical.transcript=knownGene.name ".
+            "INNER JOIN `knownToRefSeq` ON knownCanonical.transcript=knownToRefSeq.name ".
+            "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name GROUP BY `transcript` ORDER BY `chrom`, `chromStart`";
+    }
+    elsif ($what =~ m/ucsc_alternative_genes/i)
+    {
+        $q = "SELECT knownGene.chrom AS chrom, knownGene.txStart, knownGene.txEnd, knownGene.name, knownGene.exonCount, knownGene.strand, `geneName` ".
+            "FROM `knownGene` INNER JOIN `knownToRefSeq` ON knownGene.name=knownToRefSeq.name ".
+            "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
+            "WHERE knownGene.name NOT IN (SELECT `transcript` FROM knownCanonical) ".
+            "GROUP BY `name` ORDER BY `chrom`, `txStart`";
+    }
+    elsif ($what =~ m/refseq_canonical_genes/i)
+    {
+        $q = "SELECT  refFlat.chrom, refFlat.txStart, refFlat.txEnd, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
+            "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
+            "INNER JOIN knownCanonical ON knownToRefSeq.name=knownCanonical.transcript ".
+            "GROUP BY `name` ORDER BY `chrom`, `txStart`";
+    }
+    elsif ($what =~ m/refseq_alternative_genes/i)
+    {
+        $q = "SELECT  refFlat.chrom, refFlat.txStart, refFlat.txEnd, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
+            "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
+            "WHERE knownToRefSeq.value NOT IN (SELECT `transcript` FROM knownCanonical) ".
+            "GROUP BY `name` ORDER BY `chrom`, `txStart`";
+    }
+    elsif ($what =~ m/ucsc_canonical_exons/i)
+    {
+        $q = "SELECT knownGene.chrom, knownGene.exonStarts, knownGene.exonEnds, `name`, `exonCount`, knownGene.strand, `transcript` ".
+            "FROM `knownGene` INNER JOIN `knownCanonical` ON knownGene.name=knownCanonical.transcript GROUP BY `name` ORDER BY `chrom`, `exonStarts`";
+    }
+    elsif ($what =~ m/ucsc_alternative_exons/i)
+    {
+        $q = "SELECT knownGene.chrom, knownGene.exonStarts, knownGene.exonEnds, knownGene.name, knownGene.exonCount, knownGene.strand, `name` AS `transcript` ".
+            "FROM `knownGene` WHERE `name` NOT IN (SELECT `transcript` FROM knownCanonical)".
+            "GROUP BY `name` ORDER BY `chrom`, `exonStarts`";
+    }
+    elsif ($what =~ m/refseq_canonical_exons/i)
+    {
+        $q = "SELECT refFlat.chrom, refFlat.exonStarts, refFlat.exonEnds, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` AS `transcript` ".
+            "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
+            "INNER JOIN knownCanonical ON knownToRefSeq.name=knownCanonical.transcript ".
+            "GROUP BY `name` ORDER BY `chrom`, `txStart`";
+    }
+    elsif ($what =~ m/refseq_alternative_exons/i)
+    {
+        $q = "SELECT  refFlat.chrom, refFlat.exonStarts, refFlat.exonEnds, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` AS `transcript` ".
+            "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
+            "WHERE knownToRefSeq.value NOT IN (SELECT `transcript` FROM knownCanonical) ".
+            "GROUP BY `name` ORDER BY `chrom`, `txStart`";
+    }
+    elsif ($what =~ m/ucsc_canonical_5utr/i)
+    {
+        $q = "SELECT knownGene.chrom AS `chrom`, knownGene.txStart AS `start`, knownGene.cdsStart AS `end`, `transcript`, knownGene.exonCount, knownGene.strand, `geneName` ".
+            "FROM `knownCanonical` INNER JOIN `knownGene` ON knownCanonical.transcript=knownGene.name ".
+            "INNER JOIN `knownToRefSeq` ON knownCanonical.transcript=knownToRefSeq.name ".
+            "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
+            "WHERE knownGene.strand = \"+\"  AND knownGene.txStart <> knownGene.cdsStart UNION ".
+            "SELECT knownGene.chrom AS `chrom`, knownGene.cdsEnd AS `start`, knownGene.txEnd AS `end`, `transcript`, knownGene.exonCount, knownGene.strand, `geneName` ".
+            "FROM `knownCanonical` INNER JOIN `knownGene` ON knownCanonical.transcript=knownGene.name ".
+            "INNER JOIN `knownToRefSeq` ON knownCanonical.transcript=knownToRefSeq.name ".
+            "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
+            "WHERE knownGene.strand = \"-\" AND knownGene.txEnd <> knownGene.cdsEnd ".
+            "GROUP BY `transcript` ORDER BY `chrom`, `start`";
+    }
+    elsif ($what =~ m/ucsc_alternative_5utr/i)
+    {
+        $q = "SELECT knownGene.chrom AS `chrom`, knownGene.txStart AS `start`, knownGene.cdsStart AS `end`, knownGene.name, knownGene.exonCount, knownGene.strand, `geneName` ".
+            "FROM `knownGene` INNER JOIN `knownToRefSeq` ON knownGene.name=knownToRefSeq.name ".
+            "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
+            "WHERE knownGene.strand = \"+\" AND knownGene.txStart <> knownGene.cdsStart ".
+            "AND knownGene.name NOT IN (SELECT `transcript` FROM knownCanonical) UNION ".
+            "SELECT knownGene.chrom AS `chrom`, knownGene.cdsEnd AS `start`, knownGene.txEnd AS `end`, knownGene.name, knownGene.exonCount, knownGene.strand, `geneName` ".
+            "FROM `knownGene` INNER JOIN `knownToRefSeq` ON knownGene.name=knownToRefSeq.name ".
+            "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
+            "WHERE knownGene.strand = \"-\" AND knownGene.txEnd <> knownGene.cdsEnd ".
+            "AND knownGene.name NOT IN (SELECT `transcript` FROM knownCanonical) ".
+            "GROUP BY `name` ORDER BY `chrom`, `start`";
+    }
+    elsif ($what =~ m/ucsc_canonical_3utr/i)
+    {
+        $q = "SELECT knownGene.chrom AS `chrom`, knownGene.cdsEnd AS `start`, knownGene.txEnd AS `end`, `transcript`, knownGene.exonCount, knownGene.strand, `geneName` ".
+            "FROM `knownCanonical` INNER JOIN `knownGene` ON knownCanonical.transcript=knownGene.name ".
+            "INNER JOIN `knownToRefSeq` ON knownCanonical.transcript=knownToRefSeq.name ".
+            "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
+            "WHERE knownGene.strand = \"+\" AND knownGene.cdsEnd <> knownGene.txEnd UNION ".
+            "SELECT knownGene.chrom AS `chrom`, knownGene.txStart AS `start`, knownGene.cdsStart AS `end`, `transcript`, knownGene.exonCount, knownGene.strand, `geneName` ".
+            "FROM `knownCanonical` INNER JOIN `knownGene` ON knownCanonical.transcript=knownGene.name ".
+            "INNER JOIN `knownToRefSeq` ON knownCanonical.transcript=knownToRefSeq.name ".
+            "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
+            "WHERE knownGene.strand = \"-\" AND knownGene.txStart <> knownGene.cdsStart ".
+            "GROUP BY `transcript` ORDER BY `chrom`, `start`";
+    }
+    elsif ($what =~ m/ucsc_alternative_3utr/i)
+    {
+        $q = "SELECT knownGene.chrom AS `chrom`, knownGene.cdsEnd AS `start`, knownGene.txEnd AS `end`, knownGene.name, knownGene.exonCount, knownGene.strand, `geneName` ".
+            "FROM `knownGene` INNER JOIN `knownToRefSeq` ON knownGene.name=knownToRefSeq.name ".
+            "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
+            "WHERE knownGene.strand = \"+\" AND knownGene.cdsEnd <> knownGene.txEnd ".
+            "AND knownGene.name NOT IN (SELECT `transcript` FROM knownCanonical) UNION ".
+            "SELECT knownGene.chrom AS `chrom`, knownGene.txStart AS `start`, knownGene.cdsStart AS `end`, knownGene.name, knownGene.exonCount, knownGene.strand, `geneName` ".
+            "FROM `knownGene` INNER JOIN `knownToRefSeq` ON knownGene.name=knownToRefSeq.name ".
+            "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
+            "WHERE knownGene.strand = \"-\"  knownGene.txStart <> knownGene.cdsStart ".
+            "AND knownGene.name NOT IN (SELECT `transcript` FROM knownCanonical) ".
+            "GROUP BY `name` ORDER BY `chrom`, `start`";
+    }
+    elsif ($what =~ m/refseq_canonical_5utr/i)
+    {
+        $q = "SELECT refFlat.chrom AS `chrom`, refFlat.txStart AS `start`, refFlat.cdsStart AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
+            "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
+            "INNER JOIN knownCanonical ON knownToRefSeq.name=knownCanonical.transcript ".
+            "WHERE refFlat.strand = \"+\" AND refFlat.txStart <> refFlat.cdsStart UNION ".
+            "SELECT refFlat.chrom AS `chrom`, refFlat.cdsEnd AS `start`, refFlat.txEnd AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
+            "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
+            "INNER JOIN knownCanonical ON knownToRefSeq.name=knownCanonical.transcript ".
+            "WHERE refFlat.strand = \"-\" AND refFlat.txEnd <> refFlat.cdsEnd ".
+            "GROUP BY `name` ORDER BY `chrom`, `start`";
+    }
+    elsif ($what =~ m/refseq_alternative_5utr/i)
+    {
+        $q = "SELECT refFlat.chrom AS `chrom`, refFlat.txStart AS `start`, refFlat.cdsStart AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
+            "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
+            "WHERE refFlat.strand = \"+\" AND refFlat.txStart <> refFlat.cdsStart ".
+            "AND knownToRefSeq.value NOT IN (SELECT `transcript` FROM knownCanonical) UNION ".
+            "SELECT refFlat.chrom AS `chrom`, refFlat.cdsEnd AS `start`, refFlat.txEnd AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
+            "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
+            "WHERE refFlat.strand = \"-\" AND refFlat.txEnd <> refFlat.cdsEnd ".
+            "AND knownToRefSeq.value NOT IN (SELECT `transcript` FROM knownCanonical) ".
+            "GROUP BY `name` ORDER BY `chrom`, `start`";
+    }
+    elsif ($what =~ m/refseq_canonical_3utr/i)
+    {
+        $q = "SELECT refFlat.chrom AS `chrom`, refFlat.cdsEnd AS `start`, refFlat.txEnd AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
+            "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
+            "INNER JOIN knownCanonical ON knownToRefSeq.name=knownCanonical.transcript ".
+            "WHERE refFlat.strand = \"+\" AND refFlat.cdsEnd <> refFlat.txEnd UNION ".
+            "SELECT refFlat.chrom AS `chrom`, refFlat.txStart AS `start`, refFlat.cdsStart AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
+            "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
+            "INNER JOIN knownCanonical ON knownToRefSeq.name=knownCanonical.transcript ".
+            "WHERE refFlat.strand = \"-\" AND refFlat.txStart <> refFlat.cdsStart ".
+            "GROUP BY `name` ORDER BY `chrom`, `start`";
+    }
+    elsif ($what =~ m/refseq_alternative_3utr/i)
+    {
+        $q = "SELECT refFlat.chrom AS `chrom`, refFlat.cdsEnd AS `start`, refFlat.txEnd AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
+            "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
+            "WHERE refFlat.strand = \"+\" AND refFlat.cdsEnd <> refFlat.txEnd ".
+            "AND knownToRefSeq.value NOT IN (SELECT `transcript` FROM knownCanonical) UNION ".
+            "SELECT refFlat.chrom AS `chrom`, refFlat.txStart AS `start`, refFlat.cdsStart AS `end`, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
+            "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
+            "WHERE refFlat.strand = \"-\" AND refFlat.txStart <> refFlat.cdsStart ".
+            "AND knownToRefSeq.value NOT IN (SELECT `transcript` FROM knownCanonical) ".
+            "GROUP BY `name` ORDER BY `chrom`, `start`";
+    }
+    elsif ($what =~ m/ucsc_canonical_cds/i)
+    {
+        $q = "SELECT knownCanonical.chrom AS chrom, knownGene.cdsStart, knownGene.cdsEnd, `transcript`, knownGene.exonCount, knownGene.strand, `geneName` ".
+            "FROM `knownCanonical` INNER JOIN `knownGene` ON knownCanonical.transcript=knownGene.name ".
+            "INNER JOIN `knownToRefSeq` ON knownCanonical.transcript=knownToRefSeq.name ".
+            "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
+            "WHERE knownGene.cdsStart <> knownGene.cdsEnd ".
+            "GROUP BY `transcript` ORDER BY `chrom`, `cdsStart`";
+    }
+    elsif ($what =~ m/ucsc_alternative_cds/i)
+    {
+        $q = "SELECT knownGene.chrom AS chrom, knownGene.cdsStart, knownGene.cdsEnd, knownGene.name, knownGene.exonCount, knownGene.strand, `geneName` ".
+            "FROM `knownGene` INNER JOIN `knownToRefSeq` ON knownGene.name=knownToRefSeq.name ".
+            "INNER JOIN `refFlat` ON knownToRefSeq.value=refFlat.name ".
+            "WHERE knownGene.cdsStart <> knownGene.cdsEnd AND knownGene.name NOT IN ".
+            "(SELECT `transcript` FROM knownCanonical) ".
+            "GROUP BY `name` ORDER BY `chrom`, `cdsStart`";
+    }
+    elsif ($what =~ m/refseq_canonical_cds/i)
+    {
+        $q = "SELECT  refFlat.chrom, refFlat.cdsStart, refFlat.cdsEnd, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
+            "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
+            "INNER JOIN knownCanonical ON knownToRefSeq.name=knownCanonical.transcript ".
+            "WHERE refFlat.cdsStart <> refFlat.cdsEnd ".
+            "GROUP BY `name` ORDER BY `chrom`, `cdsStart`";
+    }
+    elsif ($what =~ m/refseq_alternative_cds/i)
+    {
+        $q = "SELECT  refFlat.chrom, refFlat.txStart, refFlat.txEnd, refFlat.name, refFlat.exonCount, refFlat.strand, `geneName` ".
+            "FROM `refFlat` INNER JOIN knownToRefSeq ON refFlat.name=knownToRefSeq.value ".
+            "WHERE refFlat.cdsStart <> refFlat.cdsEnd AND knownToRefSeq.value NOT IN ".
+            "(SELECT `transcript` FROM knownCanonical) ".
+            "GROUP BY `name` ORDER BY `chrom`, `cdsStart`";
+    }
+    elsif ($what =~ m/chrom_info/i)
+    {
+        $q = "SELECT `chrom`, `size` FROM `chromInfo` ORDER BY `size` DESC";
     }
     
     return($q);

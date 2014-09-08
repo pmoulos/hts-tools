@@ -314,7 +314,7 @@ sub run
 
     # Variable for matrix generation
     my (%hasPeak,%hasExpression);
-    tie %hasPeak, "Tie::IxHash::Easy" if (@out ~~ /matrix/);
+    tie %hasPeak, "Tie::IxHash::Easy" if ($helper->smatch("matrix",@out));
     
     # Initiate a counter in case we have to fetch files
     my $counter = HTS::Tools::Count->new({"tmpdir" => $self->get("tmpdir"),"silent" => 1, "input" => "foo", "region" => $region});
@@ -374,7 +374,7 @@ sub run
         $lensig++;
 
         # Initiate the hash to keep record of peaks for a peak matrix file generation
-        if (@out ~~ /matrix/)
+        if ($helper->smatch("matrix",@out))
         {
             for ($i=0; $i<@input; $i++)
             {
@@ -834,9 +834,9 @@ sub run
         }
     }
 
-    $self->print_matrix(\%hasPeak,"matrix-number",\%hasExpression) if (@out ~~ /matrix-number/);
-    $self->print_matrix(\%hasPeak,"matrix-presence",\%hasExpression) if (@out ~~ /matrix-presence/);
-    $self->print_matrix(\%hasPeak,"matrix-peaks",\%hasExpression) if (@out ~~ /matrix-peaks/);
+    $self->print_matrix(\%hasPeak,"matrix-number",\%hasExpression) if ($helper->smatch("matrix-number",@out));
+    $self->print_matrix(\%hasPeak,"matrix-presence",\%hasExpression) if ($helper->smatch("matrix-presence",@out));
+    $self->print_matrix(\%hasPeak,"matrix-peaks",\%hasExpression) if ($helper->smatch("matrix-peaks",@out));
 
     $date = $helper->now;
     $helper->disp("$date - Finished!\n\n");

@@ -845,64 +845,39 @@ For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count. $sourc
 
 sub format_species
 {
-    use v5.14;
     my ($self,$org,$ver,$source) = @_;
-    given($source)
+    if ($source =~ m/ucsc|refseq/)
     {
-        when(/ucsc|refseq/)
+        if ($org =~ m/human/)
         {
-            given($org)
-            {
-                when(/human/)
-                {
-                    given($ver)
-                    {
-                        when(/hg19/) { return("hg19"); }
-                        when(/hg18/) { return("hg18"); }
-                    }
-                }
-                when(/mouse/)
-                {
-                    given($ver)
-                    {
-                        when(/mm10/) { return("mm10"); }
-                        when(/mm9/) { return("mm9"); }
-                    }
-                }
-                when(/rat/)
-                {
-                    given($ver)
-                    {
-                        when(/rn5/) { return("rn5"); }
-                    }
-                }
-                when(/fly/)
-                {
-                    given($ver)
-                    {
-                        when(/dm3/) { return("dm3"); }
-                    }
-                }
-                when(/zebrafish/)
-                {
-                    given($ver)
-                    {
-                        when(/danrer7/i) { return("danRer7"); }
-                    }
-                }
-            }
+            if ($ver =~ m/hg19/) { return("hg19"); }
+            elsif ($ver =~ m/hg18/) { return("hg18"); }
         }
-        when(/ensembl/)
+        elsif ($org =~ m/mouse/)
         {
-            given($org)
-            {
-                when(/human/) { return("hsapiens_gene_ensembl"); }
-                when(/mouse/) { return("mmusculus_gene_ensembl"); }
-                when(/rat/) { return("rnorvegicus_gene_ensembl"); }
-                when(/fly/) { return("dmelanogaster_gene_ensembl"); }
-                when(/zebrafish/) { return("drerio_gene_ensembl"); }
-            }
+            if ($ver =~ m/mm10/) { return("mm10"); }
+            elsif ($ver =~ m/mm9/) { return("mm9"); }
         }
+        elsif ($org =~ m/rat/)
+        {
+            if ($ver =~ m/rn5/) { return("rn5"); }
+        }
+        elsif ($org =~ m/fly/)
+        {
+            if ($ver =~ m/dm3/) { return("dm3"); }
+        }
+        elsif ($org =~ m/zebrafish/)
+        {
+            if ($ver =~ m/danrer7/i) { return("danRer7"); }
+        }
+    }
+    elsif ($source =~ m/ensembl/)
+    {
+        if ($org =~ m/human/) { return("hsapiens_gene_ensembl"); }
+        elsif ($org =~ m/mouse/) { return("mmusculus_gene_ensembl"); }
+        elsif ($org =~ m/rat/) { return("rnorvegicus_gene_ensembl"); }
+        elsif ($org =~ m/fly/) { return("dmelanogaster_gene_ensembl"); }
+        elsif ($org =~ m/zebrafish/) { return("drerio_gene_ensembl"); }
     }
 }
 
