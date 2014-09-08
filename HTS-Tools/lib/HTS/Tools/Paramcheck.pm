@@ -88,7 +88,7 @@ sub init
     my @accept = ("tool","params");
     foreach my $p (keys(%$args))
     {
-        croak "Unknown parameter for initialization of HTS::Tools::Paramcheck: $p\n" if (!($p ~~ @accept));
+        croak "Unknown parameter for initialization of HTS::Tools::Paramcheck: $p\n" if (!($helper->smatch($p,@accept)));
         $self->set($p,$args->{$p});
     }
     return($self);
@@ -102,62 +102,58 @@ The main parameter validator function of the module
 
 sub validate
 {
-    use v5.14;
     my $self = shift @_;
-    given($self->{"tool"})
+    if ($self->{"tool"} =~ m/assign/i)
     {
-        when(/assign/i)
-        {
-            $self->validate_assign;
-        }
-        when(/constants/i)
-        {
-            $self->validate_constants;
-        }
-        when(/convert/i)
-        {
-            $self->validate_convert;
-        }
-        when(/count/i)
-        {
-            $self->validate_count;
-        }
-        when(/fetch/i)
-        {
-            $self->validate_fetch;
-        }
-        when(/intersect/i)
-        {
-            $self->validate_intersect;
-        }
-        when(/motifscan/i)
-        {
-            $self->validate_motifscan;
-        }
-        when(/multisect/i)
-        {
-            $self->validate_multisect;
-        }
-        when(/normalize/i)
-        {
-            $self->validate_normalize;
-        }
-        when(/profile/i)
-        {
-            $self->validate_profile;
-        }
-        when(/qc/i)
-        {
-            $self->validate_qc;
-        }
-        when(/queries/i)
-        {
-            $self->validate_queries;
-        }
-        when(/track/i)
-        {
-            $self->validate_track;
-        }
+        $self->validate_assign;
+    }
+    elsif ($self->{"tool"} =~ m/constants/i)
+    {
+        $self->validate_constants;
+    }
+    elsif ($self->{"tool"} =~ m/convert/i)
+    {
+        $self->validate_convert;
+    }
+    elsif ($self->{"tool"} =~ m/count/i)
+    {
+        $self->validate_count;
+    }
+    elsif ($self->{"tool"} =~ m/fetch/i)
+    {
+        $self->validate_fetch;
+    }
+    elsif ($self->{"tool"} =~ m/intersect/i)
+    {
+        $self->validate_intersect;
+    }
+    elsif ($self->{"tool"} =~ m/motifscan/i)
+    {
+        $self->validate_motifscan;
+    }
+    elsif ($self->{"tool"} =~ m/multisect/i)
+    {
+        $self->validate_multisect;
+    }
+    elsif ($self->{"tool"} =~ m/normalize/i)
+    {
+        $self->validate_normalize;
+    }
+    elsif ($self->{"tool"} =~ m/profile/i)
+    {
+        $self->validate_profile;
+    }
+    elsif ($self->{"tool"} =~ m/qc/i)
+    {
+        $self->validate_qc;
+    }
+    elsif ($self->{"tool"} =~ m/queries/i)
+    {
+        $self->validate_queries;
+    }
+    elsif ($self->{"tool"} =~ m/track/i)
+    {
+        $self->validate_track;
     }
 }
 
@@ -198,7 +194,7 @@ sub validate_assign
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
     {
-        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($helper->smatch($p,@accept)));
     }
     
     # Check required packages
@@ -212,7 +208,7 @@ sub validate_assign
         }
         else { use Math::Cephes; }
     }
-    if (defined($self->{"params"}->{"outformat"}) && @{$self->{"params"}->{"outformat"}} && @{$self->{"params"}->{"outformat"}} ~~ /matrix/)
+    if (defined($self->{"params"}->{"outformat"}) && @{$self->{"params"}->{"outformat"}} &&  $helper->match("matrix",@{$self->{"params"}->{"outformat"}}))
     {
         $status = eval { $helper->try_module("Tie::IxHash::Easy") };
         if ($status)
@@ -456,7 +452,7 @@ sub validate_constants
 
     foreach my $c (keys(%{$self->{"params"}}))
     {
-        $helper->disp("Unrecognized constant : $c   --- Ignoring...") if (!($c ~~ @accept));
+        $helper->disp("Unrecognized constant : $c   --- Ignoring...") if (!($helper->smatch($c,@accept)));
         $wrongs++;
     }
     
@@ -484,7 +480,7 @@ sub validate_convert
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
     {
-        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($helper->smatch($p,@accept)));
     }
     
     return($self->{"params"});
@@ -523,7 +519,7 @@ sub validate_count
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
     {
-        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($helper->smatch($p,@accept)));
     }
     # Check required packages
     $helper->try_module("IntervalTree");
@@ -739,7 +735,7 @@ sub validate_fetch
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
     {
-        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($helper->smatch($p,@accept)));
     }
 
     return($self->{"params"});
@@ -763,7 +759,7 @@ sub validate_intersect
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
     {
-        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($helper->smatch($p,@accept)));
     }
     
     # Check fatal
@@ -925,7 +921,7 @@ sub validate_motifscan
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
     {
-        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($helper->smatch($p,@accept)));
     }
     
     # Check fatal
@@ -973,24 +969,20 @@ sub validate_motifscan
         elsif (@range == 1 && $range[0] =~ /\d+\:\d+/) # Increase per 1 if pwmscan or per 0.1 if MotifScanner
         {
             my ($s,$e) = split(":",$range[0]);
-            use v5.10;
-            given($self->{"params"}->{"scanner"})
+            if ($self->{"params"}->{"scanner"} =~ m/pwmscan/i)
             {
-                when(/pwmscan/i)
+                @range = ($s..$e);
+            }
+            elsif ($self->{"params"}->{"scanner"} =~ /MotifScanner/i)
+            {
+                if ($s > 1 || $e > 1)
                 {
-                    @range = ($s..$e);
+                    $helper->disp("Range for MotifScanner should be <1. Using default (0.2:0.1:0.7)...");
+                    @range = $helper->range_vector(0.5,0.01,0.01);
                 }
-                when(/MotifScanner/i)
-                {
-                    if ($s > 1 || $e > 1)
-                    {
-                        $helper->disp("Range for MotifScanner should be <1. Using default (0.2:0.1:0.7)...");
-                        @range = $helper->range_vector(0.5,0.01,0.01);
-                    }
-                    else 
-                    { 
-                        @range = $helper->range_vector($s,$e,0.1); 
-                    }
+                else 
+                { 
+                    @range = $helper->range_vector($s,$e,0.1); 
                 }
             }
             $self->{"params"}->{"range"} = \@range;
@@ -1153,7 +1145,7 @@ sub validate_normalize_bed
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
     {
-        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($helper->smatch($p,@accept)));
     }
 
     # Check normalization option
@@ -1212,7 +1204,7 @@ sub validate_normalize_bedgraph
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
     {
-        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($helper->smatch($p,@accept)));
     }
     
     # Check signal summarization
@@ -1292,7 +1284,7 @@ sub validate_profile
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
     {
-        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($helper->smatch($p,@accept)));
     }
     
     return($self->{"params"});
@@ -1315,7 +1307,7 @@ sub validate_qc
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
     {
-        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($helper->smatch($p,@accept)));
     }
     
     return($self->{"params"});
@@ -1358,7 +1350,7 @@ sub validate_queries
         "chrom_info"
     );
 
-    if (!($query ~~ @accept))
+    if (!($helper->smatch($query,@accept)))
     {
         $helper->disp("Unkown query for $modname: $query\n");
         croak "Type perldoc $modname for help in usage.\n\n";
@@ -1420,7 +1412,7 @@ sub validate_track_signal
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
     {
-        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($helper->smatch($p,@accept)));
     }
 
     # Check fatal
@@ -1727,7 +1719,7 @@ sub validate_track_hub
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
     {
-        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($p ~~ @accept));
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($helper->smatch($p,@accept)));
     }
 
     # Check fatal

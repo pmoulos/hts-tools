@@ -199,101 +199,97 @@ sub run
 
     # Actual job must be performed, organized in subroutines...
     my ($track,$header);
-    use v5.14;
-    given($source."2".$destination)
+    if ($source."2".$destination =~ m/^bam2bedgraph$/i)
     {
-        when(/^bam2bedgraph$/i)
-        {
-            ($track,$header) = $self->bam2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when(/^bam2bigbed$/i)
-        {
-            ($track,$header) = $self->bam2bigbed($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when(/^bam2bigwig$/i)
-        {
-            ($track,$header) = $self->bam2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when(/^bam2wig$/i)
-        {
-            ($track,$header) = $self->bam2wig($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when (/^bed2bam$/i)
-        {
-            ($track,$header) = $self->bed2bam($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when (/^bed2bedgraph$/i)
-        {
-            ($track,$header) = $self->bed2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when (/^bed2bigbed$/i)
-        {
-             ($track,$header) = $self->bed2bigbed($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when (/^bed2bigwig$/i)
-        {
-            ($track,$header) = $self->bed2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when (/^bed2wig$/i)
-        {
-            ($track,$header) = $self->bed2wig($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when(/^bedgraph2bigwig$/i)
-        {
-            ($track,$header) = $self->bedgraph2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when(/^bedgraph2wig$/i)
-        {
-            ($track,$header) = $self->bedgraph2wig($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when(/^bigbed2bam$/i)
-        {
-            ($track,$header) = $self->bigbed2bam($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when(/^bigbed2bed$/i)
-        {
-            ($track,$header) = $self->bigbed2bed($input,$dir,$options);
-        }
-        when(/^bigbed2bedgraph$/i)
-        {
-            ($track,$header) = $self->bigbed2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when(/^bigbed2bigwig$/i)
-        {
-            ($track,$header) = $self->bigbed2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when(/^bigwig2bedgraph$/i)
-        {
-            ($track,$header) = $self->bigwig2bedgraph($input,$dir,$options);
-        }
-        when(/^bigwig2wig$/i)
-        {
-            ($track,$header) = $self->bigwig2wig($input,$dir,$options);
-        }
-        when(/^wig2bigwig$/i)
-        {
-            ($track,$header) = $self->wig2bigwig($input,$dir,$org,$ver,$options);
-        }
-        when(/^wig2bedgraph$/i)
-        {
-            ($track,$header) = $self->bigbed2bigwig($input,$dir,$org,$ver,$options);
-        }
-        when(/^sam2bedgraph$/i)
-        {
-            ($track,$header) = $self->sam2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when(/^sam2bigbed$/i)
-        {
-            ($track,$header) = $self->sam2bigbed($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when(/^sam2bigwig$/i)
-        {
-            ($track,$header) = $self->sam2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
-        when(/^sam2wig$/i)
-        {
-            ($track,$header) = $self->sam2wig($input,$dir,$org,$ver,$clevel,$sort,$options);
-        }
+        ($track,$header) = $self->bam2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bam2bigbed$/i)
+    {
+        ($track,$header) = $self->bam2bigbed($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bam2bigwig$/i)
+    {
+        ($track,$header) = $self->bam2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bam2wig$/i)
+    {
+        ($track,$header) = $self->bam2wig($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bed2bam$/i)
+    {
+        ($track,$header) = $self->bed2bam($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bed2bedgraph$/i)
+    {
+        ($track,$header) = $self->bed2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bed2bigbed$/i)
+    {
+         ($track,$header) = $self->bed2bigbed($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bed2bigwig$/i)
+    {
+        ($track,$header) = $self->bed2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bed2wig$/i)
+    {
+        ($track,$header) = $self->bed2wig($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bedgraph2bigwig$/i)
+    {
+        ($track,$header) = $self->bedgraph2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bedgraph2wig$/i)
+    {
+        ($track,$header) = $self->bedgraph2wig($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bigbed2bam$/i)
+    {
+        ($track,$header) = $self->bigbed2bam($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bigbed2bed$/i)
+    {
+        ($track,$header) = $self->bigbed2bed($input,$dir,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bigbed2bedgraph$/i)
+    {
+        ($track,$header) = $self->bigbed2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bigbed2bigwig$/i)
+    {
+        ($track,$header) = $self->bigbed2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bigwig2bedgraph$/i)
+    {
+        ($track,$header) = $self->bigwig2bedgraph($input,$dir,$options);
+    }
+    elsif ($source."2".$destination =~ m/^bigwig2wig$/i)
+    {
+        ($track,$header) = $self->bigwig2wig($input,$dir,$options);
+    }
+    elsif ($source."2".$destination =~ m/^wig2bigwig$/i)
+    {
+        ($track,$header) = $self->wig2bigwig($input,$dir,$org,$ver,$options);
+    }
+    elsif ($source."2".$destination =~ m/^wig2bedgraph$/i)
+    {
+        ($track,$header) = $self->bigbed2bigwig($input,$dir,$org,$ver,$options);
+    }
+    elsif ($source."2".$destination =~ m/^sam2bedgraph$/i)
+    {
+        ($track,$header) = $self->sam2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^sam2bigbed$/i)
+    {
+        ($track,$header) = $self->sam2bigbed($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^sam2bigwig$/i)
+    {
+        ($track,$header) = $self->sam2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
+    }
+    elsif ($source."2".$destination =~ m/^sam2wig$/i)
+    {
+        ($track,$header) = $self->sam2wig($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
 
     # Then, header creation and append or write to file according to destination type
@@ -1394,178 +1390,173 @@ sub check_constants
     my $self = shift @_;
     my ($source,$dest) = @_;
     
-    use v5.14;
-    given($source."2".$dest)
+    if ($source."2".$dest =~ m/bam2bedgraph/i)
     {
-        when(/bam2bedgraph/i)
-        {
-            croak "BED tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
-        }
-        when(/bam2bigbed/i)
-        {
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-            croak "BED tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
-        }
-        when(/bam2bigwig/i)
-        {
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-            croak "BED tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
-            croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
-                if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
-                    (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
-        }
-        when(/bam2wig/i)
-        {
-            croak "BED tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
-            croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
-                if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
-                    (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
-        }
-        when (/bed2bam/i)
-        {
-            croak "BED tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
-        }
-        when 
-        (/bed2bedgraph/i)
-        {
-            croak "BED tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
-        }
-        when (/bed2bigbed/i)
-        {
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-            croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
-                if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
-                    (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
-        }
-        when (/bed2bigwig/i)
-        {
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-            croak "BED tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
-        }
-        when (/bed2wig/i)
-        {
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-            croak "BED tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
-        }
-        when(/bedgraph2bigwig/i)
-        {
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-            croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
-                if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
-                    (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
-        }
-        when(/bedgraph2wig/i)
-        {
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-            croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
-                if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
-                    (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
-        }
-        when(/bigbed2bam/i)
-        {
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-            croak "BED tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
-        }
-        when(/bigbed2bed/i)
-        {
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-        }
-        when(/bigbed2bedgraph/i)
-        {
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-            croak "BED tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
-        }
-        when(/bigbed2bigwig/i)
-        {
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-            croak "BED tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
-            croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
-                if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
-                    (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
-        }
-        when(/bigwig2wig/i)
-        {
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-        }
-        when(/bigwig2bedgraph/i)
-        {
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-        }
-        when(/sam2bedgraph/i)
-        {
-            croak "SAM tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("SAMTOOLS_HOME") || (! -d $const->get("SAMTOOLS_HOME")));
-            croak "BED tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
-        }
-        when(/sam2bigbed/i)
-        {
-            croak "SAM tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("SAMTOOLS_HOME") || (! -d $const->get("SAMTOOLS_HOME")));
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-            croak "BED tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
-        }
-        when(/sam2bigwig/i)
-        {
-            croak "SAM tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("SAMTOOLS_HOME") || (! -d $const->get("SAMTOOLS_HOME")));
-             croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-            croak "BED tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
-            croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
-                if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
-                    (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
-        }
-        when(/sam2wig/i)
-        {
-            croak "SAM tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("SAMTOOLS_HOME") || (! -d $const->get("SAMTOOLS_HOME")));
-            croak "BED tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
-            croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
-                if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
-                    (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
-        }
-        when(/wig2bigwig/i)
-        {
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-        }
-        when(/wig2bedgraph/i)
-        {
-            croak "Kent tools not found in 3rd party tools! Please install them and retry!"
-                if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
-            croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
-                if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
-                    (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
-        }
+        croak "BED tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
+    }
+    elsif ($source."2".$dest =~ m/bam2bigbed/i)
+    {
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+        croak "BED tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
+    }
+    elsif ($source."2".$dest =~ m/bam2bigwig/i)
+    {
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+        croak "BED tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
+        croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
+            if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
+                (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
+    }
+    elsif ($source."2".$dest =~ m/bam2wig/i)
+    {
+        croak "BED tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
+        croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
+            if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
+                (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
+    }
+    elsif ($source."2".$dest =~ m/bed2bam/i)
+    {
+        croak "BED tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
+    }
+    elsif ($source."2".$dest =~ m/bed2bedgraph/i)
+    {
+        croak "BED tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
+    }
+    elsif ($source."2".$dest =~ m/bed2bigbed/i)
+    {
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+        croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
+            if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
+                (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
+    }
+    elsif ($source."2".$dest =~ m/bed2bigwig/i)
+    {
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+        croak "BED tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
+    }
+    elsif ($source."2".$dest =~ m/bed2wig/i)
+    {
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+        croak "BED tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
+    }
+    elsif ($source."2".$dest =~ m/bedgraph2bigwig/i)
+    {
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+        croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
+            if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
+                (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
+    }
+    elsif ($source."2".$dest =~ m/bedgraph2wig/i)
+    {
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+        croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
+            if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
+                (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
+    }
+    elsif ($source."2".$dest =~ m/bigbed2bam/i)
+    {
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+        croak "BED tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
+    }
+    elsif ($source."2".$dest =~ m/bigbed2bed/i)
+    {
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+    }
+    elsif ($source."2".$dest =~ m/bigbed2bedgraph/i)
+    {
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+        croak "BED tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
+    }
+    elsif ($source."2".$dest =~ m/bigbed2bigwig/i)
+    {
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+        croak "BED tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
+        croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
+            if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
+                (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
+    }
+    elsif ($source."2".$dest =~ m/bigwig2wig/i)
+    {
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+    }
+    elsif ($source."2".$dest =~ m/bigwig2bedgraph/i)
+    {
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+    }
+    elsif ($source."2".$dest =~ m/sam2bedgraph/i)
+    {
+        croak "SAM tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("SAMTOOLS_HOME") || (! -d $const->get("SAMTOOLS_HOME")));
+        croak "BED tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
+    }
+    elsif ($source."2".$dest =~ m/sam2bigbed/i)
+    {
+        croak "SAM tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("SAMTOOLS_HOME") || (! -d $const->get("SAMTOOLS_HOME")));
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+        croak "BED tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
+    }
+    elsif ($source."2".$dest =~ m/sam2bigwig/i)
+    {
+        croak "SAM tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("SAMTOOLS_HOME") || (! -d $const->get("SAMTOOLS_HOME")));
+         croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+        croak "BED tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
+        croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
+            if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
+                (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
+    }
+    elsif ($source."2".$dest =~ m/sam2wig/i)
+    {
+        croak "SAM tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("SAMTOOLS_HOME") || (! -d $const->get("SAMTOOLS_HOME")));
+        croak "BED tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("BEDTOOLS_HOME") || (! -d $const->get("BEDTOOLS_HOME")));
+        croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
+            if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
+                (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
+    }
+    elsif ($source."2".$dest =~ m/wig2bigwig/i)
+    {
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+    }
+    elsif ($source."2".$dest =~ m/wig2bedgraph/i)
+    {
+        croak "Kent tools not found in 3rd party tools! Please install them and retry!"
+            if (!$const->get("KENTBIN_HOME") || (! -d $const->get("KENTBIN_HOME")));
+        croak "At least one of Illumina iGenomes directory or HOST-USERNAME pair for accessing UCSC databases must be provided! Please check and retry!"
+            if ((!$const->get("IGENOMES_HOME") || (! -d $const->get("IGENOMES_HOME"))) &&
+                (!$const->get("REMOTE_HOST") || !$const->get("REMOTE_USER")));
     }
 }
 
@@ -1755,72 +1746,53 @@ chromosomal size annotation. Mostly for internal use.
 
 sub format_igenomes_chrom_size
 {
-    use v5.14;
     my ($self,$org,$ver) = @_;
     my $base = $const->get("IGENOMES_HOME");
-    given($org)
+    if ($org =~ m/human/)
     {
-        when(/human/)
+        if ($ver =~ m/hg19/)
         {
-            given($ver)
-            {
-                when(/hg19/)
-                {
-                    return(File::Spec->catfile($base,"Homo_sapiens","UCSC","hg19","Annotation","Genes","ChromInfo.txt"));
-                }
-                when(/hg18/)
-                {
-                    return(File::Spec->catfile($base,"Homo_sapiens","UCSC","hg18","Annotation","Genes","ChromInfo.txt"));
-                }
-            }
+            return(File::Spec->catfile($base,"Homo_sapiens","UCSC","hg19","Annotation","Genes","ChromInfo.txt"));
         }
-        when(/mouse/)
+        elsif ($ver =~ m/hg18/)
         {
-            given($ver)
-            {
-                when(/mm10/)
-                {
-                    return(File::Spec->catfile($base,"Mus_musculus","UCSC","mm10","Annotation","Genes","ChromInfo.txt"));
-                }
-                when(/mm9/)
-                {
-                    return(File::Spec->catfile($base,"Mus_musculus","UCSC","mm9","Annotation","Genes","ChromInfo.txt"));
-                }
-            }
+            return(File::Spec->catfile($base,"Homo_sapiens","UCSC","hg18","Annotation","Genes","ChromInfo.txt"));
         }
-        when(/rat/)
+    }
+    elsif ($org =~ m/mouse/)
+    {
+        if ($ver =~ m/mm10/)
         {
-            given($ver)
-            {
-                when(/rn5/)
-                { 
-                    return(File::Spec->catfile($base,"Rattus_norvegicus","UCSC","rn5","Annotation","Genes","ChromInfo.txt"));
-                }
-                when(/rn4/)
-                { 
-                    return(File::Spec->catfile($base,"Rattus_norvegicus","UCSC","rn4","Annotation","Genes","ChromInfo.txt"));
-                }
-            }
+            return(File::Spec->catfile($base,"Mus_musculus","UCSC","mm10","Annotation","Genes","ChromInfo.txt"));
         }
-        when(/fly/)
+        elsif ($ver =~ m/mm9/)
         {
-            given($ver)
-            {
-                when(/dm3/)
-                {
-                    return(File::Spec->catfile($base,"Drosophila_melanogaster","UCSC","dm3","Annotation","Genes","ChromInfo.txt"));
-                }
-            }
+            return(File::Spec->catfile($base,"Mus_musculus","UCSC","mm9","Annotation","Genes","ChromInfo.txt"));
         }
-        when(/zebrafish/)
+    }
+    elsif ($org =~ m/rat/)
+    {
+        if ($ver =~ m/rn5/)
+        { 
+            return(File::Spec->catfile($base,"Rattus_norvegicus","UCSC","rn5","Annotation","Genes","ChromInfo.txt"));
+        }
+        elsif ($ver =~ m/rn4/)
+        { 
+            return(File::Spec->catfile($base,"Rattus_norvegicus","UCSC","rn4","Annotation","Genes","ChromInfo.txt"));
+        }
+    }
+    elsif ($org =~ m/fly/)
+    {
+        if ($ver =~ m/dm3/)
         {
-            given($ver)
-            {
-                when(/danrer7/i)
-                {
-                    return(File::Spec->catfile($base,"Danio_rerio","UCSC","danRer7","Annotation","Genes","ChromInfo.txt"));
-                }
-            }
+            return(File::Spec->catfile($base,"Drosophila_melanogaster","UCSC","dm3","Annotation","Genes","ChromInfo.txt"));
+        }
+    }
+    elsif ($org =~ m/zebrafish/)
+    {
+        if ($ver =~ m/danrer7/i)
+        {
+            return(File::Spec->catfile($base,"Danio_rerio","UCSC","danRer7","Annotation","Genes","ChromInfo.txt"));
         }
     }
 }

@@ -22,7 +22,7 @@ BedGraph files with normalized signal.
     use HTS::Tools::Normalize::Bedgraph;
     my %params = (
         'input' => ['normal_rnaseq_1.bedGraph','normal_rnaseq_2.bedGraph',
-			'disease_rnaseq_1.bedGraph','disease_rnaseq_2.bedGraph'],
+            'disease_rnaseq_1.bedGraph','disease_rnaseq_2.bedGraph'],
         'sumto' => '10000000000',
         'exportfactors' => 'normfactors.txt'
     )
@@ -199,7 +199,7 @@ sub run
             push(@output,$self->create_output_file($f));
         }
     }
-    elsif ("stdout" ~~ (@output))
+    elsif ($helper->smatch("stdout",@output))
     {
         @output = ();
     }
@@ -258,7 +258,7 @@ sub run
                     $helper->disp("  Wrote $. normalized signals for ".basename($bglist[$i])."...") if ($.%1000000 == 0);
                     $line =~ s/\r|\n$//g;
                     ($chr,$start,$end,$signal) = split(/\t/,$line);
-                    $signal = $helper->round($signal*$normfactor{$bglist[$i]},6);
+                    $signal = $helper->round($signal*$normfactor{$bglist[$i]},2);
                     print $out "$chr\t$start\t$end\t$signal\n";
                 }
                 close(BGIN);
@@ -315,11 +315,14 @@ sub run
                 if ($output[$i])
                 {
                     $helper->disp("Writing ".basename($output[$i])."...");
-                    `awk -v var="$output[$i]" '{print \$1"\\t"\$2"\\t"\$3"\\t"\$4*$normfactor{$bglist[$i]}; if (FNR \% 1000000==0) { printf("\\n  Wrote %d signals to %s",FNR,var) | "cat 1>&2"}}' $bglist[$i] > $output[$i]`;
+                    #`awk -v var="$output[$i]" '{print \$1"\\t"\$2"\\t"\$3"\\t"\$4*$normfactor{$bglist[$i]}; if (FNR \% 1000000==0) { printf("\\n  Wrote %d signals to %s",FNR,var) | "cat 1>&2"}}' $bglist[$i] > $output[$i]`;
+                    `awk -v var="$output[$i]" '{printf \"%s\\t%s\\t%s\\t%.2f\\n\", \$1,\$2,\$3,\$4*$normfactor{$bglist[$i]}; if (FNR \% 1000000==0) { printf("\\n  Wrote %d signals to %s",FNR,var) | "cat 1>&2"}}' $bglist[$i] > $output[$i]`;
+                    
                 }
                 else {
                     $helper->disp("Writing to stdout...");
-                    `awk '{print \$1"\\t"\$2"\\t"\$3"\\t"\$4*$normfactor{$bglist[$i]}}' $bglist[$i]`;
+                    #`awk '{print \$1"\\t"\$2"\\t"\$3"\\t"\$4*$normfactor{$bglist[$i]}}' $bglist[$i]`;
+                    `awk '{printf \"%s\\t%s\\t%s\\t%.2f\\n\", \$1,\$2,\$3,\$4*$normfactor{$bglist[$i]}}' $bglist[$i]`;
                 }
             }
         }

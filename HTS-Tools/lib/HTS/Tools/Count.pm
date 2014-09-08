@@ -334,78 +334,62 @@ sub fetch_regions
     $splicing = $self->get("splicing") unless($splicing);
     $ver = $self->get("gversion") unless($ver);
     
-    use v5.14;
-    given($regionfile)
+    if ($regionfile =~ m/human-gene|mouse-gene|rat-gene|fly-gene|zebrafish-gene/i)
+    {            
+        if ($source =~ m/ensembl/i)
+        {
+            $regionfile = $fetcher->fetch_ensembl_genes($regionfile);
+            $regionfile = $fetcher->sort_ensembl_genes($regionfile);
+        }
+        elsif ($source =~ m/ucsc|refseq/i)
+        {
+            $regionfile = $fetcher->fetch_ucsc_genes($regionfile,$ver,$splicing,$source);
+        }
+    }
+    elsif ($regionfile =~ m/human-exon|mouse-exon|rat-exon|fly-exon|zebrafish-exon/i)
     {
-        when(/human-gene|mouse-gene|rat-gene|fly-gene|zebrafish-gene/i)
+        if ($source =~ m/ensembl/i)
         {
-            given($source)
-            {
-                when(/ensembl/i)
-                {
-                    $regionfile = $fetcher->fetch_ensembl_genes($regionfile);
-                    $regionfile = $fetcher->sort_ensembl_genes($regionfile);
-                }
-                when(/ucsc|refseq/i)
-                {
-                    $regionfile = $fetcher->fetch_ucsc_genes($regionfile,$ver,$splicing,$source);
-                }
-            }
+            $regionfile = $fetcher->fetch_ensembl_exons($regionfile);
+            $regionfile = $fetcher->sort_ensembl_exons($regionfile);
         }
-        when(/human-exon|mouse-exon|rat-exon|fly-exon|zebrafish-exon/i)
+        elsif ($source =~ m/ucsc|refseq/i)
         {
-            given($source)
-            {
-                when(/ensembl/i)
-                {
-                    $regionfile = $fetcher->fetch_ensembl_exons($regionfile);
-                    $regionfile = $fetcher->sort_ensembl_exons($regionfile);
-                }
-                when(/ucsc|refseq/i)
-                {
-                    $regionfile = $fetcher->fetch_ucsc_exons($regionfile,$ver,$splicing,$source);
-                }
-            }
+            $regionfile = $fetcher->fetch_ucsc_exons($regionfile,$ver,$splicing,$source);
         }
-        when(/human-(5|3)utr|mouse-(5|3)utr|rat-(5|3)utr|fly-(5|3)utr|zebrafish-(5|3)utr/i)
+    }
+    elsif ($regionfile =~ m/human-(5|3)utr|mouse-(5|3)utr|rat-(5|3)utr|fly-(5|3)utr|zebrafish-(5|3)utr/i)
+    {
+        if ($source =~ m/ensembl/i)
         {
-            given($source)
-            {
-                when(/ensembl/i)
-                {
-                    ($regionfile =~ m/5utr/i) ?
-                    ($regionfile = $fetcher->fetch_ensembl_utr($regionfile,5)) :
-                    ($regionfile = $fetcher->fetch_ensembl_utr($regionfile,3));
-                    $regionfile = $fetcher->sort_ensembl_exons($regionfile);
-                }
-                when(/ucsc|refseq/i)
-                {
-                    ($regionfile =~ m/5utr/i) ?
-                    ($regionfile = $fetcher->fetch_ucsc_utr($regionfile,$ver,$splicing,$source,5)) :
-                    ($regionfile = $fetcher->fetch_ucsc_utr($regionfile,$ver,$splicing,$source,3));
-                }
-            }
+            ($regionfile =~ m/5utr/i) ?
+            ($regionfile = $fetcher->fetch_ensembl_utr($regionfile,5)) :
+            ($regionfile = $fetcher->fetch_ensembl_utr($regionfile,3));
+            $regionfile = $fetcher->sort_ensembl_exons($regionfile);
         }
-        when(/human-cds|mouse-cds|rat-cds|fly-cds|zebrafish-cds/i)
+        elsif ($source =~ m/ucsc|refseq/i)
         {
-            given($source)
-            {
-                when(/ensembl/i)
-                {
-                    $regionfile = $fetcher->fetch_ensembl_cds($regionfile);
-                    $regionfile = $fetcher->sort_ensembl_exons($regionfile);
-                }
-                when(/ucsc|refseq/i)
-                {
-                    $regionfile = $fetcher->fetch_ucsc_cds($regionfile,$ver,$splicing,$source);
-                }
-            }
+            ($regionfile =~ m/5utr/i) ?
+            ($regionfile = $fetcher->fetch_ucsc_utr($regionfile,$ver,$splicing,$source,5)) :
+            ($regionfile = $fetcher->fetch_ucsc_utr($regionfile,$ver,$splicing,$source,3));
         }
-        default
+    }
+    elsif ($regionfile =~ m/human-cds|mouse-cds|rat-cds|fly-cds|zebrafish-cds/i)
+    {
+        if ($source =~ m/ensembl/i)
         {
-            ($regionfile,@{$self->get("input")}) = $self->sort_inputs($regionfile,@{$self->get("input")})
-                if ($self->get("sort"));
+            $regionfile = $fetcher->fetch_ensembl_cds($regionfile);
+            $regionfile = $fetcher->sort_ensembl_exons($regionfile);
         }
+        elsif ($source =~ m/ucsc|refseq/i)
+        {
+            $regionfile = $fetcher->fetch_ucsc_cds($regionfile,$ver,$splicing,$source);
+        }
+    }
+    else
+    {
+        ($regionfile,@{$self->get("input")}) = $self->sort_inputs($regionfile,@{$self->get("input")})
+            if ($self->get("sort"));
     }
 
     return($regionfile);
