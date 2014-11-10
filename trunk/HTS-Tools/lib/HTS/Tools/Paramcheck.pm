@@ -208,7 +208,7 @@ sub validate_assign
         }
         else { use Math::Cephes; }
     }
-    if (defined($self->{"params"}->{"outformat"}) && @{$self->{"params"}->{"outformat"}} &&  $helper->match("matrix",@{$self->{"params"}->{"outformat"}}))
+    if (defined($self->{"params"}->{"outformat"}) && @{$self->{"params"}->{"outformat"}} &&  $helper->smatch("matrix",@{$self->{"params"}->{"outformat"}}))
     {
         $status = eval { $helper->try_module("Tie::IxHash::Easy") };
         if ($status)

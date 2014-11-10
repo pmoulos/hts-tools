@@ -220,6 +220,8 @@ $scriptname --input peakfile(s) --region regfile --background backfile [OPTIONS]
             for data to be downloaded. It can be "hg19", "hg18" for human
           "mm10", "mm9" for mouse, "rn5" for rat, "dm3" for fruitfly and
           "danrer7" for zebrafish.
+  --expression|e      An array of column numbers which may contain
+            expression (or other custom) values in the region file.
   --log|l       Output a log file. It can be a file name or empty for
                 auto-generation.
   --silent|s        Use this option if you want to turn informative 
