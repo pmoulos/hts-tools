@@ -49,7 +49,9 @@ auto-generated.
 =item sumto B<(optional)>
 
 Normalize to --sumto total wig signal. Defaults to 1000000000. It is mutually
-exclusive with --extnorm with --extnorm in precedence.
+exclusive with --extnorm with --extnorm in precedence. It can be negative e.g.
+for creating normalized stranded tracks where the minus strand shows negative
+signal.
 
 =item extnorm B<(optional)>
 

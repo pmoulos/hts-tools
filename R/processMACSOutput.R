@@ -707,7 +707,7 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
     return(finalObj)   
 }
 
-# Plot RankSum against ratio
+# Plot saturation against ratio
 plotSatRat <- function(sat,rat,sfilt=NULL,rfilt=NULL,main.title="data",out="x11",path=NA)
 {
     if (out=="pdf")

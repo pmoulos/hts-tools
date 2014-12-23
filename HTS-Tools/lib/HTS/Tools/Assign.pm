@@ -155,6 +155,7 @@ column and a list of associated genes in the second column.
 "pretty-peak" for retrieving a more human-readable format quite self-explicating (please see output).
 "pretty-gene" similar to "pretty-peak" but gene-based (please see output).
 "peakdata" for retrieving only the assigned peaks from the original peak file.
+"bed" for retrieving a 6-column BED file suitable for a genome browser without additional data.
 "matrix-number" to retrieve a spreadsheet-like file where rows correspond to the subject region file and columns
 correspond to query files. The cell (i,j) contains the number of regions in query file j assigned to subject
 region i.
