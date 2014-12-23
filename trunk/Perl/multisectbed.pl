@@ -99,7 +99,7 @@ sub check_inputs
                "silent|s" => \$silent,
                "help|h" => \$help);
     # Check if the required arguments are set
-    if (!@ARGV || $help)
+    if ($help)
     {
         &program_usage;
         exit;
@@ -120,7 +120,7 @@ sub check_inputs
     if (!$name)
     {
         $helper->disp("Name for the Venn diagram figure not given! It will be auto-generated...");
-        $name = (scalar @input)."_venn_".&now("machine");
+        $name = (scalar @input)."_venn_".$helper->now("machine");
     }
     if ($figtype ne "png" && $figtype ne "jpg" && $figtype ne "bmp" && $figtype ne "pdf" && $figtype ne "ps")
     {
@@ -192,7 +192,7 @@ sub run_R
     my $status = system("Rscript --vanilla $sf");
     if ($status) # Dirty hack to recreate venn without overrideTriple
     {
-        disp("Known problem in VennDiagram package detected... Re-running... The output will not be proportional...");
+        $helper->disp("Known problem in VennDiagram package detected... Re-running... The output will not be proportional...");
         open(IN,$sf);
         while(<IN>)
         {

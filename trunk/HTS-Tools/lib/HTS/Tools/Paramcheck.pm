@@ -1213,9 +1213,9 @@ sub validate_normalize_bedgraph
         $helper->disp("The normalization total signal not given! Using default(1000000000)...");
         $self->{"params"}->{"sumto"} = 1000000000;
     }
-    if ($self->{"params"}->{"sumto"} !~ m/^[1-9]\d*$/ || $self->{"params"}->{"sumto"} <= 0)
+    if ($self->{"params"}->{"sumto"} !~ m/^-?[1-9]\d*$/ || $self->{"params"}->{"sumto"} == 0)
     {
-        $helper->disp("The signal sum parameter must be a positive integer! Using default (1000000000)...");
+        $helper->disp("The signal sum parameter must be a positive or negative integer! Using default (1000000000)...");
         $self->{"params"}->{"sumto"} = 1000000000;
     }
     # Check presence of external normalization factors

@@ -194,6 +194,8 @@ $scriptname --input peakfile(s) --region regfile --background backfile [OPTIONS]
                 list of associated genes in the second column.
                 "all-gene" for similar to "all-peak" but gene based.
                 "pretty-peak" for retrieving a more human-readable format
+                "bed" for retrieving a 6-column BED file suitable for a 
+                genome browser without additional data.
                 quite self-explicating (please see output).
                 "pretty-gene" similar to "pretty-peak" but gene-based
                 (please see output).
