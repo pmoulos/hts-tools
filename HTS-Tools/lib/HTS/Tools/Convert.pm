@@ -48,10 +48,10 @@ use HTS::Tools::Utils;
 use vars qw($helper);
 
 BEGIN {
-	$helper = HTS::Tools::Utils->new();
-	select(STDOUT);
-	$|=1;
-	$SIG{INT} = sub { $helper->catch_cleanup; }
+    $helper = HTS::Tools::Utils->new();
+    select(STDOUT);
+    $|=1;
+    $SIG{INT} = sub { $helper->catch_cleanup; }
 }
 
 =head2 new
@@ -60,44 +60,45 @@ BEGIN {
 
 sub new
 {
-	my ($class,$params) = @_;
-	my $self = {};
+    my ($class,$params) = @_;
+    my $self = {};
 
-	# Pass global variables to the helper
-	(defined($params->{"silent"})) ? ($helper->set("silent",$params->{"silent"})) :
-		($helper->set("silent",0));
-	(defined($params->{"tmpdir"})) ? ($helper->set("tmpdir",$params->{"tmpdir"})) :
-		($helper->set("tmpdir",File::Temp->newdir()));
-	$helper->set_logger($params->{"log"}) if (defined($params->{"log"}));
-	
-	# Validate the input parameters
-	my $checker = HTS::Tools::Paramcheck->new();
-	$checker->set("tool","convert");
-	$checker->set("params",$params);
-	$params = $checker->validate;
+    # Pass global variables to the helper
+    (defined($params->{"silent"})) ? ($helper->set("silent",$params->{"silent"})) :
+        ($helper->set("silent",0));
+    (defined($params->{"tmpdir"})) ? ($helper->set("tmpdir",$params->{"tmpdir"})) :
+        ($helper->set("tmpdir",File::Temp->newdir()));
+    $helper->set_logger($params->{"log"}) if (defined($params->{"log"}));
+    
+    # Validate the input parameters
+    my $checker = HTS::Tools::Paramcheck->new();
+    $checker->set("tool","convert");
+    $checker->set("params",$params);
+    $params = $checker->validate;
 
-	# After validating, bless and initialize
-	bless($self,$class);
-	$self->init($params);
-	return($self);
+    # After validating, bless and initialize
+    bless($self,$class);
+    $self->init($params);
+    return($self);
 }
 
 =head2 init($params)
 
-HTS::Tools::Convert object initialization method. NEVER use this directly, use new instead.
+HTS::Tools::Convert object initialization method. NEVER use this directly, use 
+new instead.
 
 =cut
 
 sub init
 {
-	my ($self,$params) = @_;
+    my ($self,$params) = @_;
 
-	# Basic
-	foreach my $p (keys(%$params)) { $self->set($p,$params->{$p}); }
+    # Basic
+    foreach my $p (keys(%$params)) { $self->set($p,$params->{$p}); }
 
     # Global
-	$self->set("silent",$helper->get("silent")) unless defined($self->{"silent"});
-	$self->set("tmpdir",$helper->get("tmpdir")) unless defined($self->{"tmpdir"});
+    $self->set("silent",$helper->get("silent")) unless defined($self->{"silent"});
+    $self->set("tmpdir",$helper->get("tmpdir")) unless defined($self->{"tmpdir"});
     
     return($self);
 }
@@ -106,125 +107,153 @@ sub init
 
 Convert a FASTA file to sequences in tabular format
 
-	my $tab_converted = $converter->fasta2tab($fasta_file);
+    my $tab_converted = $converter->fasta2tab($fasta_file);
 
 =cut
 
 sub fasta2tab
 {
-	my ($self,$infile) = @_;
-	my $currid;
-	open(INPUT,$infile) or croak "\nThe file $infile does not exist!\n";
-	my ($base,$dir) = fileparse($infile,'\.[^.]*');
-	my $outfile = File::Spec->catfile($dir,$base.".tab");
-	open(OUTPUT,">$outfile");
-	while (my $line = <INPUT>)
-	{
-		$line =~ s/\r|\n$//g;
-		if ($line =~ /^>/)
-		{
-			print OUTPUT "\n" if ($currid);
-			$currid = $line;
-			$currid =~ s/^>//g;
-			print OUTPUT "$currid\t";
-		}
-		elsif ($currid)
-		{
-			print OUTPUT "$line";
-		}
-	}
-	print OUTPUT "\n";
-	close(INPUT);
-	close(OUTPUT);
-	return($outfile);
+    my ($self,$infile) = @_;
+    my $currid;
+    open(INPUT,$infile) or croak "\nThe file $infile does not exist!\n";
+    my ($base,$dir) = fileparse($infile,'\.[^.]*');
+    my $outfile = File::Spec->catfile($dir,$base.".tab");
+    open(OUTPUT,">$outfile");
+    while (my $line = <INPUT>)
+    {
+        $line =~ s/\r|\n$//g;
+        if ($line =~ /^>/)
+        {
+            print OUTPUT "\n" if ($currid);
+            $currid = $line;
+            $currid =~ s/^>//g;
+            print OUTPUT "$currid\t";
+        }
+        elsif ($currid)
+        {
+            print OUTPUT "$line";
+        }
+    }
+    print OUTPUT "\n";
+    close(INPUT);
+    close(OUTPUT);
+    return($outfile);
 }
 
 =head2 tab2fasta($tab_file)
 
 Convert a tabular sequences file to FASTA format
 
-	my $fasta_converted = $converter->tab2fasta($tab_file);
+    my $fasta_converted = $converter->tab2fasta($tab_file);
 
 =cut
 
 sub tab2fasta
 {
-	my ($self,$infile) = @_;
-	my @conts;
-	open(INPUT,$infile) or croak "\nThe file $infile does not exist!\n";
-	my ($base,$dir) = fileparse($infile,'\.[^.]*');
-	my $outfile = File::Spec->catfile($dir,$base.".fa");
-	open(OUTPUT,">$outfile");
-	while (my $line = <INPUT>)
-	{
-		$line =~ s/\r|\n$//g;
-		@conts = split(/\t/,$line);
-		print OUTPUT ">$conts[0]\n";
-		my $seq = $conts[1];
-		while ($seq)
-		{
-			my $olin = substr($seq,0,100,"");
-			print OUTPUT "$olin\n";
-		}
-	}
-	close(INPUT);
-	close(OUTPUT);
+    my ($self,$infile) = @_;
+    my @conts;
+    open(INPUT,$infile) or croak "\nThe file $infile does not exist!\n";
+    my ($base,$dir) = fileparse($infile,'\.[^.]*');
+    my $outfile = File::Spec->catfile($dir,$base.".fa");
+    open(OUTPUT,">$outfile");
+    while (my $line = <INPUT>)
+    {
+        $line =~ s/\r|\n$//g;
+        @conts = split(/\t/,$line);
+        print OUTPUT ">$conts[0]\n";
+        my $seq = $conts[1];
+        while ($seq)
+        {
+            my $olin = substr($seq,0,100,"");
+            print OUTPUT "$olin\n";
+        }
+    }
+    close(INPUT);
+    close(OUTPUT);
 }
 
 =head2 gff2bed6($tab_file)
 
 Convert a GFF file to BED6 (no groups) file format
 
-	my $gff2bed6 = $converter->gff2bed6($gff_file);
+    my $gff2bed6 = $converter->gff2bed6($gff_file);
 
 =cut
 
 sub gff2bed6
 {
-	my ($self,$infile) = @_;
-	my @conts;
-	open(INPUT,$infile) or croak "\nThe file $infile does not exist!\n";
-	my ($base,$dir) = fileparse($infile,'\.[^.]*');
-	my $outfile = File::Spec->catfile($dir,$base.".bed");
-	my $fetcount = 0;
-	open(OUTPUT,">$outfile");
-	while (my $line = <INPUT>)
-	{
-		$fetcount++;
-		$line =~ s/\r|\n$//g;
-		@conts = split(/\t/,$line);
-		print OUTPUT "$conts[0]\t$conts[4]\t$conts[4]\t$conts[3].$fetcount\t$conts[5]\t$conts[6]\n";
-	}
-	close(INPUT);
-	close(OUTPUT);
+    my ($self,$infile) = @_;
+    my @conts;
+    open(INPUT,$infile) or croak "\nThe file $infile does not exist!\n";
+    my ($base,$dir) = fileparse($infile,'\.[^.]*');
+    my $outfile = File::Spec->catfile($dir,$base.".bed");
+    my $fetcount = 0;
+    open(OUTPUT,">$outfile");
+    while (my $line = <INPUT>)
+    {
+        $fetcount++;
+        $line =~ s/\r|\n$//g;
+        @conts = split(/\t/,$line);
+        print OUTPUT "$conts[0]\t$conts[4]\t$conts[4]\t$conts[3].$fetcount\t$conts[5]\t$conts[6]\n";
+    }
+    close(INPUT);
+    close(OUTPUT);
 }
 
 =head2 gff2bed6($tab_file)
 
 Convert a GFF file to BED12 file format
 
-	my $gff2bed12 = $converter->gff2bed12($gff_file);
+    my $gff2bed12 = $converter->gff2bed12($gff_file);
 
 =cut
 
 sub gff2bed12
 {
-	my ($self,$infile) = @_;
-	my @conts;
-	open(INPUT,$infile) or croak "\nThe file $infile does not exist!\n";
-	my ($base,$dir) = fileparse($infile,'\.[^.]*');
-	my $outfile = File::Spec->catfile($dir,$base.".bed");
-	my $fetcount = 0;
-	open(OUTPUT,">$outfile");
-	while (my $line = <INPUT>)
-	{
-		$fetcount++;
-		$line =~ s/\r|\n$//g;
-		@conts = split(/\t/,$line);
-		# This remains to be filled...
-	}
-	close(INPUT);
-	close(OUTPUT);
+    my ($self,$infile) = @_;
+    my @conts;
+    open(INPUT,$infile) or croak "\nThe file $infile does not exist!\n";
+    my ($base,$dir) = fileparse($infile,'\.[^.]*');
+    my $outfile = File::Spec->catfile($dir,$base.".bed");
+    my $fetcount = 0;
+    open(OUTPUT,">$outfile");
+    while (my $line = <INPUT>)
+    {
+        $fetcount++;
+        $line =~ s/\r|\n$//g;
+        @conts = split(/\t/,$line);
+        # This remains to be filled...
+    }
+    close(INPUT);
+    close(OUTPUT);
+}
+
+=head2 get
+
+HTS::Tools::Convert object getter
+
+    my $param_value = $converter->get("param_name")
+=cut
+
+sub get
+{
+    my ($self,$name) = @_;
+    return($self->{$name});
+}
+
+=head2 set
+
+HTS::Tools::Convert object setter
+
+    $converter->set("param_name","param_value")
+    
+=cut
+
+sub set
+{
+    my ($self,$name,$value) = @_;
+    $self->{$name} = $value;
+    return($self);
 }
 
 =head1 AUTHOR
@@ -233,11 +262,11 @@ Panagiotis Moulos, C<< <moulos at fleming.gr> >>
 
 =head1 BUGS
 
-Please report any bugs or feature requests to C<bug-hts-tools at rt.cpan.org>, or through
-the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=HTS-Tools>.  I will be notified, and then you'll
-automatically be notified of progress on your bug as I make changes.
-
-
+Please report any bugs or feature requests to C<bug-hts-tools at rt.cpan.org>, 
+or through the web interface at 
+L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=HTS-Tools>.  I will be notified, 
+and then you'll automatically be notified of progress on your bug as I make 
+changes.
 
 
 =head1 SUPPORT

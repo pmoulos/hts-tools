@@ -15,10 +15,12 @@ Parameter checker and validator for HTS::Tools
     my $checker = HTS::Tools::Check->new($tool,\%params);
 
     # Correct
-    my $checker = HTS::Tools::Check->new("count",{"input" => "myfile.bed", "region" => "human-gene"});
+    my $checker = HTS::Tools::Check->new("count",{"input" => "myfile.bed", 
+        "region" => "human-gene"});
     $checker->validate;
     # Blows up
-    my $checker = HTS::Tools::Check->new("count",{"input" => "myfile.bed", "regions" => "human-gene"});
+    my $checker = HTS::Tools::Check->new("count",{"input" => "myfile.bed", 
+        "regions" => "human-gene"});
     $checker->validate;
 
 =head1 SUBROUTINES/METHODS
@@ -57,7 +59,8 @@ use constant MAXCORES => 12;
 
 =head2 new($tool,$args)
 
-The HTS::Tools::Paramcheck object constructor. See the SYNOPSIS for usage examples.
+The HTS::Tools::Paramcheck object constructor. See the SYNOPSIS for usage 
+examples.
 
 =cut
 
@@ -78,7 +81,8 @@ sub new
 
 =head2 init($params)
 
-HTS::Tools::Count initialization method. NEVER use this directly, use new instead.
+HTS::Tools::Count initialization method. NEVER use this directly, use new 
+instead.
 
 =cut
 
@@ -159,8 +163,8 @@ sub validate
 
 =head2 validate_assign
 
-The parameter validator function of the HTS::Assign module. Do not use this directly, use the validate
-function instead
+The parameter validator function of the HTS::Assign module. Do not use this 
+directly, use the validate function instead
 
 =cut
 
@@ -170,8 +174,8 @@ sub validate_assign
     my $modname = "HTS::Tools::Assign"; 
     my $status;
     
-    my @accept = ("input","region","background","span","idstrand","idmode","test","pvalue","outformat",
-        "source","splicing","expression","gversion","log","silent","tmpdir");
+    my @accept = ("input","region","background","span","where","idstrand","idmode","test","pvalue","redundancy",
+        "outformat","source","splicing","expression","gversion","log","silent","tmpdir");
     
     # Check fatal
     my $stop;
@@ -234,8 +238,40 @@ sub validate_assign
     # Check if span given
     if ((defined($self->{"params"}->{"span"}) && !@{$self->{"params"}->{"span"}}) || !defined($self->{"params"}->{"span"}))
     {
-        $helper->disp("Search range from region start points (e.g. TSS) not given! Using defaults (-10kbp,10kbp)");
+        $helper->disp("Search range from region start points (e.g. TSS) not given! Using defaults (-10kbp,10kbp or -10kb)");
         @{$self->{"params"}->{"span"}} = (-10000,10000);
+        if (defined($self->{"params"}->{"where"}) && $self->{"params"}->{"where"} eq "coding")
+        {
+            @{$self->{"params"}->{"span"}} = (-10000);
+        }
+    }
+    # Check if where given
+    if ((defined($self->{"params"}->{"where"}) && $self->{"params"}->{"where"} ne "promoter" && $self->{"params"}->{"where"} ne "coding") || !defined($self->{"params"}->{"where"}))
+    {
+        $helper->disp("The where parameter must be one of \"promoter\" or \"coding\"! Using default (promoter)...");
+        $self->{"params"}->{"where"} = "promoter";
+        if (defined($self->{"params"}->{"span"}) && @{$self->{"params"}->{"span"}})
+        {           
+            ${$self->{"params"}->{"span"}}[1] = 10000;
+        }
+    }
+    else
+    {
+        if ($self->{"params"}->{"where"} eq "promoter")
+        {
+            if (defined($self->{"params"}->{"span"}) && @{$self->{"params"}->{"span"}} && !${$self->{"params"}->{"span"}}[1])
+            {
+                $helper->disp("The where parameter is \"promoter\" but the second \"span\" argument is not given! Using default (10000)...");
+                @{$self->{"params"}->{"span"}} = (${$self->{"params"}->{"span"}}[0])
+            }
+        }
+        if ($self->{"params"}->{"where"} eq "coding")
+        {
+            if (defined($self->{"params"}->{"span"}) && @{$self->{"params"}->{"span"}})
+            {
+                @{$self->{"params"}->{"span"}} = (${$self->{"params"}->{"span"}}[0])
+            }
+        }
     }
     # Check if id and strand columns given for sig/back files
     if ((defined($self->{"params"}->{"idstrand"}) && !@{$self->{"params"}->{"idstrand"}}) || !defined($self->{"params"}->{"idstrand"}))
@@ -283,6 +319,23 @@ sub validate_assign
         {
              ${$self->{"params"}->{"expression"}}[$i]--;
         }
+    }
+    # Check redundancy
+    if (defined($self->{"params"}->{"redundancy"}) && $self->{"params"}->{"redundancy"})
+    {
+        if ($self->{"params"}->{"redundancy"} ne "all" && $self->{"params"}->{"redundancy"} ne "genecentric" 
+            && $self->{"params"}->{"redundancy"} ne "peakcentric")
+        {
+            my $msg = "WARNING! redundancy parameter should be one of \"all\", \"genecentric\" or \"peakcentric\"!...".
+            " Using default (all)...";
+            $helper->disp($msg);
+            $self->{"params"}->{"redundancy"} = "all";
+        }
+    }
+    else
+    {
+        $helper->disp("Redundancy preference not given! Using default (all)");
+        $self->{"params"}->{"redundancy"} = "all";
     }
     # Check proper output format
     if (@{$self->{"params"}->{"outformat"}})
@@ -943,9 +996,9 @@ sub validate_motifscan
         $helper->disp("The scanner should be one of \"pwmscan\" or \"MotifScanner\". Using default (pwmscan)...");
         $self->{"params"}->{"scanner"} = "pwmscan";
     }
-    else
+    elsif (!defined($self->{"params"}->{"scanner"}))
     {
-        $helper->disp("Motif canner not set! Using default (pwmscan)...");
+        $helper->disp("Motif scanner not set! Using default (pwmscan)...");
         $self->{"params"}->{"scanner"} = "pwmscan";
     }
     # Check range - increase per real number, very simple expression, use with caution
