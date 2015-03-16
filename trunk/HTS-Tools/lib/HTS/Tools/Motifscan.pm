@@ -1,6 +1,7 @@
 =head1 NAME
 
-HTS::Tools::Motifscan - A massive motif scanner (not finder!) for short genomic regions
+HTS::Tools::Motifscan - A massive motif scanner (not finder!) for short genomic 
+regions
 
 =head1 VERSION
 
@@ -8,21 +9,27 @@ Version 0.01
 
 =head1 SYNOPSIS
 
-This module is a wrapper and significance threshold optimizer for several sequence motif scanners. At the
-present point, the scanners supported are pwmscan from the GimmeMotifs suite (van Heeringen and Veenstra, 2010)
-and MotifScanner (Thijs et al., 2001). Thus, the installation of these 3rd party tools in the system that
-uses HTS::Tools::Motifscan is necessary (or at least of one of them). Then, the module runs a workflow which
-which massively scan the input fasta files (e.g. a set of sequences corresponding to ChIP-Seq peaks) for
-the motifs given in the motif file in the form of positional weight matrices (e.g. motifs that have been
-characterized as significant during a de novo motif search in the same set of peaks). This workflow determines
-an optimal significance threshold based on a set of random background sequences selected from the background
-fasta file provided and on the false postive rate (fpr) provided. The module provides three basic outputs:
-a simple file with the number of hits of each motif in each input file, gff files with the hits and bed
-files with the hits, including also a significance score of the scan hit in the 5th column of the bed file.
+This module is a wrapper and significance threshold optimizer for several 
+sequence motif scanners. At the present point, the scanners supported are 
+pwmscan from the GimmeMotifs suite (van Heeringen and Veenstra, 2010) and 
+MotifScanner (Thijs et al., 2001). Thus, the installation of these 3rd party 
+tools in the system that uses HTS::Tools::Motifscan is necessary (or at least of
+one of them). Then, the module runs a workflow which which massively scan the 
+input fasta files (e.g. a set of sequences corresponding to ChIP-Seq peaks) for
+the motifs given in the motif file in the form of positional weight matrices 
+(e.g. motifs that have been characterized as significant during a de novo motif 
+search in the same set of peaks). This workflow determines an optimal 
+significance threshold based on a set of random background sequences selected 
+from the background fasta file provided and on the false postive rate (fpr) 
+provided. The module provides three basic outputs: a simple file with the number 
+of hits of each motif in each input file, gff files with the hits and bed files 
+with the hits, including also a significance score of the scan hit in the 5th 
+column of the bed file.
 
     use HTS::Tools::Motifscan;
     my %params = (
-        'input' => ['normal_nfkb_peaks.fa','cancer_nfkb_peaks.fa','mock_peaks.fa']
+        'input' => ['normal_nfkb_peaks.fa','cancer_nfkb_peaks.fa',
+            'mock_peaks.fa']
         'motif' => 'my_motif_matrices.pwm',
         'scanner' => 'pwmscan',
         'background' => 'background_sequences.tab',
@@ -41,85 +48,99 @@ The acceptable parameters are as follows:
 
 =item I<input> B<(required)>
 
-A set of input FASTA file(s) that will be used for matching of the motifs contained in I<motif> file. Each 
-of these files will be scanned using the scanner defined by I<scanner> and the hits will be reported either
-as a simple tab-delimited stats file, a gff file, or a bed file under conditions (see below).
+A set of input FASTA file(s) that will be used for matching of the motifs 
+contained in I<motif> file. Each of these files will be scanned using the 
+scanner defined by I<scanner> and the hits will be reported either as a simple 
+tab-delimited stats file, a gff file, or a bed file under conditions (see below).
 
 =item I<motif> B<(required)>
 
-A file containing several motifs in the Position Weight Matrix (PWM) format. The file will be decomposed
-in several motifs and each motif will be matched against each input FASTA file.
+A file containing several motifs in the Position Weight Matrix (PWM) format. The
+file will be decomposed in several motifs and each motif will be matched against
+each input FASTA file.
 
 =item I<background> B<(optional)>
 
-A FASTA file containing background sequences (must be at least the same length as the input sequences)
-that will be used for random sampling to define a score cutoff for motif matching significance based on
-I<fpr>. It is required if the option I<justscan> is not activated.
+A FASTA file containing background sequences (must be at least the same length
+as the input sequences) that will be used for random sampling to define a score
+cutoff for motif matching significance based on I<fpr>. It is required if the 
+option I<justscan> is not activated.
 
 =item I<scanner> B<(optional)>
 
-A scanning algorithm to use. Currently, two algorithms are supported: the pwmscan algorithm (van Heeringen
-and Veenstra, 2010) and MotifScanner (Thijs et al., 2001).
+A scanning algorithm to use. Currently, two algorithms are supported: the 
+pwmscan algorithm (van Heeringen and Veenstra, 2010) and MotifScanner (Thijs et 
+al., 2001).
 
 =item I<range> B<(optional)>
 
-A range of cutoffs that will be used to determine the final matching score cutoff corresponding to I<fpr>.
-The range can be given in the form a:b or a:x:b where x is an increment step. If the format a:b is chosen,
-the default increment is 1. However, in the latest versions of pwmscan, the matching score is normalized
-to one, so this notation will be eventually deprecated.
+A range of cutoffs that will be used to determine the final matching score 
+cutoff corresponding to I<fpr>. The range can be given in the form a:b or a:x:b 
+where x is an increment step. If the format a:b is chosen, the default increment
+is 1. However, in the latest versions of pwmscan, the matching score is 
+normalized to one, so this notation will be eventually deprecated.
 
 =item I<fpr> B<(optional)>
 
-The desired False Positive Rate (FPR), that is the percentage of motif matches found in the background
-sequences. Defaults to 0.05.
+The desired False Positive Rate (FPR), that is the percentage of motif matches 
+found in the background sequences. Defaults to 0.05.
 
 =item  I<times> B<(optional)>
 
-How many times should the background set of sequences that will be used for the determination of the cutoff
-score from I<range>, be larger than the input set? It default to 10, which means that if an input FASTA file
-contains 100 sequences, the background will contain 1000 random sequences.
+How many times should the background set of sequences that will be used for the 
+determination of the cutoff score from I<range>, be larger than the input set? 
+It defaulta to 10, which means that if an input FASTA file contains 100 sequences, 
+the background will contain 1000 random sequences.
 
 =item I<length> B<(optional)>
 
-The length of the background sequences. Generally, it should be larger than the length of input sequences.
-It defaults to 400.
+The length of the background sequences. Generally, it should be larger than the 
+length of input sequences. It defaults to 400.
 
 =item I<output> B<(optional)>
 
-The output types that the user wished to get. It can be one or more of "stats" for a simple delimited
-file containing the hits for each motif and input file, "gff" for the gff output of pwmscan or a related
-file from MotifScanner, containing the actual hits and positions in the input sequences, or "bed" for an
-output BED file containing the motif matches locations and a score to be used for coloring. The "bed"
-output is available only if a set of peak files is given so as to determine the relative location of the
-match inside the peak and construct proper bed lines.
+The output types that the user wished to get. It can be one or more of "stats" 
+for a simple delimited file containing the hits for each motif and input file, 
+"gff" for the gff output of pwmscan or a related file from MotifScanner, 
+containing the actual hits and positions in the input sequences, or "bed" for an
+output BED file containing the motif matches locations and a score to be used 
+for coloring. The "bed" output is available only if a set of peak files is given
+so as to determine the relative location of the match inside the peak and 
+construct proper bed lines.
 
 =item  I<besthit> B<(optional)>
 
-The number of best hits to be retrieved when I<scanner> is "pwmscan". Defaults to 1.
+The number of best hits to be retrieved when I<scanner> is "pwmscan". Defaults 
+to 1.
 
 =item I<uniquestats> B<(optional)>
 
-If the number of besthits is greater than 1, the specifying I<uniquestats> to 1 will cause the output
-"stats" file to contain unique hits. Like this you can avoid paradoxes like having more hits than input
-FASTA sequences. However, in some situations you might actually want to retrieve multiple hits.
+If the number of besthits is greater than 1, the specifying I<uniquestats> to 1 
+will cause the output "stats" file to contain unique hits. Like this you can 
+avoid paradoxes like having more hits than input FASTA sequences. However, in 
+some situations you might actually want to retrieve multiple hits.
 
 =item I<justscan> B<(optional)>
 
-Set this to 1, to just scan the input sequences for the motifs without defining an FPR. Useful if you
-have a very limited number of input sequences (e.g. just one).
+Set this to a real number between 0 and 1 (preferably close to 0.9), to just 
+scan the input sequences using this score cutoff for the motifs without defining 
+an FPR. Useful if you have a very limited number of input sequences (e.g. just 
+one).
 
 =item I<center> B<(optional)>
 
-A set of genomic regions (e.g. peaks) with the SAME IDs as the input FASTA sequences (or a superset of
-these) which will be used to assign peak regions to FASTA files in order to determine the proper coordinates 
-for the generation of BED output. It is optional, however, if BED output is requested, these files are 
-not given, and the FASTA sequence length does not correspond to the length that can be extracted by the 
-FASTA ID, the coordinates will be inaccurate.
+A set of genomic regions (e.g. peaks) with the SAME IDs as the input FASTA 
+sequences (or a superset of these) which will be used to assign peak regions to 
+FASTA files in order to determine the proper coordinates for the generation of 
+BED output. It is optional, however, if BED output is requested, these files are 
+not given, and the FASTA sequence length does not correspond to the length that 
+can be extracted by the FASTA ID, the coordinates will be inaccurate.
 
 =item I<colext> B<(optional)>
 
-A vector of length 3, containing the column numbers of peak ID and peak summit, and the length of the 
-(possible) extension upstream and downstream of the peak summit. For example I<colext> 4 5 75.
+A vector of length 3, containing the column numbers of peak ID and peak summit,
+and the length of the (possible) extension upstream and downstream of the peak 
+summit. For example I<colext> 4 5 75.
 
 =item I<silent> B<(optional)>
 
@@ -127,9 +148,10 @@ Use this parameter if you want to turn informative messages off.
 
 =head1 OUTPUT
 
-The output of the module is a set of GFF files containing the hits for each motif and each input set of
-sequences, a statistics file with the number of hits for each motif and input set of sequences and a set
-of BED files with the motif matches that can be used for display in a genome browser.
+The output of the module is a set of GFF files containing the hits for each 
+motif and each input set of sequences, a statistics file with the number of hits
+for each motif and input set of sequences and a set of BED files with the motif 
+matches that can be used for display in a genome browser.
 
 =head1 SUBROUTINES/METHODS
 
@@ -170,11 +192,12 @@ BEGIN {
 
 =head2 new
 
-The HTS::Tools::Motifscan object constructor. It accepts a set of parameters that are required to run the
-motifscanner and get the output.
+The HTS::Tools::Motifscan object constructor. It accepts a set of parameters 
+that are required to run the motifscanner and get the output.
 
-    my $motifscanner = HTS::Tools::Motifscan->new({'input' => ['peaks_1.fa','peaks_2.fa'],'motif' => 'my_motifs.pwm',
-        'scanner' => 'pwmscan','justscan' => 1});
+    my $motifscanner = HTS::Tools::Motifscan->new({'input' => ['peaks_1.fa',
+        'peaks_2.fa'],'motif' => 'my_motifs.pwm','scanner' => 'pwmscan',
+        'justscan' => 1});
 
 =cut
 
@@ -205,7 +228,8 @@ sub new
 
 =head2 init
 
-HTS::Tools::Motifscan object initialization method. NEVER use this directly, use new instead.
+HTS::Tools::Motifscan object initialization method. NEVER use this directly, use 
+new instead.
 
 =cut
 
@@ -225,8 +249,8 @@ sub init
 
 =head2 run
 
-The HTS::Tools::Motifscan run subroutine. It runs the motifscanner with the given parameters in the 
-constructor.
+The HTS::Tools::Motifscan run subroutine. It runs the motifscanner with the 
+given parameters in the constructor.
 
     $motifscanner->run;
     
@@ -394,7 +418,7 @@ sub run
                     for  ($k=0; $k<@range; $k++)
                     {
                         $helper->disp("Now testing threshold $range[$k]...\n");
-                        `pwmscan.py -i $bfile -c $range[$k] -p $mfiles[$j] -n $besthit > bgcut.gff `;
+                        `gimme scan $bfile $mfiles[$j] -c $range[$k] -n $besthit > bgcut.gff `;
                         if ($besthit > 1) 
                         {
                             ($unistats) ? ($sl = $helper->count_unique_lines("bgcut.gff")) : ($sl = &countLines("bgcut.gff"));
@@ -423,9 +447,9 @@ sub run
                     $helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j] using pwmscan... Cutoff: $cutoff.\n");
                     my $mbase = fileparse($mfiles[$j],'\.[^.]*');
                     my $currout = $self->create_output_file($seqfile[$i],"output",$mbase);
-                    #`python pwmscan.py -i $seqfile[$i] -c $cutoff -s $spacer[$j] -p $mfiles[$j] -n $besthit > $currout `;
-                    `pwmscan.py -i $seqfile[$i] -c $cutoff -p $mfiles[$j] -n $besthit > $currout `;
-                    $self->convert2bed($currout,%cnthash) if ($obed);
+                    #`python gimme scan -i $seqfile[$i] -c $cutoff -s $spacer[$j] -p $mfiles[$j] -n $besthit > $currout `;
+                    `gimme scan $seqfile[$i] $mfiles[$j] -c $cutoff -n $besthit > $currout `;
+                    $self->convert2bed($currout,$cntcol[2],%cnthash) if ($obed);
                     my $nmatch;
                     if ($besthit > 1) 
                     {
@@ -477,7 +501,7 @@ sub run
                     my $currout = $self->create_output_file($seqfile[$i],"output",$mbase);
                     ($^O !~ /MSWin/) ? (`./MotifScanner -f $seqfile[$i] -b MSmodel.bkg -m $mfiles[$j] -p $cutoff -s 0 -o $currout `) :
                     (`MotifScanner -f $seqfile[$i] -b MSmodel.bkg -m $mfiles[$j] -p $cutoff -s 0 -o $currout `);
-                    $self->convert2bed($currout,%cnthash) if ($obed);
+                    $self->convert2bed($currout,$cntcol[2],%cnthash) if ($obed);
                     my $nmatch;
                     ($unistats) ? ($nmatch = $helper->count_unique_lines($currout)) : ($nmatch = $helper->count_lines($currout));
                     $nmatch--; # One line header of MotifScanner output
@@ -512,9 +536,9 @@ sub run
                     $helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j] using pwmscan... Cutoff: $justscan.\n");
                     my $mbase = fileparse($mfiles[$j],'\.[^.]*');
                     my $currout = $self->create_output_file($seqfile[$i],"output",$mbase);
-                    #`python pwmscan.py -i $seqfile[$i] -c $justscan -s $spacer[$j] -p $mfiles[$j] -n $besthit > $currout `;
-                    `pwmscan.py -i $seqfile[$i] -c $justscan -p $mfiles[$j] -n $besthit > $currout `;
-                    $self->convert2bed($currout,%cnthash) if ($obed);
+                    #`python gimme scan -i $seqfile[$i] -c $justscan -s $spacer[$j] -p $mfiles[$j] -n $besthit > $currout `;
+                    `gimme scan $seqfile[$i] $mfiles[$j] -c $justscan -n $besthit > $currout `;
+                    $self->convert2bed($currout,$cntcol[2],%cnthash) if ($obed);
                     my $nmatch;
                     if ($besthit > 1) 
                     {
@@ -536,7 +560,7 @@ sub run
                     my $currout = $self->create_output_file($seqfile[$i],"output",$mbase);
                     ($^O !~ /MSWin/) ? (`./MotifScanner -f $seqfile[$i] -b MSmodel.bkg -m $mfiles[$j] -p $justscan -s 0 -o $currout `) :
                     (`MotifScanner -f $seqfile[$i] -b MSmodel.bkg -m $mfiles[$j] -p $justscan -s 0 -o $currout `);
-                    $self->convert2bed($currout,%cnthash) if ($obed);
+                    $self->convert2bed($currout,$cntcol[2],%cnthash) if ($obed);
                     my $nmatch;
                     ($unistats) ? ($nmatch = $helper->count_unique_lines($currout)) : ($nmatch = $helper->count_lines($currout));
                     $nmatch--; # One line header of MotifScanner output
@@ -581,7 +605,8 @@ sub run
 
 =head2 parse_motifs
 
-Parse a file of PWMs and construct different files, specific for the scanner in use. Internal use.
+Parse a file of PWMs and construct different files, specific for the scanner in 
+use. Internal use.
 
     $motifscanner->parse_motifs($motifsfile,$scanner);
 
@@ -589,9 +614,10 @@ Parse a file of PWMs and construct different files, specific for the scanner in 
 
 sub parse_motifs
 {
-    my ($self,$infile,$scn) = shift @_;
+    my ($self,$infile,$scn) = @_;
     my ($base,$dir) = fileparse($infile,'\.[^.]*');
-    my ($c,$line,$om,$f,@fhs,@outnames);
+    my ($line,$om,$f,@fhs,@outnames);
+    my $c = 0;
     open(MOTIF,"$infile");
     
     if ($scn =~ m/pwmscan/i)
@@ -667,7 +693,8 @@ sub parse_motifs
 
 =head2 construct_MS_background
 
-Construct a set of background sequences, suitable to use with MotifSampler. Internal use.
+Construct a set of background sequences, suitable to use with MotifSampler. 
+Internal use.
 
     $motifscanner->construct_MS_background($backgroundfile);
 
@@ -729,7 +756,7 @@ sub get_random_seq
         # Safeswitch in case too many sequences have small lengths, process shouldn't
         # take forever to complete...
         $safeswitch++;
-        $line = $self->get_indexed_line(*FASTA,*INDEX,int(rand($itslen)));
+        $line = $self->get_indexed_line(*FASTA,*INDEX,int(rand($itslen))+1);
         ($id,$seq) = split(/\t/,$line);
         $currlen = length($seq);
         next if ($currlen < $length);
@@ -764,7 +791,8 @@ sub get_random_seq
 
 =head2 write_seq
 
-Write a random sequence, randomly from a set of background sequences. Internal use.
+Write a random sequence, randomly from a set of background sequences. Internal 
+use.
 
     $motifscanner->write_seq($thefile,$theseqid,$theseq);
 
@@ -784,17 +812,19 @@ sub write_seq
 
 =head2 convert2bed
 
-Converts the gff output from pwmscan to bed format. The first column of the gff (that is the peak/region ID) 
-MUST contain coordinates information in the form chr:start-end (track2fasta) or chr:start:end.
-WARNING! If the fasta files used for scanning have been generated with a program like track2fasta from
-the GimmeMotifs suite, then the bed co-ordinates for each occurence can be correctly generated. If the 
-sequence ids in the fasta files correspond to peak ids rather than exact sequence locations, another file 
-with peak ids and peak centers must be provided. The function converts to 6 column bed files. It also
-converts the motif score in gff file to the 0-1000 scale of UCSC genome browser so that motif strength can 
-be visualized by color. This is done by linear conversion of the form new_value = a*old_value + b and 
-by solving the special case of a 2x2 linear system (since we know several of the values):
-min(score)*a + b = 0
-max(score)*a + b = 1000
+Converts the gff output from pwmscan to bed format. The first column of the gff 
+(that is the peak/region ID) MUST contain coordinates information in the form 
+chr:start-end (track2fasta) or chr:start:end. WARNING! If the fasta files used 
+for scanning have been generated with a program like track2fasta from the 
+GimmeMotifs suite, then the bed co-ordinates for each occurence can be correctly 
+generated. If the sequence ids in the fasta files correspond to peak ids rather 
+than exact sequence locations, another file with peak ids and peak centers must 
+be provided. The function converts to 6 column bed files. It also converts the 
+motif score in gff file to the 0-1000 scale of UCSC genome browser so that motif 
+strength can be visualized by color. This is done by linear conversion of the 
+form new_value = a*old_value + b and by solving the special case of a 2x2 linear
+system (since we know several of the values): 
+min(score)*a + b = 0 max(score)*a + b = 1000
 
     $motifscanner->convert2bed($file_to_convert);
 
@@ -802,13 +832,12 @@ max(score)*a + b = 1000
 
 sub convert2bed
 {
-    my ($self,$f2c,@cntcol) = @_;
-    my %ch = @_;
+    my ($self,$f2c,$cntcol,%ch) = @_;
     my ($base,$dir) = fileparse($f2c,'\.[^.]*');
-    my ($line,@lines,@scores,@content,@locs,@newcoord);
+    my ($line,@lines,@scores,@content,@prelocs,@locs,@newcoord);
     my $bedout = $dir.$base.".bed";
-    # In order to determine the coefficients of linear conversion we have to suck in all
-    # gff file, the hard way...
+    # In order to determine the coefficients of linear conversion we have to 
+    # suck in all gff file, the hard way...
     open(F2C,$f2c);
     while ($line = <F2C>)
     {
@@ -830,7 +859,8 @@ sub convert2bed
         foreach $line (@lines)
         {
             @content = split(/\t/,$line);
-            @locs = split(":",$content[0]);
+            @prelocs = split(/\s/,$content[0]);
+            @locs = split(":",$prelocs[0]);
             if ($#locs == 1) # track2fasta format
             {
                 my $joined = pop(@locs);
@@ -839,11 +869,11 @@ sub convert2bed
             }
             # Shift coordinates to motif occurence
             my $strand = "+";
-            $strand = "-" if ($content[6] == -1 || $content[6] eq "R");
+            $strand = "-" if ($content[6] eq "-1" || $content[6] eq "R" || $content[6] eq "-");
             @newcoord = ($locs[0],
-                         $ch{$content[0]} - $cntcol[2] + $content[3],
-                         $ch{$content[0]} - $cntcol[2] + $content[4],
-                         $content[0],$a*$content[5] + $b,$strand);
+                        $ch{$prelocs[1]} - $cntcol + $content[3],
+                        $ch{$prelocs[1]} - $cntcol + $content[4],
+                        $prelocs[1],$a*$content[5] + $b,$strand);
             print BED join("\t",@newcoord),"\n";
         }
     }
@@ -852,7 +882,8 @@ sub convert2bed
         foreach $line (@lines)
         {
             @content = split(/\t/,$line);
-            @locs = split(":",$content[0]);
+            @prelocs = split(/\s/,$content[0]);
+            @locs = split(":",$prelocs[0]);
             if ($#locs == 1) # track2fasta format
             {
                 my $joined = pop(@locs);
@@ -861,7 +892,7 @@ sub convert2bed
             }
             # Shift coordinates to motif occurence
             my $strand = "+";
-            $strand = "-" if ($content[6] == -1 || $content[6] eq "R");
+            $strand = "-" if ($content[6] eq "-1" || $content[6] eq "R" || $content[6] eq "-");
             @newcoord = ($locs[0],$locs[1] + $content[3],$locs[1] + $content[4],
                          $content[0],$a*$content[5] + $b,$strand);
             print BED join("\t",@newcoord),"\n";
@@ -872,7 +903,8 @@ sub convert2bed
 
 =head2 naive_solve_two
 
-Naive solution of a 2x2 system for proportionally scaling motif scores to BED scores. Internal use.
+Naive solution of a 2x2 system for proportionally scaling motif scores to BED 
+scores. Internal use.
 
     my ($x,$y) = $motifscanner->naive_solve_two($minscore,$maxscore);
 
@@ -892,7 +924,8 @@ sub naive_solve_two
 
 =head2 build_index
 
-Index a text file for quick access. Used internally to index the file of background sequences.
+Index a text file for quick access. Used internally to index the file of 
+background sequences.
 
     my $index = $motifscanner->build_index(*DATAHANDLE,*INDEXHANDLE);
 
@@ -911,10 +944,11 @@ sub build_index
 
 =head2 get_indexed_line
 
-Get the line of an indexed file. Returns line or undef if the requested line is out of range. Internal
-use.
+Get the line of an indexed file. Returns line or undef if the requested line is 
+out of range. Internal use.
 
-    my $iline = $motifscanner->get_indexed_line(*DATAHANDLE,*INDEXHANDLE,$theline);
+    my $iline = $motifscanner->get_indexed_line(*DATAHANDLE,*INDEXHANDLE,
+        $theline);
 
 =cut
 
@@ -937,7 +971,8 @@ sub get_indexed_line
 
 =head2 create_output_file
 
-Automatic creation of the output file name depending on the output type. Internal use.
+Automatic creation of the output file name depending on the output type. 
+Internal use.
 
     my $name = $motifscanner->create_output_file($thefile,$itstype,$itssubtype);
 
@@ -969,7 +1004,7 @@ sub create_output_file
     else # Motif file
     {
         my ($base,$dir) = fileparse($in,'\.[^.]*');
-        return(File::Spec->catfile($dir,$type."motif.pwm"));
+        return(File::Spec->catfile($dir,$type."_motif.pwm"));
     }
 }
 
@@ -1008,9 +1043,11 @@ Panagiotis Moulos, C<< <moulos at fleming.gr> >>
 
 =head1 BUGS
 
-Please report any bugs or feature requests to C<bug-hts-tools at rt.cpan.org>, or through
-the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=HTS-Tools>.  I will be notified, and then you'll
-automatically be notified of progress on your bug as I make changes.
+Please report any bugs or feature requests to C<bug-hts-tools at rt.cpan.org>, 
+or through the web interface at 
+L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=HTS-Tools>.  I will be notified, 
+and then you'll automatically be notified of progress on your bug as I make 
+changes.
 
 =head1 SUPPORT
 

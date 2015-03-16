@@ -20,6 +20,7 @@ our @peakfile; # The peak file(s) (BED format)
 our $sigfile; # Significant regions to be assigned to peaks (BED format)
 our $backfile; # Background regions to be assigned to peaks (BED format)
 our @span; # Upstream and downstream  (default +/-100k from TSS)
+our $where; # Promoter or coding?
 our @sbcols; # Columns containing unique sig/back region ID and strand (default (4,5))
 our @pcols; # Columns containing unique peak region ID and mode (default (4,5))
 our @expcols; # Columns containing gene expression
@@ -29,6 +30,7 @@ our $gversion; # Genome version
 our $splicing; # Splicing for automatic templates
 our $test; # Default hypergeometric test
 our $pval; # Hypergeometric p-value cutoff (default 0.05)
+our $redun; # Redundancy level of assignment
 our $log; # Keep log?
 our $silent; # Display verbose messages
 our $help; # Help?
@@ -45,12 +47,14 @@ my $tool = HTS::Tools->new({
             "region" => $sigfile,
             "background" => $backfile,
             "span" => \@span,
+            "where" => $where,
             "idstrand" => \@sbcols,
             "idmode" => \@pcols,
             "expression" => \@expcols,
             "outformat" => \@out,
             "test" => $test,
             "pvalue" => $pval,
+            "redundancy" => $redun,
             "source" => $source,
             "gversion" => $gversion,
             "splicing" => $splicing
@@ -65,11 +69,13 @@ sub check_inputs
                "region|r=s" => \$sigfile,
                "background|b=s" => \$backfile,
                "span|n=i{,}" => \@span,
+               "where|w=s" => \$where,
                "idstrand|c=i{,}" => \@sbcols,
                "idmode|m=i{,}" => \@pcols,
                "expression|e=i{,}" => \@expcols,
                "test|t=s" => \$test,
                "pvalue|p=f" => \$pval,
+               "redundancy|d=s" => \$redun,
                "outformat|o=s{,}" => \@out,
                "source|u=s" => \$source,
                "gversion|g=s" => \$gversion,
@@ -152,6 +158,15 @@ $scriptname --input peakfile(s) --region regfile --background backfile [OPTIONS]
             upstream and downstream from TSS) into which the program
             will look for any peaks. It should be two values (e.g.
             --span -50000 50000) and defaults to (-100000,100000).
+  --where|w         Use this parameter to tell Assign.pm whether to 
+            check for query regions. When  "promoter", it will check 
+            for queries upstream and downstream of subjects according 
+            to --span. If "coding", the second --span argument is 
+            ignored and it automatically becomes 
+            subject_end - subject_start + span_1 to check for
+            queries inside the subject regions. "promoter" and "coding" 
+            are indicative. Queries and subjects can be any genomic 
+            regions of interest.
   --idstrand|t      The columns in BOTH the gene files where their
             unique IDs and strands are. You should provide two values
             (e.g. --idstrand 4 5) where the first denotes the unique
@@ -172,6 +187,11 @@ $scriptname --input peakfile(s) --region regfile --background backfile [OPTIONS]
             no testing. Defaults to hypgeom.
   --pvalue|p        The hypergeometric test p-value threshold. It
             defaults to 0.05.
+  --redundancy|d        The reundancy level when assigning peaks to genes.
+            It can be "genecentric" for assigning multiple peaks to one
+            gene, "peakcentric" to allow one peak to many genes or "all"
+            to allow a multi-to-multi assignment (default). The option
+            "peakcentric" is not yet implemented.
   --outformat|o     Use this option to determine which output format
             filetype(s) you wish to retrieve.   Possible choices are:
                 "stats" for retrieving the significantly associated 

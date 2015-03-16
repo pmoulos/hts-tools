@@ -1,6 +1,7 @@
 =head1 NAME
 
-HTS::Tools::Assign - Genomic region distance-based assignment, with optional statistical significance.
+HTS::Tools::Assign - Genomic region distance-based assignment, with optional 
+statistical significance.
 
 =head1 VERSION
 
@@ -8,24 +9,30 @@ Version 0.01
 
 =head1 SYNOPSIS
 
-This module assigns one or more sets of genomic regions (queries) to another set of genomic regions (subject) 
-using the distance from a fixed point in the queries to another fixed point in the subject regions. One example
-of the above is the assignment of a set of ChIP-Seq peaks to a set of regulated genes based on the gene-peak 
-distances between the genes of the regulated set. The peak mode (or summit) can be used as the queries fixed
-point, while the gene TSS can be used as the fixed point of the subject geneomic regions. The module may
-optionally assign a p-value to each query, using a total genomic background subject (e.g. the whole genome
-annotation instead of a set of differentially expressed genes) based on an experimental procedure described
-below. This procedure has been used in Rao et al., 2011 (http://www.ncbi.nlm.nih.gov/pubmed/18981474) and is
-highly experimental. It is optional and you may use it at own risk.
-In order to find peaks associatevely enriched in a set of the regulated genes as compared to a background set, 
-the module uses the hypergeometric test on the population of peaks at a p-value threshold. This p-value expresses
-the probability of a peak being significantly assigned to a set of close regulated genes as compared to the 
-total number of genes present in the area specified by the span parameter. Please see the article above for
-further details.
-There can be multiple outputs, all of them containing the gene-peak associations in different formats which
-are described in the parameters below. The hypergeometric method is NOT verified and there are other methods
-out there that may perform better. Again, use at your own risk. The tools works very nicely to calculate 
-peak-gene distances with a set of very nice and informative outputs.
+This module assigns one or more sets of genomic regions (queries) to another set
+of genomic regions (subject) using the distance from a fixed point in the 
+queries to another fixed point in the subject regions. One example of the above 
+is the assignment of a set of ChIP-Seq peaks to a set of regulated genes based 
+on the gene-peak distances between the genes of the regulated set. The peak mode
+(or summit) can be used as the queries fixed point, while the gene TSS can be 
+used as the fixed point of the subject geneomic regions. The module may 
+optionally assign a p-value to each query, using a total genomic background 
+subject (e.g. the whole genome annotation instead of a set of differentially 
+expressed genes) based on an experimental procedure described below. This 
+procedure has been used in Rao et al., 2011 
+(http://www.ncbi.nlm.nih.gov/pubmed/18981474) and is highly experimental. It is 
+optional and you may use it at own risk. In order to find peaks associatevely 
+enriched in a set of the regulated genes as compared to a background set, the 
+module uses the hypergeometric test on the population of peaks at a p-value 
+threshold. This p-value expresses the probability of a peak being significantly 
+assigned to a set of close regulated genes as compared to the total number of 
+genes present in the area specified by the span parameter. Please see the 
+article above for further details. There can be multiple outputs, all of them 
+containing the gene-peak associations in different formats which are described 
+in the parameters below. The hypergeometric method is NOT verified and there are
+other methods out there that may perform better. Again, use at your own risk. 
+The tools works very nicely to calculate peak-gene distances with a set of very 
+nice and informative outputs.
 
     use HTS::Tools::Assign;
     my %params = (
@@ -34,7 +41,8 @@ peak-gene distances with a set of very nice and informative outputs.
         'span' => [-10000,1000],
         'idstrand' => [4 6],
         'idmode' => [4 5],
-        'outformat' => ['pretty-peak','gff-gene','gene-peak-presence','gene-peak-number']
+        'outformat' => ['pretty-peak','gff-gene','gene-peak-presence',
+            'gene-peak-number']
     )
     my $assigner = HTS::Tools::Assign->new(\%params);
     $assigner->run;
@@ -45,17 +53,20 @@ The acceptable parameters are as follows:
 
 =item I<input> B<(required)>
 
-A set of input BED-like file(s) to be used as query regions. Each should containing a column with a UNIQUE 
-region ID and a column with the region mode (e.g. peak summit, the point with the highest tag pile-up) or 
-a location that the user thinks as the point of the region from which the distance to the genes will be 
-calculated. If there is no such point, the center of the region may be used (see I<idmode>) parameter below
+A set of input BED-like file(s) to be used as query regions. Each should 
+containing a column with a UNIQUE region ID and a column with the region mode 
+(e.g. peak summit, the point with the highest tag pile-up) or a location that 
+the user thinks as the point of the region from which the distance to the genes 
+will be calculated. If there is no such point, the center of the region may be 
+used (see I<idmode>) parameter below
 
 =item I<region> B<(required)>
 
-A BED-like file with the set of subject regions (e.g. a set of regulated genes), containing a column with a 
-UNIQUE gene (or whatever region) ID and a column with the gene strand. Alternatively, the I<region> parameter
-can be one of the following keywords for a set of predefined region templates, which will be automatically 
-downloaded from the source defined by the I<source> parameter:
+A BED-like file with the set of subject regions (e.g. a set of regulated genes),
+containing a column with a  UNIQUE gene (or whatever region) ID and a column 
+with the gene strand. Alternatively, the I<region> parameter can be one of the 
+following keywords for a set of predefined region templates, which will be 
+automatically downloaded from the source defined by the I<source> parameter:
 
 "human-gene" for homo sapiens gene co-ordinates
 "human-exon" for homo sapiens exon co-ordinates
@@ -85,86 +96,120 @@ downloaded from the source defined by the I<source> parameter:
 
 =item I<background> B<(optional)>
 
-A BED file with the set of background regions (e.g. a set of regulated genes), containing a column with a 
-UNIQUE gene (or whatever region) ID and a column with the gene strand. Alternatively, the I<region> parameter
-can be one of the following keywords for a set of predefined region templates (this file is used only for
-the statistical test described above). For these templates, see the I<region> parameter above.
+A BED file with the set of background regions (e.g. a set of regulated genes), 
+containing a column with a UNIQUE gene (or whatever region) ID and a column with
+the gene strand. Alternatively, the I<region> parameter can be one of the 
+following keywords for a set of predefined region templates (this file is used 
+only for the statistical test described above). For these templates, see the 
+I<region> parameter above.
 
 =item I<source> B<(optional)>
 
-Use this option to set the online data source in the case of selecting one of the predefined region 
-templates with I<region>. It can be one of "ucsc", "refseq" or "ensembl" and Default to "ensembl".
+Use this option to set the online data source in the case of selecting one of 
+the predefined region templates with I<region>. It can be one of "ucsc", 
+"refseq" or "ensembl" and Default to "ensembl".
 
 =item I<splicing> B<(optional)>
 
-Use this option with I<source> to determine whether the canonical or alternatively spliced transcripts will
-be used for counting. It can be "canonical" or "alternative" and defaults to "canonical"
+Use this option with I<source> to determine whether the canonical or 
+alternatively spliced transcripts will be used for counting. It can be 
+"canonical" or "alternative" and defaults to "canonical"
 
 =item  I<span> B<(optional)>
 
-Use this parameter to set the genomic span (distance upstream and downstream from the fixed point of the subject
-regions) into which the module will look for any queries. It should consist of an array of two values (e.g. 
-[-10000,1000]) and defaults to [-10000,10000].
+Use this parameter to set the genomic span (distance upstream and downstream 
+from the fixed point of the subject regions) into which the module will look for
+any queries. It should consist of an array of two values (e.g. [-10000,1000]) 
+and defaults to [-10000,10000].
+
+=item  I<where> B<(optional)>
+
+Use this parameter to tell Assign.pm whether to check for query regions. When 
+"promoter", it will check for queries upstream and downstream of subjects
+according to I<span>. If "coding", the second I<span> argument is ignored and
+it automatically becomes subject_end - subject_start + span_1 to check for
+queries inside the subject regions. "promoter" and "coding" are indicative.
+Queries and subjects can be any genomic regions of interest.
 
 =item I<idstrand> B<(optional)>
 
-The columns in both the subject and the background (if used) file(s) where their unique IDs and strands are. 
-You should provide an array of two values (e.g. [4,5]) where the first denotes the unique ID column and the 
-second the strand column. It defaults to [4,5].
+The columns in both the subject and the background (if used) file(s) where their
+unique IDs and strands are. You should provide an array of two values 
+(e.g. [4,5]) where the first denotes the unique ID column and the second the 
+strand column. It defaults to [4,5].
 
 =item I<expression> B<(optional)>
 
-The columns in the subject file where there are optional expression values, for example if the subject file is
-a set of expressed genes. You should provide an array of values (e.g. [7,8,9]) that denote the column number where
-the expression values are stored.
+The columns in the subject file where there are optional expression values,
+for example if the subject file is a set of expressed genes. You should provide 
+an array of values (e.g. [7,8,9]) that denote the column number where the 
+expression values are stored.
 
 =item I<idmode> B<(optional)>
 
-The columns in the query files where their unique IDs and possibly modes are. You should provide at least two values 
-(e.g I<idmode> [4,5]) where the first denotes the unique ID column and the second the mode column. If the second
-value is not provided, the module assumes that the center of each query region is its mode. It defaults to [4].
-Optionally, you can provide three values, where the 3rd represents a peak score if available. This will be reported
-when using the "matrix-peak" output. The values must be provided strictly with the following order: id column, mode
-column, score column.
+The columns in the query files where their unique IDs and possibly modes are. 
+You should provide at least two values (e.g I<idmode> [4,5]) where the first 
+denotes the unique ID column and the second the mode column. If the second value
+is not provided, the module assumes that the center of each query region is its 
+mode. It defaults to [4]. Optionally, you can provide three values, where the 
+3rd represents a peak score if available. This will be reported when using the 
+"matrix-peak" output. The values must be provided strictly with the following 
+order: id column, mode column, score column.
 
 =item I<test> B<(optional)>
 
-What over-representation statistical test to perform. Can be one of hypgeom for hypergeometric test, chi2 for
-chi-square test, auto for automatic selection and none for no testing. Defaults to none.
+What over-representation statistical test to perform. Can be one of hypgeom for 
+hypergeometric test, chi2 for chi-square test, auto for automatic selection and 
+none for no testing. Defaults to none.
 
 =item I<pvalue> B<(optional)>
 
 The statistical test p-value threshold. It defaults to 0.05.
 
+=item I<redundancy> B<(optional)>
+
+The reundancy level when assigning peaks (queries) to genes (subjects). It can 
+be "genecentric" for assigning multiple peaks to one gene, "peakcentric" to 
+allow one peak to many genes or "all" to allow a multi-to-multi assignment 
+(default). The option "peakcentric" is not yet implemented.
+
 =item I<outformat>  B<(optional)>
 
-Use this parameter to determine which output format filetype(s) you wish to retrieve. Possible choices are:
-"stats" for retrieving the significantly associated peaks with their p-values, Bonferroni corrected p-values
-and enrichment ratios.
-"gff-peak" for retrieving a peak-based gff file which contains additional columns with peak ids, distances
-and enrichment ratios. The score column is the p-value.
+Use this parameter to determine which output format filetype(s) you wish to 
+retrieve. Possible choices are:
+"stats" for retrieving the significantly associated peaks with their p-values, 
+Bonferroni corrected p-values and enrichment ratios.
+"gff-peak" for retrieving a peak-based gff file which contains additional 
+columns with peak ids, distances and enrichment ratios. The score column is the 
+p-value.
 "gff-gene" for similar to "gff-peak" but gene-based.
-"gff-peak-db" for same as "gff-peak" but with a header, suitable for incorporating to a database.
-"gff-gene-db" for same as "gff-gene" but with a header, suitable for incorporating to a database.
-"peak" for a simple file which contains the significantly associated peak IDs in the first column and a 
-list of associated genes in the second column.
+"gff-peak-db" for same as "gff-peak" but with a header, suitable for 
+incorporating to a database.
+"gff-gene-db" for same as "gff-gene" but with a header, suitable for 
+incorporating to a database.
+"peak" for a simple file which contains the significantly associated peak IDs in
+the first column and a list of associated genes in the second column.
 "gene" for similar to "peak" but gene based.
-"all-peak" for a simple file which contains ALL (based on distance) associated peak IDs in the first 
-column and a list of associated genes in the second column.
+"all-peak" for a simple file which contains ALL (based on distance) associated 
+peak IDs in the first column and a list of associated genes in the second column.
 "all-gene" for similar to "all-peak" but gene based.
-"pretty-peak" for retrieving a more human-readable format quite self-explicating (please see output).
+"pretty-peak" for retrieving a more human-readable format quite self-explicating
+(please see output).
 "pretty-gene" similar to "pretty-peak" but gene-based (please see output).
 "peakdata" for retrieving only the assigned peaks from the original peak file.
-"bed" for retrieving a 6-column BED file suitable for a genome browser without additional data.
-"matrix-number" to retrieve a spreadsheet-like file where rows correspond to the subject region file and columns
-correspond to query files. The cell (i,j) contains the number of regions in query file j assigned to subject
-region i.
-"matrix-presence" to retrieve a spreadsheet-like file where rows correspond to the subject region file and columns
-correspond to peak files. The cell (i,j) contains "+" if region in query file j assigned to subjecy region i, or"-" 
+"bed" for retrieving a 6-column BED file suitable for a genome browser without 
+additional data.
+"matrix-number" to retrieve a spreadsheet-like file where rows correspond to the
+subject region file and columns correspond to query files. The cell (i,j) 
+contains the number of regions in query file j assigned to subject region i.
+"matrix-presence" to retrieve a spreadsheet-like file where rows correspond to 
+the subject region file and columns correspond to peak files. The cell (i,j) 
+contains "+" if region in query file j assigned to subjecy region i, or"-" 
 otherwise.
-"matrix-peaks" to retrieve a spreadsheet-like file where rows correspond to subject region file and columns
-correspond to query region files. The cell (i,j) contains the regions in query file j assigned to subject region i, 
-or "NP" otherwise.
+"matrix-peaks" to retrieve a spreadsheet-like file where rows correspond to 
+subject region file and columns correspond to query region files. The cell (i,j)
+contains the regions in query file j assigned to subject region i, or "NP" 
+otherwise.
 
 =item I<silent> B<(optional)>
 
@@ -172,8 +217,8 @@ Use this parameter if you want to turn informative messages off.
 
 =head1 OUTPUT
 
-The main output of the program is up to twelve files with information on gene-peak (or more generally, 
-region-region) association.
+The main output of the program is up to twelve files with information on 
+gene-peak (or more generally, region-region) association.
 
 =head1 SUBROUTINES/METHODS
 
@@ -189,7 +234,8 @@ our $MODNAME = "HTS::Tools::Assign";
 our $VERSION = '0.01';
 our $AUTHOR = "Panagiotis Moulos";
 our $EMAIL = "moulos\@fleming.gr";
-our $DESC = "Assign query genomic regions to subject genomic regions, possibly based on over-representation.";
+our $DESC = "Assign query genomic regions to subject genomic regions, possibly".
+    " based on over-representation.";
 
 use Carp;
 use File::Basename;
@@ -211,10 +257,11 @@ BEGIN {
 
 =head2 new
 
-The HTS::Tools::Assign object constructor. It accepts a set of parameters that are required to run the
-asigner and get the output.
+The HTS::Tools::Assign object constructor. It accepts a set of parameters that 
+are required to run the asigner and get the output.
 
-    my $assigner = HTS::Tools::Assign->new({'input' => 'my_peaks.txt','region' => 'my_genome.txt'});
+    my $assigner = HTS::Tools::Assign->new({'input' => 'my_peaks.txt',
+        'region' => 'my_genome.txt'});
 
 =cut
 
@@ -245,7 +292,8 @@ sub new
 
 =head2 init
 
-HTS::Tools::Assign object initialization method. NEVER use this directly, use new instead.
+HTS::Tools::Assign object initialization method. NEVER use this directly, use 
+new instead.
 
 =cut
 
@@ -265,7 +313,8 @@ sub init
 
 =head2 run
 
-The HTS::Tools::Assign run subroutine. It runs the assigner with the given parameters in the constructor.
+The HTS::Tools::Assign run subroutine. It runs the assigner with the given 
+parameters in the constructor.
 
     $assigner->run;
     
@@ -283,6 +332,8 @@ sub run
     my $pval = $self->get("pvalue");
     my $source = $self->get("source");
     my $splicing = $self->get("splicing");
+    my $where = $self->get("where");
+    my $redun = $self->get("redundancy");
     my @pcols = @{$self->get("idmode")};
     my @sbcols = @{$self->get("idstrand")};
     my @expcols = @{$self->get("expression")};
@@ -292,7 +343,15 @@ sub run
     # Bavard
     my $date = $helper->now;
     $helper->disp("$date - Started...\n");
-    $helper->disp("Genomic span from TSS : ($span[0],$span[1])");
+    if ($where eq "promoter")
+    {
+        $helper->disp("Genomic span from TSS : ($span[0],$span[1])");
+    }
+    else
+    {
+        $helper->disp("Genomic span from TSS : ($span[0], TES)");
+    }
+    $helper->disp("Assignment redundancy level : $redun");
     $helper->disp("Over-representation test : $test");
     $helper->disp("p-value threshold : $pval") if ($test ne "none");
     $helper->disp("Chosen output(s) : ",join("\, ",@out),"\n");
@@ -446,6 +505,7 @@ sub run
         my ($pstart,$pend,%peakStarts,%peakEnds) if ($gffreq);
         my (@pall,$pchr,$pmode,$pid,$phead,$pscore);
         my (@starts,@ends,@modes);
+        my ($limit1,$limit2);
         my (@peakchrs,@peakids,@peakscores,@geneids);
         my (@sigallpeakids,@backallpeakids,@sigassgenes,@backassgenes);
         my ($currchr,$currdist,$currpeak,$currgene,$currout,@currgenes);
@@ -516,7 +576,17 @@ sub run
                     for ($k=0; $k<@modes; $k++)
                     {
                         $currdist = $self->dist($starts[$j],$ends[$j],$modes[$k]);
-                        if ($currdist > $span[0] && $currdist < $span[1])
+                        if ($where eq "promoter")
+                        {
+                            $limit1 = $span[0];
+                            $limit2 = $span[1];
+                        }
+                        elsif ($where eq "coding")
+                        {
+                            $limit1 = $span[0];
+                            $limit2 = abs($ends[$j]-$starts[$j]+$limit1);
+                        }
+                        if ($currdist > $limit1 && $currdist < $limit2)
                         {
                             push(@{$genePeaksSig{$currchr}{$geneids[$j]}},$peakids[$k]);
                             push(@{$peaksGenesSig{$currchr}{$peakids[$k]}},$geneids[$j]);
@@ -531,7 +601,75 @@ sub run
                         }
                     }
                 }
+                # if non-redundant
+                if ($redun eq "genecentric")
+                {
+                    my (%geneDist,%peakInd);
+                    my (@pGenes,@pDists,@pInds,@gPeaks,@gDists,@gInds,@sortedGenesByDist,@remaining,@matrixElems);
+                    my ($index,$pe,$di,$in,$hs,$hsi,$redPeak,$g);
+                    my @redPeaks = keys(%{$peaksGenesSig{$currchr}});
+                    foreach $redPeak (@redPeaks)
+                    {
+                        #print "\n----------  $redPeak";
+                        @pGenes = @{$peaksGenesSig{$currchr}{$redPeak}};
+                        @pDists = @{$distPeakBased{$currchr}{$redPeak}};
+                        @pInds = @{$peakIndex{$currchr}{$redPeak}};
+                        @geneDist{@pGenes} = @pDists;
+                        @peakInd{@pGenes} = @pInds;
+                        @sortedGenesByDist = sort { abs($geneDist{$a}) <=> abs($geneDist{$b}) } keys(%geneDist);
+                        # We need the first and based on this we adjust the rest of the hashes
+                        #print "\nF: ",$sortedGenesByDist[0];
+                        @{$peaksGenesSig{$currchr}{$redPeak}} = ($sortedGenesByDist[0]);
+                        @{$distPeakBased{$currchr}{$redPeak}} = ($geneDist{$sortedGenesByDist[0]});
+                        @{$peakIndex{$currchr}{$redPeak}} = $peakInd{$sortedGenesByDist[0]};
+                        # Then we need to kick out the rest of the sorted genes from gene based hashes
+                        @remaining = @sortedGenesByDist[1..$#sortedGenesByDist];
+                        if (@remaining)
+                        {
+                            #print "\nR: ",join(", ",@remaining);
+                            foreach $g (@remaining)
+                            {
+                                #print "\n$g\n";
+                                @gPeaks = @{$genePeaksSig{$currchr}{$g}};
+                                #print join(", ",@gPeaks);
+                                @gDists = @{$distGeneBased{$currchr}{$g}};
+                                @gInds = @{$geneIndex{$currchr}{$g}};
+                                $index = 0;
+                                $index++ until $gPeaks[$index] eq $redPeak;
+                                $pe = splice(@gPeaks,$index,1);
+                                $di = splice(@gDists,$index,1);
+                                $in = splice(@gInds,$index,1);
+                                @{$genePeaksSig{$currchr}{$g}} = @gPeaks;
+                                @{$distGeneBased{$currchr}{$g}} = @gDists;
+                                @{$geneIndex{$currchr}{$g}} = @gInds;                       
+                                $hs = $pe."_".$di;
+                                #print "\nP: $hs";
+                                @matrixElems = @{$hasPeak{$g}{basename($input[$i])}};
+                                #print "\nD: ",join(", ",@matrixElems);
+                                if (scalar @matrixElems == 1)
+                                {
+                                    #print "\nF: ",join(", ",@matrixElems),"\n";
+                                    @{$hasPeak{$g}{basename($input[$i])}} = ();
+                                }
+                                else
+                                {
+                                    $hsi = grep { ${$hasPeak{$g}{basename($input[$i])}}[$_] =~ m/$hs/ } 0..$#matrixElems;
+                                    my @z = splice(@matrixElems,$hsi,1);
+                                    #print "\nF: ",join(", ",@z),"\n";
+                                    @{$hasPeak{$g}{basename($input[$i])}} = @matrixElems;
+                                }
+                            }
+                        }
+                        # Empty the temp hashes
+                        %geneDist = ();
+                        %peakInd = ();
+                    }
+                }
+                if ($redun eq "peakcentric") { }
             }
+            
+            # A function must be added to correct the above hashes for gene-centric
+            # redundancy
 
             if ($test ne "none") # If no test performed, no need to do anything with background file
             {
@@ -730,7 +868,7 @@ sub run
                         {
                             push(@outpeaks,$currpeak) if ($finalPeaks{$currpeak});
                         }
-                        print OUTPUT "$currgene\t",join("\ ",@outpeaks),"\n"  if (@outpeaks);
+                        print OUTPUT "$currgene\t",join("\ ",@outpeaks),"\n" if (@outpeaks);
                     }
                 }
                 close(OUTPUT);
@@ -1040,9 +1178,8 @@ sub print_matrix
             my @v;
             foreach $column (@tmp)
             {
-                (defined($colhash->{$column})) ?
-                (push(@v,scalar(@{$colhash->{$column}}))) :
-                (push(@v,0));
+                (defined($colhash->{$column}) && scalar @{$colhash->{$column}} > 0) ? 
+                (push(@v,scalar(@{$colhash->{$column}}))) : (push(@v,0));
             }
             (!$exprhash->{"data"}->{$row}) ? (print OUTPUT "$row\t",join("\t",@v),"\n") :
             (print OUTPUT "$row\t",join("\t",@v),"\t",$exprhash->{"data"}->{$row},"\n");
@@ -1057,7 +1194,8 @@ sub print_matrix
             my @v;
             foreach $column (@tmp)
             {
-                (defined($colhash->{$column})) ? (push(@v,"+")) : (push(@v,"-"));
+                (defined($colhash->{$column}) && scalar @{$colhash->{$column}} > 0) ? 
+                (push(@v,"+")) : (push(@v,"-"));
             }
             (!$exprhash->{"data"}->{$row}) ? (print OUTPUT "$row\t",join("\t",@v),"\n") :
             (print OUTPUT "$row\t",join("\t",@v),"\t",$exprhash->{"data"}->{$row},"\n");
@@ -1072,9 +1210,8 @@ sub print_matrix
             my @v;
             foreach $column (@tmp)
             {
-                (defined($colhash->{$column})) ?
-                (push(@v,join("; ",@{$colhash->{$column}}))) :
-                (push(@v,"NP"));
+                (defined($colhash->{$column}) && scalar @{$colhash->{$column}} > 0) ? 
+                (push(@v,join("; ",@{$colhash->{$column}}))) : (push(@v,"NP"));
             }
             (!$exprhash->{"data"}->{$row}) ? (print OUTPUT "$row\t",join("\t",@v),"\n") :
             (print OUTPUT "$row\t",join("\t",@v),"\t",$exprhash->{"data"}->{$row},"\n");
