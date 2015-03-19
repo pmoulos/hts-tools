@@ -72,6 +72,25 @@ A scanning algorithm to use. Currently, two algorithms are supported: the
 pwmscan algorithm (van Heeringen and Veenstra, 2010) and MotifScanner (Thijs et 
 al., 2001).
 
+=item I<sigmethod> B<(optional)>
+
+It can be "bootstrap", "converge" or "none". If "bootstrap", the input sequence 
+set is scanned using the I<justscan> threshold and the hits are counted. Then, 
+using the same  threshold, I<times> background sequences of the same length are 
+scanned and the number of hits is counted. The p-value is the number of times 
+that the number of hits is larger in the background than the input sequence set 
+divided by I<times>. When "converge", the input sequences are scanned with 
+I<range> thresholds until less hits remain in I<times> background  sequences 
+until I<fpr> is reached. If "none", then just a scan is performed with the 
+I<justscan> threshold without any statistical significance. The default is 
+"bootstrap".
+
+=item I<ncore> B<(optional)>
+
+If the machine has multicore processor(s) and the package Parallel::Iterator is 
+installed, you can use parallel processing when I<sigmethod> is "bootstrap". 
+Default is 1 and can go up to 12.
+
 =item I<range> B<(optional)>
 
 A range of cutoffs that will be used to determine the final matching score 
@@ -269,6 +288,8 @@ sub run
     our $motfile = $self->get("motif"); 
     our $backfile = $self->get("background");
     our $scanner = $self->get("scanner");
+    our $sigmethod = $self->get("sigmethod");
+    our $ncore = $self->get("ncore");
     our $fpr = $self->get("fpr");
     our $times = $self->get("times");
     our $length = $self->get("length");
@@ -296,9 +317,18 @@ sub run
 
     # More bavard... I like information...
     $helper->disp("Selected scanner : $scanner");
+    $helper->disp("Enrichment significance assessment : $sigmethod");
+    if ($sigmethod eq "converge")
+    {
+        $helper->disp("Background sequences files larger by factor of : $times");
+    }
+    elsif ($sigmethod eq "bootstrap")
+    {
+        $helper->disp("Bootstrap iterations with background : $times");
+    }
     ($justscan) ? ($helper->disp("Cutoff range : $justscan")) : 
     ($helper->disp("Cutoff range : ",$range[0],"to",$range[$#range]));
-    $helper->disp("False Positive Rate : $fpr");
+    $helper->disp("False Positive Rate : $fpr") if ($fpr);
     $helper->disp("Chosen output(s) : ",join("\, ",@output),"\n");
 
     # If bed output chosen and cntfile given, read them and merge them to database
@@ -309,7 +339,7 @@ sub run
         foreach my $c (@cntfile)
         {
             my ($line,@columns);
-            open(CNT,"$c");
+            open(CNT,"$c") or croak "\nCannot open peak center file $c.\n";
             $line = <CNT>;
             my $header = $helper->decide_header($line);
             seek(CNT,0,0) if (!$header);
@@ -329,13 +359,13 @@ sub run
     }
 
     my ($i,$j,$k); # General indices
-    my @stats; # Stats array in case
+    my (@stats,@pvalues,@means,@sds); # Stats arrays in case
 
     # Parse the motifs file, split it into different files
     my @mfiles = $self->parse_motifs($motfile,$scanner);
 
     # If running the full process, not just scanning given only one threshold
-    if (!$justscan)
+    if (!$justscan && $sigmethod eq "converge")
     {
         # Quick and dirty checking about tabular file
         my $chk = $helper->check_tabseq($backfile);
@@ -378,7 +408,7 @@ sub run
         if ($scanner =~ /MotifScanner/i)
         {
             $helper->disp("Constructing Markov background model to be used with MotifScanner...");
-            $self->constructMSBackground($backbackup);
+            $self->construct_MS_background($backbackup);
         }
 
         # Do job for peak-region-whatever files
@@ -417,11 +447,11 @@ sub run
                     # Use range vector
                     for  ($k=0; $k<@range; $k++)
                     {
-                        $helper->disp("Now testing threshold $range[$k]...\n");
+                        $helper->disp("Now testing threshold $range[$k]...");
                         `gimme scan $bfile $mfiles[$j] -c $range[$k] -n $besthit > bgcut.gff `;
                         if ($besthit > 1) 
                         {
-                            ($unistats) ? ($sl = $helper->count_unique_lines("bgcut.gff")) : ($sl = &countLines("bgcut.gff"));
+                            ($unistats) ? ($sl = $helper->count_unique_lines("bgcut.gff")) : ($sl = $helper->count_lines("bgcut.gff"));
                         }
                         else { $sl = $helper->count_lines("bgcut.gff"); }
                         if ($sl <= $fpr*$n)
@@ -444,7 +474,7 @@ sub run
                         $helper->disp("Cutoff for FPR $fpr determined at $cutoff.");
                         $helper->disp("$sl matches out of $n sequences remain in background.\n");
                     }
-                    $helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j] using pwmscan... Cutoff: $cutoff.\n");
+                    $helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j] using pwmscan... Cutoff: $cutoff.");
                     my $mbase = fileparse($mfiles[$j],'\.[^.]*');
                     my $currout = $self->create_output_file($seqfile[$i],"output",$mbase);
                     #`python gimme scan -i $seqfile[$i] -c $cutoff -s $spacer[$j] -p $mfiles[$j] -n $besthit > $currout `;
@@ -453,7 +483,7 @@ sub run
                     my $nmatch;
                     if ($besthit > 1) 
                     {
-                        ($unistats) ? ($nmatch = $helper->count_unique_lines($currout)) : ($nmatch = &countLines($currout));
+                        ($unistats) ? ($nmatch = $helper->count_unique_lines($currout)) : ($nmatch = $helper->count_lines($currout));
                     }
                     else { $nmatch = $helper->count_lines($currout); }
                     $stats[$i][$j] = $nmatch if ($ostat);
@@ -496,7 +526,7 @@ sub run
                         $helper->disp("Cutoff for FPR $fpr determined at $cutoff.");
                         $helper->disp("$sl matches out of $n sequences remain in background.\n");
                     }
-                    $helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j]... Cutoff: $cutoff.\n");
+                    $helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j]... Cutoff: $cutoff.");
                     my $mbase = fileparse($mfiles[$j],'\.[^.]*');
                     my $currout = $self->create_output_file($seqfile[$i],"output",$mbase);
                     ($^O !~ /MSWin/) ? (`./MotifScanner -f $seqfile[$i] -b MSmodel.bkg -m $mfiles[$j] -p $cutoff -s 0 -o $currout `) :
@@ -513,8 +543,53 @@ sub run
             $helper->disp(" ");
         }
     }
-    else # Just scan the sequence files using one defined threshold
+    else # Just scan the sequence files using one defined threshold or bootstrap
     {
+        my ($bbi,$bbd,$nback,$backbackup,$chk);
+        if ($sigmethod eq "bootstrap")
+        {
+            # Quick and dirty checking about tabular file
+            $chk = $helper->check_tabseq($backfile);
+            $backbackup  = $backfile;
+            if ($chk)
+            {
+                $helper->disp("Background file $backfile does not appear to be a tabular sequence file...");
+                $helper->disp("Checking if $backfile is in FASTA format...");
+                my $chkchk = $helper->check_fasta($backfile);
+                croak "\nBackground file $backfile does not appear to be in FASTA format either! Exiting...\n" if ($chkchk);
+                $helper->disp("$backfile is in FASTA format. Converting to tabular format...");
+                $backbackup = $backfile;
+                my $converter = HTS::Tools::Convert->new();
+                $backfile = $converter->fasta2tab($backfile);
+            }
+            # Construct background index file for quick reference
+            ($bbi,$bbd) = fileparse($backfile,'\.[^.]*');
+            $bbi = $bbd.$bbi.".idx";
+            if (! -e $bbi)
+            {
+                $helper->disp("Constructing index file for background file $backfile...");
+                open(BACK,"< $backfile");
+                open(INDEX,"+>$bbi") or croak "Can't open $bbi for read/write: $!\n";
+                $self->build_index(*BACK,*INDEX);
+                close(BACK);
+                close(INDEX);
+                $helper->disp("Index file for background constructed in $bbi.");
+            }
+            else
+            {
+                $helper->disp("Index file $bbi for background file $backfile already exists. Proceeding...\n");
+            }
+            $helper->disp("Counting sequences in background file $backfile...");
+            $nback = $helper->count_lines($backfile); 
+            $helper->disp("Background file $backfile contains $nback sequences.");
+        }
+        
+        if ($scanner =~ /MotifScanner/i)
+        {
+            $helper->disp("Constructing Markov background model to be used with MotifScanner...");
+            $self->construct_MS_background($backbackup);
+        }
+        
         # Do job for peak-region-whatever files
         for ($i=0; $i<@seqfile; $i++)
         {
@@ -533,10 +608,9 @@ sub run
             {
                 for ($j=0; $j<@mfiles; $j++)
                 {
-                    $helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j] using pwmscan... Cutoff: $justscan.\n");
+                    $helper->disp("Scanning $seqfile[$i] for motif $mfiles[$j] using pwmscan... Cutoff: $justscan.");
                     my $mbase = fileparse($mfiles[$j],'\.[^.]*');
                     my $currout = $self->create_output_file($seqfile[$i],"output",$mbase);
-                    #`python gimme scan -i $seqfile[$i] -c $justscan -s $spacer[$j] -p $mfiles[$j] -n $besthit > $currout `;
                     `gimme scan $seqfile[$i] $mfiles[$j] -c $justscan -n $besthit > $currout `;
                     $self->convert2bed($currout,$cntcol[2],%cnthash) if ($obed);
                     my $nmatch;
@@ -545,12 +619,70 @@ sub run
                         ($unistats) ? ($nmatch = $helper->count_unique_lines($currout)) : ($nmatch = $helper->count_lines($currout));
                     }
                     else { $nmatch = $helper->count_lines($currout); }
-                    $stats[$i][$j] = $nmatch if ($ostat);
+                    $stats[$i][$j] = $nmatch;
                     $helper->disp("$nmatch matches found in $seqfile[$i]. Output written in $currout.\n");
                     unlink($currout) if (!$ogff);
                 }
+                if ($sigmethod eq "bootstrap")
+                {
+                    $helper->disp("Counting sequences in file $seqfile[$i]...");
+                    my $nseqs = $helper->count_fasta($seqfile[$i]);
+                    $helper->disp("File $seqfile[$i] has $nseqs sequences.");
+                    $helper->disp("\nAssessing statistical significance for tne input motifs for $seqfile[$i] using resampling... It might take some time...\n");
+                    for ($j=0; $j<@mfiles; $j++)
+                    {
+                        my (@bhits,@nums);
+                        my $sl;
+                        if ($ncore == 1)
+                        {                           
+                            for ($k=1; $k<=$times; $k++)
+                            {
+                                $helper->disp("  Motif $mfiles[$j] -- Iteration $k");
+                                $helper->disp("    Generating $nseqs background sequences to be used for motif scanning...");
+                                my $bfile = $self->get_random_seq($backfile,$bbi,$nback,$length,$nseqs);
+                                $helper->disp("    $nseqs background sequences written in file $bfile...");
+                                $helper->disp("    Now scanning file $bfile...");
+                                `gimme scan $bfile $mfiles[$j] -c $justscan -n $besthit > bgcut.gff `;
+                                if ($besthit > 1) 
+                                {
+                                    ($unistats) ? ($sl = $helper->count_unique_lines("bgcut.gff")) : ($sl = $helper->count_lines("bgcut.gff"));
+                                }
+                                else { $sl = $helper->count_lines("bgcut.gff"); }
+                                $helper->disp("    Found $sl hits");
+                                push(@bhits,$sl);
+                                unlink($bfile);
+                            }
+                        }
+                        else
+                        {
+                            @nums = (1..$times);
+                            $helper->disp("Parallel boostraping enrichment for motif $mfiles[$j]...");
+                            @bhits = Parallel::Iterator->iterate_as_array({workers => $ncore},sub{
+                                my ($id,$job) = @_;
+                                my $sl;
+                                my $bfile = $self->get_random_seq($backfile,$bbi,$nback,$length,$nseqs,$job);
+                                `gimme scan $bfile $mfiles[$j] -c $justscan -n $besthit > bgcut_$job.gff `;
+                                if ($besthit > 1) 
+                                {
+                                    ($unistats) ? ($sl = $helper->count_unique_lines("bgcut_$job.gff")) : 
+                                    ($sl = $helper->count_lines("bgcut_$job.gff"));
+                                }
+                                else { $sl = $helper->count_lines("bgcut_$job.gff"); }
+                                unlink($bfile);
+                                unlink("bgcut_$job.gff");
+                                return($sl);
+                            },\@nums);
+                        }
+                        
+                        my $ng = scalar grep { $_ > $stats[$i][$j] } @bhits;
+                        $means[$i][$j] = $helper->mean(@bhits);
+                        $sds[$i][$j] = $helper->stdev(@bhits);
+                        $pvalues[$i][$j] = $ng/$times;
+                        $helper->disp("  Average background hits for $mfiles[$j]: $means[$i][$j] +/- $sds[$i][$j]");
+                        $helper->disp("  p-value for $mfiles[$j]: $pvalues[$i][$j]\n");
+                    }
+                }
             }
-            
             if ($scanner =~ m/MotifScanner/i)
             {
                 for ($j=0; $j<@mfiles; $j++)
@@ -567,6 +699,61 @@ sub run
                     $stats[$i][$j] = $nmatch if ($ostat);
                     $helper->disp("$nmatch matches found in $seqfile[$i]. Output written in $currout.\n");
                     unlink($currout) if (!$ogff);
+                }
+                if ($sigmethod eq "bootstrap")
+                {
+                    $helper->disp("Counting sequences in file $seqfile[$i]...");
+                    my $nseqs = $helper->count_fasta($seqfile[$i]);
+                    $helper->disp("File $seqfile[$i] has $nseqs sequences.");
+                    $helper->disp("\nAssessing statistical significance for tne input motifs for $seqfile[$i] using resampling... It might take some time...\n");
+                    
+                    for ($j=0; $j<@mfiles; $j++)
+                    {
+                        my (@bhits,@nums);
+                        my $sl;
+                        if ($ncore == 1)
+                        {
+                            for ($k=1; $k<=$times; $k++)
+                            {
+                                $helper->disp("  Motif $mfiles[$j] -- Iteration $k");
+                                $helper->disp("    Generating $nseqs background sequences to be used for motif scanning...");
+                                my $bfile = $self->get_random_seq($backfile,$bbi,$nback,$length,$nseqs);
+                                $helper->disp("    $nseqs background sequences written in file $bfile...");
+                                $helper->disp("    Now scanning file $bfile...");
+                                ($^O !~ /MSWin/) ? (`./MotifScanner -f $bfile -b MSmodel.bkg -m $mfiles[$j] -p $justscan -s 0 -o bgcut.gff `) :
+                                (`MotifScanner -f $bfile -b MSmodel.bkg -m $mfiles[$j] -p $justscan -s 0 -o bgcut.gff `);
+                                ($unistats) ? ($sl = $helper->count_unique_lines("bgcut.gff")) : ($sl = $helper->count_lines("bgcut.gff"));
+                                $sl--; # One line header of MotifScanner output
+                                $helper->disp("    Found $sl hits");
+                                push(@bhits,$sl);
+                                unlink($bfile);
+                            }
+                        }
+                        else
+                        {
+                            @nums = (1..$times);
+                            $helper->disp("Parallel boostraping enrichment for motif $mfiles[$j]...");
+                            @bhits = Parallel::Iterator->iterate_as_array(sub{
+                                my ($id,$job) = @_;
+                                my $sl;
+                                my $bfile = $self->get_random_seq($backfile,$bbi,$nback,$length,$nseqs,$job);
+                                ($^O !~ /MSWin/) ? (`./MotifScanner -f $bfile -b MSmodel.bkg -m $mfiles[$j] -p $justscan -s 0 -o bgcut_$job.gff `) :
+                                (`MotifScanner -f $bfile -b MSmodel.bkg -m $mfiles[$j] -p $justscan -s 0 -o bgcut.gff `);
+                                ($unistats) ? ($sl = $helper->count_unique_lines("bgcut_$job.gff")) : ($sl = $helper->count_lines("bgcut_$job.gff"));
+                                $sl--; # One line header of MotifScanner output
+                                unlink($bfile);
+                                unlink("bgcut_$job.gff");
+                                return($sl);
+                            },\@nums);
+                        }
+                        
+                        my $ng = scalar grep { $_ > $stats[$i][$j] } @bhits;
+                        $means[$i][$j] = $helper->mean(@bhits);
+                        $sds[$i][$j] = $helper->stdev(@bhits);
+                        $pvalues[$i][$j] = $ng/$times;
+                        $helper->disp("  Average background hits for $mfiles[$j]: $means[$i][$j] +/- $sds[$i][$j]\n");
+                        $helper->disp("  p-value for $mfiles[$j]: $pvalues[$i][$j]\n");
+                    }
                 }
             }
             $helper->disp(" ");
@@ -585,6 +772,21 @@ sub run
             for ($j=0; $j<@mfiles; $j++)
             {
                 print STATS "\t$stats[$i][$j]";
+            }
+            print STATS "\n\t";
+            for ($j=0; $j<@mfiles; $j++)
+            {
+                print STATS "\t$pvalues[$i][$j]";
+            }
+            print STATS "\n\t";
+            for ($j=0; $j<@mfiles; $j++)
+            {
+                print STATS "\t$means[$i][$j]";
+            }
+            print STATS "\n\t";
+            for ($j=0; $j<@mfiles; $j++)
+            {
+                print STATS "\t$sds[$i][$j]";
             }
             print STATS "\n";
         }
@@ -742,12 +944,13 @@ Get a random sequence from a set of background sequences.
 
 sub get_random_seq
 {
-    my ($self,$tabfasta,$itsindex,$itslen,$length,$num) = @_;
+    my ($self,$tabfasta,$itsindex,$itslen,$length,$num,$job) = @_;
     my ($line,$id,$seq,$currlen,$start,$end);
     my $count = my $safeswitch = 0;
     my $BIG = 1e+6;
     srand;
     my $outfile = $self->create_output_file(" ","sequence");
+    $outfile = $outfile."_$job"  if ($job);
     open(RANDSEQ,">$outfile");
     open(FASTA,"<$tabfasta");
     open(INDEX,"$itsindex");

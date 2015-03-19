@@ -28,7 +28,8 @@ our @cntfile; # Original peak files, containing the centers in case of peak ids 
 our @cntcol; # Columns with peak IDs and peak centers in cntfile
 our @range; # Range of cutoffs to use with p53Scan
 our $scanner; # Which scanner to use
-our $fpr; # Allowed false positive rate to be used with p53Scan
+our $sigmethod; # Which enrichment significance method to use?
+our $fpr; # Allowed false positive rate to be used with pwmcan
 our $times; # How many times larger background?
 our $length; # Length for background sequences
 our $besthit; # How many best matches to return (default 1)
@@ -51,6 +52,7 @@ my $tool = HTS::Tools->new({
             "motif" => $motfile,
             "background" => $backfile,
             "scanner" => $scanner,
+            "sigmethod" => $sigmethod,
             "center" => \@cntfile,
             "colext" => \@cntcol,
             "range" => \@range,
@@ -72,6 +74,7 @@ sub check_inputs
                "motif|m=s" => \$motfile,
                "background|b=s" => \$backfile,
                "scanner|a=s" => \$scanner,
+               "sigmethod|d=s" => \$sigmethod,
                "center|c=s{,}" => \@cntfile,
                "colext|x=i{,}" => \@cntcol,
                "range|r=s{,}" => \@range,
@@ -140,13 +143,29 @@ $scriptname --input peak_fasta_file(s) --region regfile --background backfile [O
             algorithms are supported: the pwmscan algorithm (van 
             Heeringen and Veenstra, 2010) and MotifScanner (Thijs 
             et al., 2001).
+  --sigmethod|d     It can be "bootstrap", "converge" or "none". If 
+            "bootstrap", the input sequence set is scanned using the 
+            --justscan threshold and the hits are counted. Then, using 
+            the same  threshold, --times background sequences of the same 
+            length are scanned and the number of hits is counted. The 
+            p-value is the number of times that the number of hits is 
+            larger in the background than the input sequence set divided 
+            by --times. When "converge", the input sequences are scanned 
+            with --range thresholds until less hits remain in --times 
+            background  sequences until --fpr is reached. If "none", then
+            just a scan is performed with the --justscan threshold without
+            any statistical significance. The default is "bootstrap".
+  --ncore|k     The number of CPU cores to use when --sigmethod is
+            bootstrap. Module Parallel::Iterator must be present and
+            of course a multicore CPU too!
   --range|r     A range of cutoffs that will be used to determine 
             the final matching score cutoff corresponding to --fpr.
             The range can be given in the form a:b or a:x:b where x 
             is an increment step. If the format a:b is chosen, the 
             default increment is 1. However, in the latest versions 
             of pwmscan, the matching score is normalized to one, so 
-            this notation will be eventually deprecated.
+            this notation will be eventually deprecated. This parameter
+            is ignored when --sigmethod is "bootstrap".
   --fpr|p       The desired False Positive Rate (FPR), that is the 
             percentage of motif matches found in the background
             sequences. Defaults to 0.05.
@@ -173,7 +192,7 @@ $scriptname --input peak_fasta_file(s) --region regfile --background backfile [O
             Example: --output stats gff
   --besthit|e       The number of best hits to be retrieved when --scanner
             is "pwmscan". Defaults to 1.
-  --uniquestats|e       If the number of besthits is greater than 1,
+  --uniquestats|u       If the number of besthits is greater than 1,
             then specifying --uniquestats to 1 will cause the output
             "stats" file to contain unique hits. Like this you can 
             avoid paradoxes like having more hits than input FASTA 

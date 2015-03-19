@@ -967,9 +967,10 @@ sub validate_motifscan
 {
     my $self = shift @_;
     my $modname = "HTS::Tools::Motifscan";
+    my $status;
     
-    my @accept = ("input","motif","background","scanner","center","colext","range","fpr","times","length",
-            "besthit","output","uniquestats","justscan","log","silent","tmpdir");
+    my @accept = ("input","motif","background","scanner","sigmethod","center","colext","range","fpr","times",
+            "ncore","length","besthit","output","uniquestats","justscan","log","silent","tmpdir");
     
     # Check and warn for unrecognized parameters
     foreach my $p (keys(%{$self->{"params"}}))
@@ -1001,6 +1002,35 @@ sub validate_motifscan
         $helper->disp("Motif scanner not set! Using default (pwmscan)...");
         $self->{"params"}->{"scanner"} = "pwmscan";
     }
+    # Check the sigmethod
+    if (defined($self->{"params"}->{"sigmethod"}) && $self->{"params"}->{"sigmethod"} !~ /bootstrap/i && $self->{"params"}->{"sigmethod"} !~ /converge/i
+        && $self->{"params"}->{"sigmethod"} !~ /none/i)
+    {
+        $helper->disp("The enrichment significance method should be one of \"bootstrap\", \"converge\" or \"none\". Using default (bootstrap)...");
+        $self->{"params"}->{"sigmethod"} = "bootstrap";
+    }
+    elsif (!defined($self->{"params"}->{"sigmethod"}))
+    {
+        $helper->disp("Enrichment significance method not set! Using default (bootstrap)...");
+        $self->{"params"}->{"sigmethod"} = "bootstrap";
+    }
+    if ($self->{"params"}->{"ncore"})
+    {
+        $status = eval { $helper->try_module("Parallel::Iterator") };
+        if ($status)
+        {
+            $helper->disp("Module Parallel::Iterator not found, proceeding with one core...");
+            $self->{"params"}->{"ncore"} = 1;
+        }
+        else { use Parallel::Iterator; }
+        if ($self->{"params"}->{"ncore"} > MAXCORES)
+        {
+            my $c = MAXCORES;
+            $helper->disp("The maximum number of cores allowed is $c...");
+            $self->{"params"}->{"ncore"} = MAXCORES;
+        }
+    }
+    else { $self->{"params"}->{"ncore"} = 1; }
     # Check range - increase per real number, very simple expression, use with caution
     if (defined($self->{"params"}->{"range"}) && @{$self->{"params"}->{"range"}})
     {
@@ -1056,16 +1086,23 @@ sub validate_motifscan
         $self->{"params"}->{"range"} = \@range;
     }
     # Check fpr
-    if ((!defined($self->{"params"}->{"fpr"}) || !$self->{"params"}->{"fpr"}) && !$self->{"params"}->{"justscan"})
+    if ((!defined($self->{"params"}->{"fpr"}) || !$self->{"params"}->{"fpr"}) && !$self->{"params"}->{"justscan"} 
+        && $self->{"params"}->{"sigmethod"} ne "bootstrap")
     {
         $helper->disp("FPR not defined! Using default (0.05)...");
         $self->{"params"}->{"fpr"} = 0.05;
     }
     elsif (defined($self->{"params"}->{"fpr"}) && ($self->{"params"}->{"fpr"} < 0 || $self->{"params"}->{"fpr"} > 1)
-        && !$self->{"params"}->{"justscan"})
+        && !$self->{"params"}->{"justscan"} && $self->{"params"}->{"sigmethod"} ne "bootstrap")
     {
         $helper->disp("FPR should be a number between 0 and 1! Using default (0.05)...");
         $self->{"params"}->{"fpr"} = 0.05;
+    }
+    elsif (defined($self->{"params"}->{"fpr"}) && !$self->{"params"}->{"justscan"} 
+        && $self->{"params"}->{"sigmethod"} eq "bootstrap")
+    {
+        $helper->disp("Enrichment significance method is \"bootstrap\"! FPR will be ignored...");
+        $self->{"params"}->{"fpr"} = 0.05; # Typically...
     }
     if (defined($self->{"params"}->{"output"}) && @{$self->{"params"}->{"output"}})
     {
@@ -1084,6 +1121,14 @@ sub validate_motifscan
     {
         $helper->disp("Output file type(s) not defined! Using default (\"gff\")...");
         $self->{"params"}->{"output"} = ["gff"];
+    }
+    if (defined($self->{"params"}->{"center"}) && $self->{"params"}->{"center"})
+    {
+        if (!defined($self->{"params"}->{"colext"}) || !@{$self->{"params"}->{"colext"}})
+        {
+            $helper->disp("WARNING! Coordinate centers file given but without column mapping given! Ignoring the centers file...");
+            delete($self->{"params"}->{"center"})
+        }
     }
     if (defined($self->{"params"}->{"colext"}) && @{$self->{"params"}->{"colext"}})
     {
@@ -1116,7 +1161,7 @@ sub validate_motifscan
         $helper->disp("The times parameter must be a positive integer! Using default (10)...");
         $self->{"params"}->{"times"} = 10;
     }
-    else
+    elsif (!defined($self->{"params"}->{"times"}))
     {
         $helper->disp("times parameter not defined! Using default (10)...");
         $self->{"params"}->{"times"} = 10;
