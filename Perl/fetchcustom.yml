@@ -193,9 +193,9 @@ org:
   gbdb:
    - knownGene.ix
    - knownGene.ixx
-   - bbi/wgEncodeCrgMapabilityAlign36mer.bw	
-   - bbi/wgEncodeCrgMapabilityAlign40mer.bw	
-   - bbi/wgEncodeCrgMapabilityAlign50mer.bw	
+   - bbi/wgEncodeCrgMapabilityAlign36mer.bw 
+   - bbi/wgEncodeCrgMapabilityAlign40mer.bw 
+   - bbi/wgEncodeCrgMapabilityAlign50mer.bw 
    - bbi/wgEncodeCrgMapabilityAlign75mer.bw
    - bbi/wgEncodeCrgMapabilityAlign100mer.bw
    - wib/gc5Base.wib
@@ -722,11 +722,11 @@ org:
   gbdb:
    - knownGene.ix
    - knownGene.ixx
-   - bbi/wgEncodeCrgMapabilityAlign24mer.bw	
-   - bbi/wgEncodeCrgMapabilityAlign36mer.bw	
-   - bbi/wgEncodeCrgMapabilityAlign40mer.bw	
-   - bbi/wgEncodeCrgMapabilityAlign50mer.bw	
-   - bbi/wgEncodeCrgMapabilityAlign75mer.bw	
+   - bbi/wgEncodeCrgMapabilityAlign24mer.bw 
+   - bbi/wgEncodeCrgMapabilityAlign36mer.bw 
+   - bbi/wgEncodeCrgMapabilityAlign40mer.bw 
+   - bbi/wgEncodeCrgMapabilityAlign50mer.bw 
+   - bbi/wgEncodeCrgMapabilityAlign75mer.bw 
    - bbi/wgEncodeCrgMapabilityAlign100mer.bw
    - bbi/wgEncodeBroadHistoneHelas3ControlStdSig.bigWig
    - bbi/wgEncodeBroadHistoneHelas3H2azSig.bigWig

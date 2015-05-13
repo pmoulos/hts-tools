@@ -156,8 +156,8 @@ sub run_intersections
         {
             #$cmd = File::Spec->catfile($bedtoolspath,"intersectBed")." -a $a -b $b -wa > ".File::Spec->catfile($tmpdir,"${$pairs->{$k}}[0]"."${$pairs->{$k}}[1]");
             ($reportonce) ?
-            ($cmd = File::Spec->catfile($bedtoolspath,"intersectBed")." -a $a -b $b | sort -k1,1 -k2g,2 -u > ".File::Spec->catfile($tmpdir,"${$pairs->{$k}}[0]"."${$pairs->{$k}}[1]")) :
-            ($cmd = File::Spec->catfile($bedtoolspath,"intersectBed")." -a $a -b $b > ".File::Spec->catfile($tmpdir,"${$pairs->{$k}}[0]"."${$pairs->{$k}}[1]"));
+            ($cmd = File::Spec->catfile($bedtoolspath,"bedtools intersect")." -a $a -b $b -u | sort -k1,1 -k2g,2 > ".File::Spec->catfile($tmpdir,"${$pairs->{$k}}[0]"."${$pairs->{$k}}[1]")) :
+            ($cmd = File::Spec->catfile($bedtoolspath,"bedtools intersect")." -a $a -b $b > ".File::Spec->catfile($tmpdir,"${$pairs->{$k}}[0]"."${$pairs->{$k}}[1]"));
             $helper->disp("The command is:");
             $helper->disp($cmd);
             system($cmd);

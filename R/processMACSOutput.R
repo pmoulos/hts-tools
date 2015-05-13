@@ -151,9 +151,19 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
         for (i in 1:n)
         {
             cat("Reading MACS 2 output ",basename(input[i])," ...\n",sep="")
-            all.peaks[[basename(input[i])]] <- read.delim(input[i],skip=26,row.names=NULL)
-            names(all.peaks[[basename(input[i])]]) <- 
-                c("chromosome","start","end","length","summit","pileup","significance","MACS_fe","fdr","name")
+            all.peaks[[basename(input[i])]] <- tryCatch(
+                read.delim(input[i],skip=26,row.names=NULL),
+            error = function(e) {
+                return(read.delim(input[i],skip=27,row.names=NULL))
+            },finally=NULL)
+            if (ncol(all.peaks[[basename(input[i])]])==10)
+                names(all.peaks[[basename(input[i])]]) <- 
+                    c("chromosome","start","end","length","summit","pileup",
+                        "significance","MACS_fe","fdr","name")
+            else
+                names(all.peaks[[basename(input[i])]]) <- 
+                    c("chromosome","start","end","length","pileup",
+                        "significance","MACS_fe","fdr","name")
             # FDR filtering
             if (pileup != 0 && !is.na(pileup) && !is.null(pileup))
                 fdr.fail[[basename(input[i])]] <- which(10^-all.peaks[[basename(input[i])]]$fdr>=fdr.cut | all.peaks[[basename(input[i])]]$pileup<pileup)
@@ -506,7 +516,10 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
                                 all.peaks[[nam]]$start[-filter.fail[[nam]]],sep=":"),
                                 all.peaks[[nam]]$end[-filter.fail[[nam]]],sep="-"),
                     all.peaks[[nam]]$length[-filter.fail[[nam]]],
-                    all.peaks[[nam]]$summit[-filter.fail[[nam]]],
+                    if (!is.null(all.peaks[[nam]]$summit))
+                        all.peaks[[nam]]$summit[-filter.fail[[nam]]]
+                    else
+                        rep(NA,length(all.peaks[[nam]]$chromosome[-filter.fail[[nam]]])),
                     count.matrix[[nam]][-filter.fail[[nam]],],
                     if (!is.null(count.matrix.norm[[nam]])) count.matrix.norm[[nam]][-filter.fail[[nam]],] else matrix(NA,length(all.peaks[[nam]]$chromosome[-filter.fail[[nam]]]),ifelse(hasControl,2,1)),
                     avg.counts.matrix[[nam]][-filter.fail[[nam]],],
@@ -537,7 +550,10 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
                                     all.peaks[[nam]]$start[filter.fail[[nam]]],sep=":"),
                                     all.peaks[[nam]]$end[filter.fail[[nam]]],sep="-"),
                         all.peaks[[nam]]$length[filter.fail[[nam]]],
-                        all.peaks[[nam]]$summit[filter.fail[[nam]]],
+                        if (!is.null(all.peaks[[nam]]$summit))
+                            all.peaks[[nam]]$summit[filter.fail[[nam]]]
+                        else
+                            rep(NA,length(all.peaks[[nam]]$chromosome[filter.fail[[nam]]])),
                         count.matrix[[nam]][filter.fail[[nam]],],
                         if (!is.null(count.matrix.norm[[nam]])) count.matrix.norm[[nam]][filter.fail[[nam]],] else matrix(NA,length(all.peaks[[nam]]$chromosome[filter.fail[[nam]]]),2),
                         avg.counts.matrix[[nam]][filter.fail[[nam]],],
@@ -567,7 +583,10 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
                                 all.peaks[[nam]]$start,sep=":"),
                                 all.peaks[[nam]]$end,sep="-"),
                     all.peaks[[nam]]$length,
-                    all.peaks[[nam]]$summit,
+                    if (!is.null(all.peaks[[nam]]$summit))
+                        all.peaks[[nam]]$summit
+                    else
+                        rep(NA,length(all.peaks[[nam]]$chromosome)),
                     count.matrix[[nam]],
                     if (!is.null(count.matrix.norm[[nam]])) count.matrix.norm[[nam]] else matrix(NA,length(all.peaks[[nam]]$chromosome),ifelse(hasControl,2,1)),
                     avg.counts.matrix[[nam]],
