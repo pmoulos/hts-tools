@@ -78,6 +78,10 @@ to determine the total normalization signal (sumto).
 Writes the output of prerun option to a file specified by prerunlog. If only the
 prerunlog is specified, prerun is assumed and executed automatically.
 
+=item ncores B<(optional)>
+
+How many cores to use. Requires the presence of Parallel::Loops.
+
 =item silent B<optional>
 
 Do not display verbose messages.
@@ -193,6 +197,7 @@ sub run
     my @output = (defined($self->get("output"))) ? (@{$self->get("output")}) : (());
     my $prerun = $self->get("prerun");
     my $prerunlog = $self->get("prerunlog");
+    my $ncores = $self->get("ncores");
 
     if (!@output)
     {
@@ -221,49 +226,94 @@ sub run
         }
         else
         {
-            for (my $i=0; $i<@bglist; $i++)
+            if ($ncores==1)
             {
-                $helper->disp("Reading ".basename($bglist[$i])."...");
-                $wigsum{$bglist[$i]} = 0;
-                open(BGIN,$bglist[$i]);
-                while ($line = <BGIN>)
+                for (my $i=0; $i<@bglist; $i++)
                 {
-                    $helper->disp("  Read $. signals from ".basename($bglist[$i])."...") if ($.%1000000 == 0);
-                    $line =~ s/\r|\n$//g;
-                    ($chr,$start,$end,$signal) = split(/\t/,$line);
-                    $wigsum{$bglist[$i]} += ($end - $start)*$signal;
+                    $helper->disp("Reading ".basename($bglist[$i])."...");
+                    $wigsum{$bglist[$i]} = 0;
+                    open(BGIN,$bglist[$i]);
+                    while ($line = <BGIN>)
+                    {
+                        $helper->disp("  Read $. signals from ".basename($bglist[$i])."...") if ($.%1000000 == 0);
+                        $line =~ s/\r|\n$//g;
+                        ($chr,$start,$end,$signal) = split(/\t/,$line);
+                        $wigsum{$bglist[$i]} += ($end - $start)*$signal;
+                    }
+                    close(BGIN);
+                    $normfactor{$bglist[$i]} = $sumto/$wigsum{$bglist[$i]};
                 }
-                close(BGIN);
-                $normfactor{$bglist[$i]} = $sumto/$wigsum{$bglist[$i]};
+            }
+            else
+            {
+                my $pl1 = Parallel::Loops->new($ncores);
+                $pl1->share(\%wigsum,\%normfactor);
+                $pl1->foreach(\@bglist, sub {
+                    $helper->disp("Reading ".basename($_)."...");
+                    $wigsum{$_} = 0;
+                    open(BGIN,$_);
+                    while ($line = <BGIN>)
+                    {
+                        $line =~ s/\r|\n$//g;
+                        ($chr,$start,$end,$signal) = split(/\t/,$line);
+                        $wigsum{$_} += ($end - $start)*$signal;
+                    }
+                    close(BGIN);
+                    $normfactor{$_} = $sumto/$wigsum{$_};
+                });
             }
         }
 
         if (!$prerun && !$prerunlog)
         {
             # Reparse the bedgraph, rescale and write
-            for (my $i=0; $i<@bglist; $i++)
+            if ($ncores==1)
             {
-                if ($output[$i])
+                for (my $i=0; $i<@bglist; $i++)
                 {
-                    $helper->disp("Writing ".basename($output[$i])."...");
-                    open(OUTPUT,">$output[$i]");
+                    if ($output[$i])
+                    {
+                        $helper->disp("Writing ".basename($output[$i])."...");
+                        open(OUTPUT,">$output[$i]");
+                        $out = *OUTPUT;
+                    }
+                    else
+                    {
+                        $helper->disp("Writing to stdout...");
+                        $out = *STDOUT;
+                    }
+                    open(BGIN,$bglist[$i]);
+                    while ($line = <BGIN>)
+                    {
+                        $helper->disp("  Wrote $. normalized signals for ".basename($bglist[$i])."...") if ($.%1000000 == 0);
+                        $line =~ s/\r|\n$//g;
+                        ($chr,$start,$end,$signal) = split(/\t/,$line);
+                        $signal = $helper->round($signal*$normfactor{$bglist[$i]},2);
+                        print $out "$chr\t$start\t$end\t$signal\n";
+                    }
+                    close(BGIN);
+                }
+            }
+            else
+            {
+                my $pl2 = Parallel::Loops->new($ncores);
+                $pl2->share(\%wigsum,\%normfactor);
+                $pl2->foreach(\@bglist, sub {
+                    my $outp = $self->create_output_file($_);
+                    $helper->disp("Writing ".basename($outp)."...");
+                    open(OUTPUT,">$out");
                     $out = *OUTPUT;
-                }
-                else
-                {
-                    $helper->disp("Writing to stdout...");
-                    $out = *STDOUT;
-                }
-                open(BGIN,$bglist[$i]);
-                while ($line = <BGIN>)
-                {
-                    $helper->disp("  Wrote $. normalized signals for ".basename($bglist[$i])."...") if ($.%1000000 == 0);
-                    $line =~ s/\r|\n$//g;
-                    ($chr,$start,$end,$signal) = split(/\t/,$line);
-                    $signal = $helper->round($signal*$normfactor{$bglist[$i]},2);
-                    print $out "$chr\t$start\t$end\t$signal\n";
-                }
-                close(BGIN);
+                    
+                    open(BGIN,$_);
+                    while ($line = <BGIN>)
+                    {
+                        $line =~ s/\r|\n$//g;
+                        ($chr,$start,$end,$signal) = split(/\t/,$line);
+                        $signal = $helper->round($signal*$normfactor{$_},2);
+                        print $out "$chr\t$start\t$end\t$signal\n";
+                    }
+                    close(BGIN);
+                });
             }
         }
         else
@@ -301,31 +351,57 @@ sub run
         }
         else
         {
-            for (my $i=0; $i<@bglist; $i++)
+            if ($ncores==1)
             {
-                $helper->disp("Reading ".basename($bglist[$i])."...");
-                $wigsum{$bglist[$i]} = `awk '{sum += (\$3-\$2)*\$4; if (FNR \% 1000000==0) { printf("\\n  Read %d signals from %s",FNR,FILENAME) | "cat 1>&2"}} END {print sum}' $bglist[$i]`;
-                $normfactor{$bglist[$i]} = $sumto/$wigsum{$bglist[$i]};
+                for (my $i=0; $i<@bglist; $i++)
+                {
+                    $helper->disp("Reading ".basename($bglist[$i])."...");
+                    $wigsum{$bglist[$i]} = `awk '{sum += (\$3-\$2)*\$4; if (FNR \% 1000000==0) { printf("\\n  Read %d signals from %s",FNR,FILENAME) | "cat 1>&2"}} END {print sum}' $bglist[$i]`;
+                    $normfactor{$bglist[$i]} = $sumto/$wigsum{$bglist[$i]};
+                }
+            }
+            else
+            {
+                my $pl3 = Parallel::Loops->new($ncores);
+                $pl3->share(\%wigsum,\%normfactor);
+                $pl3->foreach(\@bglist, sub {
+                    $helper->disp("Reading ".basename($_)."...");
+                    $wigsum{$_} = `awk '{sum += (\$3-\$2)*\$4; } END {print sum}' $_`;
+                    $normfactor{$_} = $sumto/$wigsum{$_};
+                });
             }
         }
 
         if (!$prerun && !$prerunlog)
         {
             # Reparse the bedgraph, rescale and write
-            for (my $i=0; $i<@bglist; $i++)
+            if ($ncores==1)
             {
-                if ($output[$i])
+                for (my $i=0; $i<@bglist; $i++)
                 {
-                    $helper->disp("Writing ".basename($output[$i])."...");
-                    #`awk -v var="$output[$i]" '{print \$1"\\t"\$2"\\t"\$3"\\t"\$4*$normfactor{$bglist[$i]}; if (FNR \% 1000000==0) { printf("\\n  Wrote %d signals to %s",FNR,var) | "cat 1>&2"}}' $bglist[$i] > $output[$i]`;
-                    `awk -v var="$output[$i]" '{printf \"%s\\t%s\\t%s\\t%.2f\\n\", \$1,\$2,\$3,\$4*$normfactor{$bglist[$i]}; if (FNR \% 1000000==0) { printf("\\n  Wrote %d signals to %s",FNR,var) | "cat 1>&2"}}' $bglist[$i] > $output[$i]`;
-                    
+                    if ($output[$i])
+                    {
+                        $helper->disp("Writing ".basename($output[$i])."...");
+                        #`awk -v var="$output[$i]" '{print \$1"\\t"\$2"\\t"\$3"\\t"\$4*$normfactor{$bglist[$i]}; if (FNR \% 1000000==0) { printf("\\n  Wrote %d signals to %s",FNR,var) | "cat 1>&2"}}' $bglist[$i] > $output[$i]`;
+                        `awk -v var="$output[$i]" '{printf \"%s\\t%s\\t%s\\t%.2f\\n\", \$1,\$2,\$3,\$4*$normfactor{$bglist[$i]}; if (FNR \% 1000000==0) { printf("\\n  Wrote %d signals to %s",FNR,var) | "cat 1>&2"}}' $bglist[$i] > $output[$i]`;
+                        
+                    }
+                    else {
+                        $helper->disp("Writing to stdout...");
+                        #`awk '{print \$1"\\t"\$2"\\t"\$3"\\t"\$4*$normfactor{$bglist[$i]}}' $bglist[$i]`;
+                        `awk '{printf \"%s\\t%s\\t%s\\t%.2f\\n\", \$1,\$2,\$3,\$4*$normfactor{$bglist[$i]}}' $bglist[$i]`;
+                    }
                 }
-                else {
-                    $helper->disp("Writing to stdout...");
-                    #`awk '{print \$1"\\t"\$2"\\t"\$3"\\t"\$4*$normfactor{$bglist[$i]}}' $bglist[$i]`;
-                    `awk '{printf \"%s\\t%s\\t%s\\t%.2f\\n\", \$1,\$2,\$3,\$4*$normfactor{$bglist[$i]}}' $bglist[$i]`;
-                }
+            }
+            else
+            {
+                my $pl4 = Parallel::Loops->new($ncores);
+                $pl4->share(\%wigsum,\%normfactor);
+                $pl4->foreach(\@bglist, sub {
+                    my $outp = $self->create_output_file($_);
+                    $helper->disp("Writing ".basename($outp)."...");
+                    `awk -v var="$outp" '{printf \"%s\\t%s\\t%s\\t%.2f\\n\", \$1,\$2,\$3,\$4*$normfactor{$_};}' $_ > $outp`;
+                });
             }
         }
         else

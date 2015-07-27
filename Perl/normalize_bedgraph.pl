@@ -26,6 +26,7 @@ our $perlonly;
 our @output;
 our $prerun;
 our $prerunlog;
+our $ncores;
 our $man;
 our $log;
 our $silent;
@@ -46,7 +47,8 @@ my $tool = HTS::Tools->new({
             "exportfactors" => $exportfacs,
             "perlonly" => $perlonly,
             "prerun" => $prerun,
-            "prerunlog" => $prerunlog
+            "prerunlog" => $prerunlog,
+            "ncores" => $ncores
         }
 });
 $tool->run;
@@ -64,6 +66,7 @@ sub check_inputs
         "perlonly|p" => \$perlonly,
         "prerun|r" => \$prerun,
         "prerunlog|l=s" => \$prerunlog,
+        "ncores|c=i" => \$ncores,
         "man|m" => \$man,
         "log|g" => \$log,
         "silent|s" => \$silent,
@@ -165,6 +168,13 @@ to determine the total normalization signal (--sumto).
 
 Writes the output of --prerun to a file specified by --prerunlog. If only the
 --prerunlog is specified, --prerun is executed automatically.
+
+=item ncores B<(optional)>
+
+--ncores or -c
+
+Runs the script in parallel mode where one core processes one bedgraph file. It
+requires the module Parallel::Loops to be installed.
 
 =item silent B<optional>
 

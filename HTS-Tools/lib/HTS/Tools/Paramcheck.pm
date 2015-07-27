@@ -1286,7 +1286,7 @@ sub validate_normalize_bedgraph
     my $modname = "HTS::Tools::Normalize::Bedgraph";
     
     my @accept = ("input","type","output","extnorm","sumto","exportfactors","perlonly","prerun",
-            "prerunlog","log","silent","tmpdir");
+            "prerunlog","ncores","log","silent","tmpdir");
     
     # Check fatal
     my $stop;
@@ -1305,6 +1305,17 @@ sub validate_normalize_bedgraph
         $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($helper->smatch($p,@accept)));
     }
     
+    # Check number of cores and parallel mode
+    if ($self->{"params"}->{"ncores"} && $self->{"params"}->{"ncores"}>1)
+    {
+        my $status = eval { $helper->try_module("Parallel::Loops") };
+        if ($status)
+        {
+            $helper->disp("Module Parallel::Loops is required to use multiple cores! Using 1 core...");
+            $self->{"params"}->{"ncores"} = 1;
+        }
+        else { use Parallel::Loops; }
+    }
     # Check signal summarization
     if (!$self->{"params"}->{"sumto"})
     {
