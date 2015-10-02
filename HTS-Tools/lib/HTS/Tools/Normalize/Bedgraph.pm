@@ -148,7 +148,8 @@ sub new
     $helper->advertise($MODNAME,$VERSION,$AUTHOR,$EMAIL,$DESC);
 
     # Validate the input parameters
-    my $checker = HTS::Tools::Paramcheck->new({"tool" => "normalize", "params" => $params});
+    my $checker = HTS::Tools::Paramcheck->new({"tool" => "normalize_bedgraph",
+        "params" => $params});
     $params = $checker->validate;
 
     # After validating, bless and initialize
@@ -441,6 +442,8 @@ sub run
     }
 
     $helper->disp("Finished!\n\n");
+    
+    return(@output);
 }
 
 =head2 create_output_file

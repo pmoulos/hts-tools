@@ -107,57 +107,73 @@ The main parameter validator function of the module
 sub validate
 {
     my $self = shift @_;
-    if ($self->{"tool"} =~ m/assign/i)
+    if ($self->{"tool"} =~ m/^assign$/i)
     {
         $self->validate_assign;
     }
-    elsif ($self->{"tool"} =~ m/constants/i)
+    elsif ($self->{"tool"} =~ m/^constants$/i)
     {
         $self->validate_constants;
     }
-    elsif ($self->{"tool"} =~ m/convert/i)
+    elsif ($self->{"tool"} =~ m/^convert$/i)
     {
         $self->validate_convert;
     }
-    elsif ($self->{"tool"} =~ m/count/i)
+    elsif ($self->{"tool"} =~ m/^count$/i)
     {
         $self->validate_count;
     }
-    elsif ($self->{"tool"} =~ m/fetch/i)
+    elsif ($self->{"tool"} =~ m/^fetch$/i)
     {
         $self->validate_fetch;
     }
-    elsif ($self->{"tool"} =~ m/intersect/i)
+    elsif ($self->{"tool"} =~ m/^intersect$/i)
     {
         $self->validate_intersect;
     }
-    elsif ($self->{"tool"} =~ m/motifscan/i)
+    elsif ($self->{"tool"} =~ m/^motifscan$/i)
     {
         $self->validate_motifscan;
     }
-    elsif ($self->{"tool"} =~ m/multisect/i)
+    elsif ($self->{"tool"} =~ m/^multisect$/i)
     {
         $self->validate_multisect;
     }
-    elsif ($self->{"tool"} =~ m/normalize/i)
+    elsif ($self->{"tool"} =~ m/^normalize$/i)
     {
         $self->validate_normalize;
     }
-    elsif ($self->{"tool"} =~ m/profile/i)
+    elsif ($self->{"tool"} =~ m/^normalize_bed$/i)
+    {
+        $self->validate_normalize_bed;
+    }
+    elsif ($self->{"tool"} =~ m/^normalize_bedgraph$/i)
+    {
+        $self->validate_normalize_bedgraph;
+    }
+    elsif ($self->{"tool"} =~ m/^profile$/i)
     {
         $self->validate_profile;
     }
-    elsif ($self->{"tool"} =~ m/qc/i)
+    elsif ($self->{"tool"} =~ m/^qc$/i)
     {
         $self->validate_qc;
     }
-    elsif ($self->{"tool"} =~ m/queries/i)
+    elsif ($self->{"tool"} =~ m/^queries$/i)
     {
         $self->validate_queries;
     }
-    elsif ($self->{"tool"} =~ m/track/i)
+    elsif ($self->{"tool"} =~ m/^track$/i)
     {
         $self->validate_track;
+    }
+    elsif ($self->{"tool"} =~ m/^track_signal$/i)
+    {
+        $self->validate_track_signal;
+    }
+    elsif ($self->{"tool"} =~ m/^track_hub$/i)
+    {
+        $self->validate_track_hub;
     }
 }
 
@@ -1306,15 +1322,22 @@ sub validate_normalize_bedgraph
     }
     
     # Check number of cores and parallel mode
-    if ($self->{"params"}->{"ncores"} && $self->{"params"}->{"ncores"}>1)
+    if (defined($self->{"params"}->{"ncores"}))
     {
-        my $status = eval { $helper->try_module("Parallel::Loops") };
-        if ($status)
+        if ($self->{"params"}->{"ncores"}>1)
         {
-            $helper->disp("Module Parallel::Loops is required to use multiple cores! Using 1 core...");
-            $self->{"params"}->{"ncores"} = 1;
+            my $status = eval { $helper->try_module("Parallel::Loops") };
+            if ($status)
+            {
+                $helper->disp("Module Parallel::Loops is required to use multiple cores! Using 1 core...");
+                $self->{"params"}->{"ncores"} = 1;
+            }
+            else { use Parallel::Loops; }
         }
-        else { use Parallel::Loops; }
+    }
+    else
+    {
+        $self->{"params"}->{"ncores"} = 1;
     }
     # Check signal summarization
     if (!$self->{"params"}->{"sumto"})
@@ -1328,7 +1351,7 @@ sub validate_normalize_bedgraph
         $self->{"params"}->{"sumto"} = 1000000000;
     }
     # Check presence of external normalization factors
-    if (@{$self->{"params"}->{"extnorm"}})
+    if (defined($self->{"params"}->{"extnorm"}) && @{$self->{"params"}->{"extnorm"}})
     {
         my $e = @{$self->{"params"}->{"extnorm"}};
         my $b = @{$self->{"params"}->{"input"}};
@@ -1346,17 +1369,25 @@ sub validate_normalize_bedgraph
     # Check dry run and output files
     if (!$self->{"params"}->{"prerun"} && !$self->{"params"}->{"prerunlog"})
     {
-        if (@{$self->{"params"}->{"output"}} && ${$self->{"params"}->{"output"}}->[0] ne "stdout")
+        if (defined($self->{"params"}->{"output"}))
         {
-            my $o = @{$self->{"params"}->{"output"}};
-            my $b = @{$self->{"params"}->{"input"}};
-            if ($o != $b)
+            if (@{$self->{"params"}->{"output"}} && ${$self->{"params"}->{"output"}}->[0] ne "stdout")
             {
-                $helper->disp("The number of output files must be equal to the number of input files! Ignoring and autogenerating...");
+                my $o = @{$self->{"params"}->{"output"}};
+                my $b = @{$self->{"params"}->{"input"}};
+                if ($o != $b)
+                {
+                    $helper->disp("The number of output files must be equal to the number of input files! Ignoring and autogenerating...");
+                    @{$self->{"params"}->{"output"}} = ();
+                }
+            }
+            elsif (!@{$self->{"params"}->{"output"}})
+            {
+                $helper->disp("Output filenames will be autogenerated...");
                 @{$self->{"params"}->{"output"}} = ();
             }
         }
-        elsif (!@{$self->{"params"}->{"output"}})
+        else
         {
             $helper->disp("Output filenames will be autogenerated...");
             @{$self->{"params"}->{"output"}} = ();
@@ -1671,7 +1702,7 @@ sub validate_track_signal
         my ($base,$dir,$ext) = fileparse($self->{"params"}->{"input"},'\.[^.]*');
         $self->{"params"}->{"dir"} = $dir;
     }
-    if (!$self->{"params"}->{"cleanlevel"})
+    if (!defined($self->{"params"}->{"cleanlevel"}))
     {
         $helper->disp("No clean level specified! Using default (2: Removal of unlocalized/random chromosome regions and mitochondrial DNA)...");
         $self->{"params"}->{"cleanlevel"} = 2;

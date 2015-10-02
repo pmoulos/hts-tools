@@ -198,7 +198,8 @@ sub new
     $helper->advertise($MODNAME,$VERSION,$AUTHOR,$EMAIL,$DESC);
 
     # Validate the input parameters
-    my $checker = HTS::Tools::Paramcheck->new({"tool" => "track","params" => $params});
+    my $checker = HTS::Tools::Paramcheck->new({"tool" => "track_hub",
+        "params" => $params});
     $params = $checker->validate;
 
     # After validating, bless and initialize

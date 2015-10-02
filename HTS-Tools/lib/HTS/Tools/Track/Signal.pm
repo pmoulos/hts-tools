@@ -141,7 +141,8 @@ sub new
     $helper->advertise($MODNAME,$VERSION,$AUTHOR,$EMAIL,$DESC);
 
     # Validate the input parameters
-    my $checker = HTS::Tools::Paramcheck->new({"tool" => "track", "params" => $params});
+    my $checker = HTS::Tools::Paramcheck->new({"tool" => "track_signal",
+        "params" => $params});
     $params = $checker->validate;
 
     # After validating, bless and initialize
@@ -185,114 +186,121 @@ sub run
     
     # Copy some memory-less variables to avoid rewriting the whole thing...
     my $input = $self->get("input");
-    my $source = $self->get("source");
-    my $destination = $self->get("destination");
+    my $source = lc($self->get("source"));
+    my $destination = lc($self->get("destination"));
     my $dir = $self->get("dir");
     my $org = $self->get("org");
     my $ver = $self->get("gversion");
     my $clevel = $self->get("cleanlevel");
     my $sort = $self->get("sort");
     my $options = $self->get("options");
+    
+    #print "\n\n$source\n$destination\n";
+    #print $source."2".$destination."\n";
+    #if ($source."2".$destination eq "bedgraph2bigwig") {
+    #    print "Fucking matches!\n\n";
+    #}
 
-    # Check the existence of propoer Constants
+    # Check the existence of proper Constants
     $self->check_constants($source,$destination);
 
     # Actual job must be performed, organized in subroutines...
     my ($track,$header);
-    if ($source."2".$destination =~ m/^bam2bedgraph$/i)
+    if ($source."2".$destination eq "bam2bedgraph")
     {
         ($track,$header) = $self->bam2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^bam2bigbed$/i)
+    elsif ($source."2".$destination eq "bam2bigbed")
     {
         ($track,$header) = $self->bam2bigbed($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^bam2bigwig$/i)
+    elsif ($source."2".$destination eq "bam2bigwig")
     {
         ($track,$header) = $self->bam2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^bam2wig$/i)
+    elsif ($source."2".$destination eq "bam2wig")
     {
         ($track,$header) = $self->bam2wig($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^bed2bam$/i)
+    elsif ($source."2".$destination eq "bed2bam")
     {
         ($track,$header) = $self->bed2bam($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^bed2bedgraph$/i)
+    elsif ($source."2".$destination eq "bed2bedgraph")
     {
         ($track,$header) = $self->bed2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^bed2bigbed$/i)
+    elsif ($source."2".$destination eq "bed2bigbed")
     {
          ($track,$header) = $self->bed2bigbed($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^bed2bigwig$/i)
+    elsif ($source."2".$destination eq "bed2bigwig")
     {
         ($track,$header) = $self->bed2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^bed2wig$/i)
+    elsif ($source."2".$destination eq "bed2wig")
     {
         ($track,$header) = $self->bed2wig($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^bedgraph2bigwig$/i)
+    elsif ($source."2".$destination eq "bedgraph2bigwig")
     {
         ($track,$header) = $self->bedgraph2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^bedgraph2wig$/i)
+    elsif ($source."2".$destination eq "bedgraph2wig")
     {
         ($track,$header) = $self->bedgraph2wig($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^bigbed2bam$/i)
+    elsif ($source."2".$destination eq "bigbed2bam")
     {
         ($track,$header) = $self->bigbed2bam($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^bigbed2bed$/i)
+    elsif ($source."2".$destination eq "bigbed2bed")
     {
         ($track,$header) = $self->bigbed2bed($input,$dir,$options);
     }
-    elsif ($source."2".$destination =~ m/^bigbed2bedgraph$/i)
+    elsif ($source."2".$destination eq "bigbed2bedgraph")
     {
         ($track,$header) = $self->bigbed2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^bigbed2bigwig$/i)
+    elsif ($source."2".$destination eq "bigbed2bigwig")
     {
         ($track,$header) = $self->bigbed2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^bigwig2bedgraph$/i)
+    elsif ($source."2".$destination eq "bigwig2bedgraph")
     {
         ($track,$header) = $self->bigwig2bedgraph($input,$dir,$options);
     }
-    elsif ($source."2".$destination =~ m/^bigwig2wig$/i)
+    elsif ($source."2".$destination eq "bigwig2wig")
     {
         ($track,$header) = $self->bigwig2wig($input,$dir,$options);
     }
-    elsif ($source."2".$destination =~ m/^wig2bigwig$/i)
+    elsif ($source."2".$destination eq "wig2bigwig")
     {
         ($track,$header) = $self->wig2bigwig($input,$dir,$org,$ver,$options);
     }
-    elsif ($source."2".$destination =~ m/^wig2bedgraph$/i)
+    elsif ($source."2".$destination eq "wig2bedgraph")
     {
         ($track,$header) = $self->bigbed2bigwig($input,$dir,$org,$ver,$options);
     }
-    elsif ($source."2".$destination =~ m/^sam2bedgraph$/i)
+    elsif ($source."2".$destination eq "sam2bedgraph")
     {
         ($track,$header) = $self->sam2bedgraph($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^sam2bigbed$/i)
+    elsif ($source."2".$destination eq "sam2bigbed")
     {
         ($track,$header) = $self->sam2bigbed($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^sam2bigwig$/i)
+    elsif ($source."2".$destination eq "sam2bigwig")
     {
         ($track,$header) = $self->sam2bigwig($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
-    elsif ($source."2".$destination =~ m/^sam2wig$/i)
+    elsif ($source."2".$destination eq "sam2wig")
     {
         ($track,$header) = $self->sam2wig($input,$dir,$org,$ver,$clevel,$sort,$options);
     }
 
     # Then, header creation and append or write to file according to destination type
+    return($track,$header);
     
 }
 
@@ -832,7 +840,6 @@ sub bedgraph2bigwig
 {
     my ($self,$input,$dir,$org,$ver,$clevel,$sort,$options) = @_;
     my ($track,$header);
-
     my $chromsize = $self->get_chrom_size($org,$ver);
     my $kenthome = $const->get("KENTBIN_HOME");
     my $bedgraph2bigwig = File::Spec->catfile($kenthome,"bedGraphToBigWig");
@@ -1587,15 +1594,15 @@ sub clean_bedstar
             }
             elsif ($clevel == 1)
             {
-                `grep -vP 'chrU|rand|hap' $infile | sort -k1,1 -k2g,2 -k3g,3  > $tmpfile `;
+                `grep -vP 'chrU|chrG|rand|hap|loc|cox' $infile | sort -k1,1 -k2g,2 -k3g,3  > $tmpfile `;
             }
             elsif ($clevel == 2)
             {
-                `grep -vP 'chrM|chrU|rand|hap' $infile | sort -k1,1 -k2g,2 -k3g,3  > $tmpfile `;
+                `grep -vP 'chrM|chrU|chrG|rand|hap|loc|cox' $infile | sort -k1,1 -k2g,2 -k3g,3  > $tmpfile `;
             }
             elsif ($clevel == 3)
             {
-                `grep -vP 'chrM|chrU|rand|hap' $infile | sort -k1,1 -k2g,2 -k3g,3 -u  > $tmpfile `;
+                `grep -vP 'chrM|chrU|chrG|rand|hap|loc|cox' $infile | sort -k1,1 -k2g,2 -k3g,3 -u  > $tmpfile `;
             }
             $infile = $tmpfile;
         }
@@ -1614,8 +1621,8 @@ sub clean_bedstar
                 {
                     while (<LEV1INPUT>)
                     {
-                        next if ($_ =~ m/chrU|rand|hap/i && $clevel == 1);
-                        next if ($_ =~ m/chrM|chrU|rand|hap/i && $clevel == 2);
+                        next if ($_ =~ m/chrU|chrG|rand|hap|loc|cox/i && $clevel == 1);
+                        next if ($_ =~ m/chrM|chrU|chrG|rand|hap|loc|cox/i && $clevel == 2);
                         print LEV1OUTPUT $_;
                     }
                 }
@@ -1624,7 +1631,7 @@ sub clean_bedstar
                     while (my $line = <LEV1INPUT>)
                     {
                         my @cols = split(/\t/,$line);
-                        next if ($line =~ m/chrM|chrU|rand|hap/i && $seen{join("\t",@cols[0..2])});
+                        next if ($line =~ m/chrM|chrU|chrG|rand|hap|loc|cox/i && $seen{join("\t",@cols[0..2])});
                         $seen{join("\t",@cols[0..2])}++;
                         print LEV1OUTPUT $line;
                     }
@@ -1654,15 +1661,15 @@ sub clean_bedstar
             }
             elsif ($clevel == 1)
             {
-                `grep -vP 'chrU|rand|hap' $infile > $tmpfile `;
+                `grep -vP 'chrU|chrG|rand|hap|loc|cox' $infile > $tmpfile `;
             }
             elsif ($clevel == 2)
             {
-                `grep -vP 'chrM|chrU|rand|hap' $infile > $tmpfile `;
+                `grep -vP 'chrM|chrG|rand|hap|loc|cox' $infile > $tmpfile `;
             }
             elsif ($clevel == 3) # In this case, sorting is forced...
             {
-                `grep -vP 'chrM|chrU|rand|hap' $infile | sort -k1,1 -k2g,2 -k3g,3 -u  > $tmpfile `;
+                `grep -vP 'chrM|chrG|rand|hap|loc|cox' $infile | sort -k1,1 -k2g,2 -k3g,3 -u  > $tmpfile `;
             }
             $infile = $tmpfile;
         }
@@ -1679,8 +1686,8 @@ sub clean_bedstar
                 {
                     while (<LEV1INPUT>)
                     {
-                        next if ($_ =~ m/chrU|rand|hap/i && $clevel == 1);
-                        next if ($_ =~ m/chrM|chrU|rand|hap/i && $clevel == 2);
+                        next if ($_ =~ m/chrG|rand|hap|loc|cox/i && $clevel == 1);
+                        next if ($_ =~ m/chrM|chrG|rand|hap|loc|cox/i && $clevel == 2);
                         print LEV1OUTPUT $_;
                     }
                 }
@@ -1689,7 +1696,7 @@ sub clean_bedstar
                     while (my $line = <LEV1INPUT>)
                     {
                         my @cols = split(/\t/,$line);
-                        next if ($line =~ m/chrM|chrU|rand|hap/i && $seen{join("\t",@cols[0..2])});
+                        next if ($line =~ m/chrM|chrG|rand|hap|loc|cox/i && $seen{join("\t",@cols[0..2])});
                         $seen{join("\t",@cols[0..2])}++;
                         print LEV1OUTPUT $line;
                     }

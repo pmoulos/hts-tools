@@ -16,7 +16,7 @@ run on Linux or Windows.
     use HTS::Tools::Normalize::Bed;
     my %params = (
         'input' => ['normal_rnaseq_1.bed','normal_rnaseq_2.bed',
-			'disease_rnaseq_1.bed','disease_rnaseq_2.bed'],
+            'disease_rnaseq_1.bed','disease_rnaseq_2.bed'],
         'rand' => '20000000'
     )
     my $bed = HTS::Tools::Normalize::Bed->new(\%params);
@@ -114,7 +114,8 @@ sub new
     $helper->advertise($MODNAME,$VERSION,$AUTHOR,$EMAIL,$DESC);
 
     # Validate the input parameters
-    my $checker = HTS::Tools::Paramcheck->new({"tool" => "normalize", "params" => $params});
+    my $checker = HTS::Tools::Paramcheck->new({"tool" => "normalize_bed",
+        "params" => $params});
     $params = $checker->validate;
 
     # After validating, bless and initialize
