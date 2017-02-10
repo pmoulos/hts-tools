@@ -2,6 +2,8 @@
 #       the original inputs
 # TODO: Support for two values of f, one for treatment, one for control
 # TODO: Write documentation...
+# Apparently, just Poisson is not good enough when only treatment available. To
+# make Poisson work, we obviously have to completely exclude enriched regions
 
 normalize.skellam <- function(treatment,control=NA,down.to=NA,bin.size=1000,frag.size=300,chrom.info.file=NULL,f=0.9,pval=1e-6,
                               rr.score="uniform",c=1,write.output=TRUE,org="hg19",output=NA,n.core=6,
@@ -101,14 +103,14 @@ normalize.skellam <- function(treatment,control=NA,down.to=NA,bin.size=1000,frag
     # Start doing the job
     cat("Importing track ",basename(treatment),"... Please wait...\n",sep="")
     flush.console()
-    treat.bed <- import.bed(treatment,trackLine=FALSE,asRangedData=FALSE)
+    treat.bed <- import.bed(treatment,trackLine=FALSE)
     treat.depth <- length(treat.bed)
 
     if (!is.na(control))
     {
         cat("Importing track ",basename(control),"... Please wait...\n",sep="")
         flush.console()
-        control.bed <- import.bed(control,trackLine=FALSE,asRangedData=FALSE)
+        control.bed <- import.bed(control,trackLine=FALSE)
         control.depth <- length(control.bed)
     }
     
@@ -603,13 +605,15 @@ normalize.skellam <- function(treatment,control=NA,down.to=NA,bin.size=1000,frag
                 gen.win.et[[chr]] <- gen.win[[chr]][alive[iet]]
                 gen.win.ec[[chr]] <- gen.win[[chr]][alive[iec]]
             }
-            else
+            else # HERE!!!
             {
                 alive <- which(bin.counts$treatment[[chr]] != 0)
-                l.alive[chr] <- lentgh(alive)
+                l.alive[chr] <- length(alive)
                 y <- bin.counts$treatment[[chr]][alive]
-                lamda <- (length(treat.bed[seqnames(treat.bed)==chr])*(y/win.size))/(eff.gen.size*win.sidze/attr(chrom.info,"genome.size"))
+                lamda <- (length(treat.bed[seqnames(treat.bed)==chr])*(y/bin.size))/(eff.gen.size*bin.size/attr(chrom.info,"genome.size"))
+                ###***
                 exp.tag <- qpois(1-pval,lambda=lamda)
+                ###***
                 ie <- which(y > exp.tag)
                 ye[[chr]] <- y[ie]
                 gen.win.et[[chr]] <- gen.win[[chr]][alive[ie]]
@@ -619,13 +623,16 @@ normalize.skellam <- function(treatment,control=NA,down.to=NA,bin.size=1000,frag
             cat("  Adjusting treatment bounds for enrichment bleeding...\n")
             if ( start(gen.win.et[[chr]][1]) + (end(gen.win.et[[chr]][1]) - start(gen.win.et[[chr]][1]))/2 - (bin.size+2*frag.size)/2 < 1 )
             {
+                cat("    Done first\n")
                 # The first position
                 ranges(gen.win.et[[chr]][1]) <- resize(ranges(gen.win.et[[chr]][1]),bin.size+frag.size,fix="start")
+                cat("    Done second\n")
                 # The second position
                 if ( start(gen.win.et[[chr]][2]) + (end(gen.win.et[[chr]][2]) - start(gen.win.et[[chr]][2]))/2 - (bin.size+2*frag.size)/2 < 1 )
                     ranges(gen.win.et[[chr]][2]) <- resize(ranges(gen.win.et[[chr]][2]),bin.size+frag.size,fix="start")
                 else
                     ranges(gen.win.et[[chr]][2]) <- resize(ranges(gen.win.et[[chr]][2]),bin.size+2*frag.size,fix="center")
+                cat("    Done third\n")
             }
             else
                 ranges(gen.win.et[[chr]][1:2]) <- resize(ranges(gen.win.et[[chr]][1:2]),bin.size+2*frag.size,fix="center")
@@ -740,11 +747,11 @@ normalize.skellam <- function(treatment,control=NA,down.to=NA,bin.size=1000,frag
                 n.remove.net[chr] <- n.remove.net[chr] + d
             }
             
-            #cat("    ",n.fall.et[chr]," reads fall into enriched regions\n",sep="")
-            #cat("    ",n.fall.net[chr]," reads fall into non-enriched regions\n",sep="")
-            #cat("    ",n.remove.et[chr]," reads will be removed from enriched regions\n",sep="")
-            #cat("    ",n.remove.net[chr]," reads will be removed from non-enriched regions\n",sep="")
-            #cat("\n\n")
+            cat("    ",n.fall.et[chr]," reads fall into enriched regions\n",sep="")
+            cat("    ",n.fall.net[chr]," reads fall into non-enriched regions\n",sep="")
+            cat("    ",n.remove.et[chr]," reads will be removed from enriched egions\n",sep="")
+            cat("    ",n.remove.net[chr]," reads will be removed from non-enriched regions\n",sep="")
+            cat("\n\n")
             
             # Exponential and linear score are not available because of different lengths of enriched and non-enriched regions in
             # treatment and control
@@ -763,6 +770,10 @@ normalize.skellam <- function(treatment,control=NA,down.to=NA,bin.size=1000,frag
                     cat("    Iteration ",cc,"...\n",sep="")
                     d <- n.remove.t[chr] - ul
                     sample.space <- setdiff(unlist(bin.index$treatment$e[[chr]]),i.remove)
+                    if (length(sample.space)<ceiling(f*d)) { # Nothing to sample, already reached
+                        cat("      Empty sample space! Goal reached.\n")
+                        break
+                    }
                     cat("      Sample space: ",length(sample.space),"\tSample size: ",ceiling(f*d),"\n",sep="")
                     i.more <- sample(sample.space,ceiling(f*d))
                     i.remove <- c(i.remove,i.more)
@@ -777,6 +788,10 @@ normalize.skellam <- function(treatment,control=NA,down.to=NA,bin.size=1000,frag
                     cat("    Iteration ",cc,"...\n",sep="")
                     d <- n.remove.t[chr] - ul
                     sample.space <- setdiff(unlist(bin.index$treatment$ne[[chr]]),i.remove)
+                    if (length(sample.space)<ceiling(f*d)) { # Nothing to sample, already reached
+                        cat("      Empty sample space! Goal reached.\n")
+                        break
+                    }
                     cat("      Sample space: ",length(sample.space),"\tSample size: ",ceiling(f*d),"\n",sep="")
                     i.more <- sample(sample.space,ceiling(f*d))
                     i.remove <- c(i.remove,i.more)
@@ -835,6 +850,10 @@ normalize.skellam <- function(treatment,control=NA,down.to=NA,bin.size=1000,frag
                         cat("    Iteration ",cc,"...\n",sep="")
                         d <- n.remove.c[chr] - ul
                         sample.space <- setdiff(unlist(bin.index$control$e[[chr]]),i.remove)
+                        if (length(sample.space)<ceiling(f*d)) { # Nothing to sample, already reached
+                            cat("      Empty sample space! Goal reached.\n")
+                            break
+                        }
                         cat("      Sample space: ",length(sample.space),"\tSample size: ",ceiling(f*d),"\n",sep="")
                         i.more <- sample(sample.space,ceiling(f*d))
                         i.remove <- c(i.remove,i.more)
@@ -849,6 +868,10 @@ normalize.skellam <- function(treatment,control=NA,down.to=NA,bin.size=1000,frag
                         cat("    Iteration ",cc,"...\n",sep="")
                         d <- n.remove.c[chr] - ul
                         sample.space <- setdiff(unlist(bin.index$control$ne[[chr]]),i.remove)
+                            if (length(sample.space)<ceiling(f*d)) { # Nothing to sample, already reached
+                            cat("      Empty sample space! Goal reached.\n")
+                            break
+                        }
                         cat("      Sample space: ",length(sample.space),"\tSample size: ",ceiling(f*d),"\n",sep="")
                         i.more <- sample(sample.space,ceiling(f*d))
                         i.remove <- c(i.remove,i.more)

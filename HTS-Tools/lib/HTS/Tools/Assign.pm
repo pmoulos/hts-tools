@@ -128,8 +128,11 @@ Use this parameter to tell Assign.pm whether to check for query regions. When
 "promoter", it will check for queries upstream and downstream of subjects
 according to I<span>. If "coding", the second I<span> argument is ignored and
 it automatically becomes subject_end - subject_start + span_1 to check for
-queries inside the subject regions. "promoter" and "coding" are indicative.
-Queries and subjects can be any genomic regions of interest.
+queries inside the subject regions. If "downtes", the second I<span> argument is 
+ignored and it automatically becomes subject_end + span_1 to check for presence
+e.g. downstream of transcriptional end sites. The option names "promoter",
+"coding" and "downtes" are indicative. Queries and subjects can be any genomic 
+regions of interest.
 
 =item I<idstrand> B<(optional)>
 
@@ -585,6 +588,10 @@ sub run
                         {
                             $limit1 = $span[0];
                             $limit2 = abs($ends[$j]-$starts[$j]+$limit1);
+                        }
+                         elsif ($where eq "downtes") {
+                            $limit1 = $ends[$j];
+                            $limit2 = $ends[$j] + $span[0];
                         }
                         if ($currdist > $limit1 && $currdist < $limit2)
                         {

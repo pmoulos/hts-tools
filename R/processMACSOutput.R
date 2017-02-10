@@ -185,7 +185,7 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
             tmp <- tempfile()
             tmp.frame <- cbind(all.peaks[[basename(input[[i]])]][,1:5],as.matrix(rep("*",nrow(all.peaks[[basename(input[[i]])]]))))
             write.table(tmp.frame,tmp,sep="\t",row.names=FALSE,col.names=FALSE,quote=FALSE)
-            input.bed[[basename(input[[i]])]] <- import.bed(tmp,trackLine=FALSE,asRangedData=FALSE)
+            input.bed[[basename(input[[i]])]] <- import.bed(tmp,trackLine=FALSE)
             unlink(tmp)
         }
         
@@ -195,13 +195,13 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
             treat <- map$treatment[i]
             cat("Importing track ",basename(treat),"... Please wait...\n",sep="")
             flush.console()
-            treat.bed <- import.bed(treat,trackLine=FALSE,asRangedData=FALSE)
+            treat.bed <- import.bed(treat,trackLine=FALSE)
 
             if (normalize=="balance")
             {
                 rawt <- map$rawt[i]
                 cat("Importing track ",basename(rawt),"... Please wait...\n",sep="")
-                rawt.bed <- import.bed(rawt,trackLine=FALSE,asRangedData=FALSE)
+                rawt.bed <- import.bed(rawt,trackLine=FALSE)
                 flush.console()
             }
             
@@ -210,13 +210,13 @@ processMACSOutput <- function(input,output=NA,mapfile=NA,fdr.cut=ifelse(ver==14,
                 control <- map$control[i]
                 cat("Importing track ",basename(control),"... Please wait...\n",sep="")
                 flush.console()
-                control.bed <- import.bed(control,trackLine=FALSE,asRangedData=FALSE)
+                control.bed <- import.bed(control,trackLine=FALSE)
 
                 if (normalize=="balance")
                 {
                     rawc <- map$rawc[i]
                     cat("Importing track ",basename(rawc),"... Please wait...\n",sep="")
-                    rawc.bed <- import.bed(rawc,trackLine=FALSE,asRangedData=FALSE)
+                    rawc.bed <- import.bed(rawc,trackLine=FALSE)
                     flush.console()
                 }
             }

@@ -164,9 +164,12 @@ $scriptname --input peakfile(s) --region regfile --background backfile [OPTIONS]
             to --span. If "coding", the second --span argument is 
             ignored and it automatically becomes 
             subject_end - subject_start + span_1 to check for
-            queries inside the subject regions. "promoter" and "coding" 
-            are indicative. Queries and subjects can be any genomic 
-            regions of interest.
+            queries inside the subject regions. If "downtes", the 
+            second --span argument is ignored and it automatically 
+            becomes subject_end + span_1 to check for presence
+            e.g. downstream of transcriptional end sites. The option 
+            names "promoter", "coding" and "downtes" are indicative. 
+            Queries and subjects can be any genomic regions of interest.
   --idstrand|t      The columns in BOTH the gene files where their
             unique IDs and strands are. You should provide two values
             (e.g. --idstrand 4 5) where the first denotes the unique

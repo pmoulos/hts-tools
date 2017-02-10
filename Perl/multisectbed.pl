@@ -142,6 +142,7 @@ sub run_intersections
     # Create initial conditions for running
     my $alias = &copy_targets;
     my $pairs = &construct_run_pairs;
+    my $more_pairs = &construct_more_run_pairs;
     my $optargs = &construct_optargs;
     $optargs->{"silent"} = 1 if ($usebedtools);
     my $intersecter = HTS::Tools::Intersect->new($optargs);
@@ -169,10 +170,36 @@ sub run_intersections
             $intersecter->run;
         }
     }
+    
+    # Run more intersections
+    foreach $k (keys(%$more_pairs))
+    {
+        $a = File::Spec->catfile($tmpdir,${$more_pairs->{$k}}[0]);
+        $b = File::Spec->catfile($tmpdir,${$more_pairs->{$k}}[1]);
+        $helper->disp("\nIntersecting ${$more_pairs->{$k}}[0] and ${$more_pairs->{$k}}[1]...");
+        if ($usebedtools)
+        {
+            ($reportonce) ?
+            ($cmd = File::Spec->catfile($bedtoolspath,"bedtools intersect")." -a $a -b $b -u -v | sort -k1,1 -k2g,2 > ".File::Spec->catfile($tmpdir,"${$more_pairs->{$k}}[0]"."${$more_pairs->{$k}}[1]")) :
+            ($cmd = File::Spec->catfile($bedtoolspath,"bedtools intersect")." -a $a -b $b -v > ".File::Spec->catfile($tmpdir,"${$more_pairs->{$k}}[0]"."${$more_pairs->{$k}}[1]"));
+            $helper->disp("The command is:");
+            $helper->disp($cmd);
+            system($cmd);
+        }
+        else
+        {
+            $intersecter->set("inputA",$a);
+            $intersecter->set("inputB",$b);
+            $intersecter->set("output",["onlyA"]);
+            $intersecter->run;
+        }
+    }
 
     # Get the the areas and their length
     my $areas = &get_areas;
+    my $more_areas = &get_more_areas;
     my $counts = &count_areas($areas);
+    #my $more_counts = &count_more_areas($more_areas);
     if (!$nodraw)
     {
         $s = &create_venn($counts);
@@ -180,7 +207,7 @@ sub run_intersections
     }
     if ($export)
     {
-        &export_areas($areas,$alias,$s,$p);
+        &export_areas($areas,$more_areas,$alias,$s,$p);
     }
 }
 
@@ -211,7 +238,7 @@ sub run_R
 sub export_areas
 {
     use Archive::Tar;
-    my ($areas,$alias,@filelist) = @_;
+    my ($areas,$more_areas,$alias,@filelist) = @_;
     my $start;
     if (!defined($filelist[0]))
     {
@@ -224,13 +251,31 @@ sub export_areas
     switch(scalar @input)
     {
         case 2 {
+            copy(File::Spec->catfile($tmpdir,$more_areas->{"Ao"}),
+                File::Spec->catfile($tmpdir,"Ao"));
+            copy(File::Spec->catfile($tmpdir,$more_areas->{"Bo"}),
+                File::Spec->catfile($tmpdir,"Bo"));
             push(@filelist,(
                 File::Spec->catfile($tmpdir,$areas->{"area1"}),
                 File::Spec->catfile($tmpdir,$areas->{"area2"}),
-                File::Spec->catfile($tmpdir,$areas->{"cross.area"})
+                File::Spec->catfile($tmpdir,$areas->{"cross.area"}),
+                File::Spec->catfile($tmpdir,"Ao"),
+                File::Spec->catfile($tmpdir,"Bo")
             ));
         }
         case 3 {
+            copy(File::Spec->catfile($tmpdir,$more_areas->{"Ao"}),
+                File::Spec->catfile($tmpdir,"Ao"));
+            copy(File::Spec->catfile($tmpdir,$more_areas->{"Bo"}),
+                File::Spec->catfile($tmpdir,"Bo"));
+            copy(File::Spec->catfile($tmpdir,$more_areas->{"Co"}),
+                File::Spec->catfile($tmpdir,"Co"));
+            copy(File::Spec->catfile($tmpdir,$more_areas->{"ABo"}),
+                File::Spec->catfile($tmpdir,"ABo"));
+            copy(File::Spec->catfile($tmpdir,$more_areas->{"ACo"}),
+                File::Spec->catfile($tmpdir,"ACo"));
+            copy(File::Spec->catfile($tmpdir,$more_areas->{"BCo"}),
+                File::Spec->catfile($tmpdir,"BCo"));
             push(@filelist,(
                 File::Spec->catfile($tmpdir,$areas->{"area1"}),
                 File::Spec->catfile($tmpdir,$areas->{"area2"}),
@@ -238,7 +283,13 @@ sub export_areas
                 File::Spec->catfile($tmpdir,$areas->{"n12"}),
                 File::Spec->catfile($tmpdir,$areas->{"n23"}),
                 File::Spec->catfile($tmpdir,$areas->{"n13"}),
-                File::Spec->catfile($tmpdir,$areas->{"n123"})
+                File::Spec->catfile($tmpdir,$areas->{"n123"}),
+                File::Spec->catfile($tmpdir,"Ao"),
+                File::Spec->catfile($tmpdir,"Bo"),
+                File::Spec->catfile($tmpdir,"Co"),
+                File::Spec->catfile($tmpdir,"ABo"),
+                File::Spec->catfile($tmpdir,"ACo"),
+                File::Spec->catfile($tmpdir,"BCo")
             ));
         }
         case 4 {
@@ -584,6 +635,43 @@ sub construct_run_pairs
     return(\%uple);
 }
 
+sub construct_more_run_pairs
+{
+    use Tie::IxHash::Easy;
+    my %uple;
+    tie %uple, "Tie::IxHash::Easy";
+    use Switch;
+    switch(scalar @input)
+    {
+        case 2 {
+            %uple = (
+                1 => ["A","B"], # Ao
+                2 => ["B","A"] # Bo
+            );
+        }
+        case 3 {
+            %uple = (
+                1 => ["AB","AC"], # ABo
+                2 => ["AC","AB"], # ACo
+                3 => ["BC","AC"], # BCo
+                4 => ["A","AB"], # Ao_intermediate
+                5 => ["AAB","ACAB"], # Ao
+                6 => ["B","AB"], # Bo_intermediate
+                7 => ["BAB","BCAC"], # Bo
+                8 => ["C","BC"], # Co_intermediate
+                9 => ["CBC","ACAB"] # Co
+            );
+        }
+        case 4 {
+            %uple = ();
+        }
+        case 5 {
+            %uple = ();
+        }
+    }
+    return(\%uple);
+}
+
 sub get_areas
 {
     my %areas;
@@ -666,6 +754,38 @@ sub get_areas
     return(\%areas);
 }
 
+sub get_more_areas
+{
+    my %areas;
+    use Switch;
+    switch(scalar @input)
+    {
+        case 2 {
+            %areas = (
+                "Ao" => "AB",
+                "Bo" => "BA"
+            );
+        }
+        case 3 {
+            %areas = (
+                "Ao" => "AABACAB",
+                "Bo" => "BABBCAC",
+                "Co" => "CBCACAB",
+                "ABo" => "ABAC",
+                "ACo" => "ACAB",
+                "BCo" => "BCAC"
+            );
+        }
+        case 4 {
+            %areas = ();
+        }
+        case 5 {
+            %areas = ();
+        }
+    }
+    return(\%areas);
+}
+
 sub count_areas
 {
     my $areas = $_[0];
@@ -677,7 +797,7 @@ sub count_areas
             %counts = (
                 "area1" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area1"})),
                 "area2" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"area2"})),
-                "cross.area" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"cross.area"})),
+                "cross.area" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"cross.area"}))
             );
         }
         case 3 {
@@ -747,6 +867,46 @@ sub count_areas
             );
         }
     }
+    if ($header)
+    {
+        foreach my $k (keys(%counts))
+        {
+            $counts{$k}--;
+        }
+    }
+    return(\%counts);
+}
+
+sub count_more_areas
+{
+    my $areas = $_[0];
+    my %counts;
+    use Switch;
+    switch(scalar @input)
+    {
+        case 2 {
+            %counts = (
+                "Ao" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"Ao"})),
+                "Bo" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"Bo"}))
+            );
+        }
+        case 3 {
+            %counts = (
+                "Ao" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"Ao"})),
+                "Bo" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"Bo"})),
+                "Co" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"Co"})),
+                "ABo" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"ABo"})),
+                "ACo" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"ACo"})),
+                "BCo" => $helper->count_lines(File::Spec->catfile($tmpdir,$areas->{"BCo"}))
+            );
+        }
+        case 4 {
+            %counts = ();
+        }
+        case 5 {
+            %counts = ();
+        }
+}
     if ($header)
     {
         foreach my $k (keys(%counts))
