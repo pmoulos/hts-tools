@@ -46,6 +46,7 @@ use strict;
 use warnings FATAL => 'all';
 
 use Carp;
+use Log::Log4perl qw(get_logger :levels);
     
 use File::Spec;
 use File::Path qw(make_path remove_tree);
@@ -71,6 +72,33 @@ sub new
     my $self = {};
     bless($self,$class);
     return($self);
+}
+
+=head2 set_logger($filename)
+
+Creates a logger object using Log::Log4perl and sends messages to a specific log file defined by the
+calling module. Sets also the logger layout.
+
+    $helper->set_logger("log.txt");
+
+=cut
+
+sub set_logger
+{
+    my ($self,$logfilename) = @_;
+    #croak "\nA log file name MUST be defined if output log file is requested!\n" if (!$logfilename);
+    $logfilename = $self->now("machine").".log" if (!$logfilename || $logfilename eq "auto");
+    my $logger = get_logger("HTS::Tools::Utils");
+    $logger->level($INFO);
+    my $appender = Log::Log4perl::Appender->new(
+        "Log::Dispatch::File",
+        filename => $logfilename,
+    );
+    my $layout = Log::Log4perl::Layout::PatternLayout->new(
+        "%d %p> %m%n"
+    );
+    $appender->layout($layout);
+    $logger->add_appender($appender);
 }
 
 =head2 now($format)

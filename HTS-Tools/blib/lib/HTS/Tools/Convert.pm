@@ -68,6 +68,7 @@ sub new
         ($helper->set("silent",0));
     (defined($params->{"tmpdir"})) ? ($helper->set("tmpdir",$params->{"tmpdir"})) :
         ($helper->set("tmpdir",File::Temp->newdir()));
+    $helper->set_logger($params->{"log"}) if (defined($params->{"log"}));
     
     # Validate the input parameters
     my $checker = HTS::Tools::Paramcheck->new();

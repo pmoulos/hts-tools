@@ -1,6 +1,6 @@
 =head1 NAME
 
-HTS::Tools::Normalize - Normalization of some UCSC track formats.
+HTS::Tools - A Perl collection for processing results from next generation sequencing experiments!
 
 =head1 VERSION
 
@@ -8,12 +8,12 @@ Version 0.01
 
 =head1 SYNOPSIS
 
-This module is just a wrapper for the rest of the HTS::Tools::Normalize
+This module is just a wrapper for the rest of the HTS::Tools
 
     use HTS::Tools;
 
-    my $normalizer = HTS::Tools::Normalize->new($what,%params);
-    $normalizer->run;
+    my $tool = HTS::Tools->new($tool,%params);
+    $tool->run;
 
 =head1 EXPORT
 
@@ -24,71 +24,55 @@ if you don't export anything, such as for a purely object-oriented module.
 
 =cut
 
-package HTS::Tools::Normalize;
+package HTS::Tools;
 
-our $MODNAME = "HTS::Tools::Normalize";
+our $MODNAME = "HTS::Tools";
 our $VERSION = '0.01';
 our $AUTHOR = "Panagiotis Moulos";
 our $EMAIL = "moulos\@fleming.gr";
-our $DESC = "Track normalization wrapper for HTS::Tools::Normalize.";
+our $DESC = "Tool collection for the analysis of Next Generation Sequencing experiments.";
 
 use v5.10;
 use strict;
 use warnings FATAL => 'all';
 
-use Carp;
-use HTS::Tools::Normalize::Bed;
-use HTS::Tools::Normalize::Bedgraph;
-use HTS::Tools::Paramcheck;
+use File::Temp;
+
+use HTS::Tools::Assign;
+use HTS::Tools::Convert;
+use HTS::Tools::Count;
+use HTS::Tools::Fetch;
+use HTS::Tools::Intersect;
+use HTS::Tools::Motifscan;
+use HTS::Tools::Normalize;
+use HTS::Tools::Profile;
+use HTS::Tools::QC;
 use HTS::Tools::Utils;
 
-use vars qw($helper);
+use vars qw($tmpdir $helper);
 
 BEGIN {
     $helper = HTS::Tools::Utils->new();
-    select(STDOUT);
-    $|=1;
+    # On Ctrl-C or die, do cleanup
     $SIG{INT} = sub { $helper->catch_cleanup; }
 }
 
-=head2 new
-
-The HTS::Tools::Normalize object constructor. It accepts a set of parameters that are required to run
-the normalizer and get the output.
-
-    my $normalizer = HTS::Tools::Normalize->new({'type' => 'bedgraph','input' => 'myfile.bedGraph',
-        'sumto' => 1000000000});
+=head2 new($args)
 
 =cut
 
-sub new 
+sub new
 {
-    my ($class,$params) = @_;
+    my ($class,$args) = @_;
     my $self = {};
-
-    # Pass global variables to the helper
-    (defined($params->{"silent"})) ? ($helper->set("silent",$params->{"silent"})) :
-        ($helper->set("silent",0));
-    (defined($params->{"tmpdir"})) ? ($helper->set("tmpdir",$params->{"tmpdir"})) :
-        ($helper->set("tmpdir",File::Temp->newdir()));
-    $helper->advertise($MODNAME,$VERSION,$AUTHOR,$EMAIL,$DESC);
-
-    # Validate the input parameters
-    my $checker = HTS::Tools::Paramcheck->new();
-    $checker->set("tool","normalize");
-    $checker->set("params",$params);
-    $params = $checker->validate;
-
-    # After validating, bless and initialize
     bless($self,$class);
-    $self->init($params);
+    $self->init($args);
     return($self);
 }
 
-
 =head2 init($args)
 
-HTS::Tools::Normalize object initialization method. NEVER use this directly, use new instead.
+HTS::Tools object initialization method. NEVER use this directly, use new instead.
 
 =cut
 
@@ -96,28 +80,57 @@ sub init
 {
     my ($self,$args) = @_;
 
-    ## Pass the above global parameters to the parameter structure for each tool. We do it like this
-    ## because each module is supposed to be used also independently of the wrapper.
-    #$args->{"params"}->{"tmpdir"} = $self->get("tmpdir");
-    #$args->{"params"}->{"silent"} = $self->get("silent");
-    #$args->{"params"}->{"log"} = $self->get("log");
+    # Init self with global variables such as tmpdir and verbosity
+    (defined($args->{"tmpdir"})) ? ($self->set("tmpdir",$args->{"tmpdir"})) :
+        ($self->set("tmpdir",File::Temp->newdir()));
+    (defined($args->{"silent"})) ? ($self->set("silent",$args->{"silent"})) :
+        ($self->set("silent",0));
+    (defined($args->{"log"})) ? ($self->set("log",$args->{"log"})) :
+        ($self->set("log",0));
 
-    # Can't use matching as bed and bedgraph would cause problem
-    if ($args->{"type"} eq "bed")
-    {
-        $self->set("tool",HTS::Tools::Normalize::Bed->new($args));
-    }
-    elsif ($args->{"type"} eq "bedgraph")
-    {
-        $self->set("tool",HTS::Tools::Normalize::Bedgraph->new($args));
-    }
+    # Pass the above global parameters to the parameter structure for each tool. We do it like this
+    # because each module is supposed to be used also independently of the wrapper.
+    $args->{"params"}->{"tmpdir"} = $self->get("tmpdir");
+    $args->{"params"}->{"silent"} = $self->get("silent");
+    $args->{"params"}->{"log"} = $self->get("log");
     
+    if ($args->{"tool"} =~ m/assign/i) {
+        $self->set("tool",HTS::Tools::Assign->new($args->{"params"}));
+    }
+    elsif ($args->{"tool"} =~ m/convert/i) {
+        $self->set("tool",HTS::Tools::Convert->new($args->{"params"}));
+    }
+    elsif ($args->{"tool"} =~ m/count/i) {
+        $self->set("tool",HTS::Tools::Count->new($args->{"params"}));
+    }
+    elsif ($args->{"tool"} =~ m/fetch/i) {
+        $self->set("tool",HTS::Tools::Fetch->new($args->{"params"}));
+    }
+    elsif ($args->{"tool"} =~ m/intersect/i) {
+        $self->set("tool",HTS::Tools::Intersect->new($args->{"params"}));
+    }
+    elsif ($args->{"tool"} =~ m/motifscan/i) {
+        $self->set("tool",HTS::Tools::Motifscan->new($args->{"params"}));
+    }
+    elsif ($args->{"tool"} =~ m/normalize/i) {
+        $self->set("tool",HTS::Tools::Normalize->new($args->{"params"}));
+    }
+    elsif ($args->{"tool"} =~ m/profile/i) {
+        $self->set("tool",HTS::Tools::Profile->new($args->{"params"}));
+    }
+    elsif ($args->{"tool"} =~ m/qc/i) {
+        $self->set("tool",HTS::Tools::QC->new($args->{"params"}));
+    }
+    elsif ($args->{"tool"} =~ m/track/i) {
+        $self->set("tool",HTS::Tools::Track->new($args->{"params"}));
+    }
+
     return($self);
 }
 
 =head2 run
 
-# The main running function of HTS::Tools::Normalize
+# The main running function of HTS::Tools
 
 =cut
 
@@ -125,13 +138,13 @@ sub run
 {
     my $self = shift @_;
     my $tool = $self->get("tool");
-    $tool->run;
+    $self->get("tool")->run;
     $helper->cleanup;
 }
 
 =head2 get
 
-HTS::Tools::Normalize object getter
+HTS::Tools object getter
 
     my $param_value = $tool->get("param_name")
 =cut
@@ -144,7 +157,7 @@ sub get
 
 =head2 set
 
-HTS::Tools::Normalize object setter
+HTS::Tools object setter
 
     $tool->set("param_name","param_value")
     
@@ -171,7 +184,7 @@ automatically be notified of progress on your bug as I make changes.
 
 You can find documentation for this module with the perldoc command.
 
-    perldoc HTS::Tools::Normalize
+    perldoc HTS::Tools
 
 
 You can also look for information at:
@@ -243,4 +256,4 @@ EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =cut
 
-1; # End of HTS::Tools::Normalize
+1; # End of HTS::Tools

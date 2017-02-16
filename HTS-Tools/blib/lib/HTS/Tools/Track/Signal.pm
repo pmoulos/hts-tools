@@ -137,6 +137,7 @@ sub new
         ($helper->set("silent",0));
     (defined($params->{"tmpdir"})) ? ($helper->set("tmpdir",$params->{"tmpdir"})) :
         ($helper->set("tmpdir",File::Temp->newdir()));
+    $helper->set_logger($params->{"log"}) if (defined($params->{"log"}));
     $helper->advertise($MODNAME,$VERSION,$AUTHOR,$EMAIL,$DESC);
 
     # Validate the input parameters

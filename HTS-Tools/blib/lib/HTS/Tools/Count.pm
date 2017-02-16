@@ -267,6 +267,7 @@ sub new
         ($helper->set("silent",0));
     (defined($params->{"tmpdir"})) ? ($helper->set("tmpdir",$params->{"tmpdir"})) :
         ($helper->set("tmpdir",File::Temp->newdir()));
+    $helper->set_logger($params->{"log"}) if (defined($params->{"log"}));
     $helper->advertise($MODNAME,$VERSION,$AUTHOR,$EMAIL,$DESC);
 
     # Validate the input parameters
@@ -337,7 +338,7 @@ sub fetch_regions
     {            
         if ($source =~ m/ensembl/i)
         {
-            $regionfile = $fetcher->fetch_ensembl_genes($regionfile,$ver);
+            $regionfile = $fetcher->fetch_ensembl_genes($regionfile);
             $regionfile = $fetcher->sort_ensembl_genes($regionfile);
         }
         elsif ($source =~ m/ucsc|refseq/i)
@@ -349,7 +350,7 @@ sub fetch_regions
     {
         if ($source =~ m/ensembl/i)
         {
-            $regionfile = $fetcher->fetch_ensembl_exons($regionfile,$ver);
+            $regionfile = $fetcher->fetch_ensembl_exons($regionfile);
             $regionfile = $fetcher->sort_ensembl_exons($regionfile);
         }
         elsif ($source =~ m/ucsc|refseq/i)
@@ -362,8 +363,8 @@ sub fetch_regions
         if ($source =~ m/ensembl/i)
         {
             ($regionfile =~ m/5utr/i) ?
-            ($regionfile = $fetcher->fetch_ensembl_utr($regionfile,$ver,5)) :
-            ($regionfile = $fetcher->fetch_ensembl_utr($regionfile,$ver,3));
+            ($regionfile = $fetcher->fetch_ensembl_utr($regionfile,5)) :
+            ($regionfile = $fetcher->fetch_ensembl_utr($regionfile,3));
             $regionfile = $fetcher->sort_ensembl_exons($regionfile);
         }
         elsif ($source =~ m/ucsc|refseq/i)
@@ -377,7 +378,7 @@ sub fetch_regions
     {
         if ($source =~ m/ensembl/i)
         {
-            $regionfile = $fetcher->fetch_ensembl_cds($regionfile,$ver);
+            $regionfile = $fetcher->fetch_ensembl_cds($regionfile);
             $regionfile = $fetcher->sort_ensembl_exons($regionfile);
         }
         elsif ($source =~ m/ucsc|refseq/i)

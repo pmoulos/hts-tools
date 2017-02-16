@@ -70,11 +70,9 @@ sub new
     my $self = {};
 
     # Pass global variables to the helper
-    (defined($args->{"params"}->{"silent"})) ? 
-		($helper->set("silent",$args->{"params"}->{"silent"})) :
+    (defined($args->{"params"}->{"silent"})) ? ($helper->set("silent",$args->{"params"}->{"silent"})) :
         ($helper->set("silent",0));
-    $helper->set_logger($args->{"params"}->{"log"}) 
-		if (defined($args->{"params"}->{"log"}));
+    $helper->set_logger($args->{"params"}->{"log"}) if (defined($args->{"params"}->{"log"}));
 
     bless($self,$class);
     $self->init($args);
@@ -94,8 +92,7 @@ sub init
     my @accept = ("tool","params");
     foreach my $p (keys(%$args))
     {
-        croak "Unknown parameter for initialization of HTS::Tools::Paramcheck: $p\n" 
-			if (!($helper->smatch($p,@accept)));
+        croak "Unknown parameter for initialization of HTS::Tools::Paramcheck: $p\n" if (!($helper->smatch($p,@accept)));
         $self->set($p,$args->{$p});
     }
     return($self);
@@ -138,6 +135,10 @@ sub validate
     {
         $self->validate_motifscan;
     }
+    elsif ($self->{"tool"} =~ m/^multisect$/i)
+    {
+        $self->validate_multisect;
+    }
     elsif ($self->{"tool"} =~ m/^normalize$/i)
     {
         $self->validate_normalize;
@@ -149,6 +150,14 @@ sub validate
     elsif ($self->{"tool"} =~ m/^normalize_bedgraph$/i)
     {
         $self->validate_normalize_bedgraph;
+    }
+    elsif ($self->{"tool"} =~ m/^profile$/i)
+    {
+        $self->validate_profile;
+    }
+    elsif ($self->{"tool"} =~ m/^qc$/i)
+    {
+        $self->validate_qc;
     }
     elsif ($self->{"tool"} =~ m/^queries$/i)
     {
@@ -1362,7 +1371,7 @@ sub validate_normalize_bedgraph
     {
         if (defined($self->{"params"}->{"output"}))
         {
-            if (@{$self->{"params"}->{"output"}} && $self->{"params"}->{"output"}->[0] ne "stdout")
+            if (@{$self->{"params"}->{"output"}} && ${$self->{"params"}->{"output"}}->[0] ne "stdout")
             {
                 my $o = @{$self->{"params"}->{"output"}};
                 my $b = @{$self->{"params"}->{"input"}};
@@ -1395,6 +1404,52 @@ sub validate_normalize_bedgraph
         }
     }
 
+    return($self->{"params"});
+}
+
+=head2 validate_profile
+
+The parameter validator function of the HTS::Profile module. Do not use this directly, use the validate
+function instead
+
+=cut
+
+sub validate_profile
+{
+    my $self = shift @_;
+    my $modname = "HTS::Tools::Profile";
+    
+    my @accept = ();
+    
+    # Check and warn for unrecognized parameters
+    foreach my $p (keys(%{$self->{"params"}}))
+    {
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($helper->smatch($p,@accept)));
+    }
+    
+    return($self->{"params"});
+}
+
+=head2 validate_qc
+
+The parameter validator function of the HTS::QC module. Do not use this directly, use the validate
+function instead
+
+=cut
+
+sub validate_qc
+{
+    my $self = shift @_;
+    my $modname = "HTS::Tools::QC";
+    
+    my @accept = ();
+    
+    # Check and warn for unrecognized parameters
+    foreach my $p (keys(%{$self->{"params"}}))
+    {
+        $helper->disp("Unrecognized parameter : $p   --- Ignoring...") if (!($helper->smatch($p,@accept)));
+    }
+    
     return($self->{"params"});
 }
 

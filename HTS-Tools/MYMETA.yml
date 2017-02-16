@@ -1,0 +1,62 @@
+---
+abstract: 'A Perl collection for processing results from next generation sequencing experiments!'
+author:
+  - 'Panagiotis Moulos <moulos@fleming.gr>'
+build_requires:
+  Test::More: '0'
+configure_requires:
+  Module::Build: '0'
+dynamic_config: 0
+generated_by: 'Module::Build version 0.422, CPAN::Meta::Converter version 2.150010'
+license: artistic_2
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: '1.4'
+name: HTS-Tools
+provides:
+  HTS::Tools:
+    file: lib/HTS/Tools.pm
+    version: '0.01'
+  HTS::Tools::Assign:
+    file: lib/HTS/Tools/Assign.pm
+    version: '0.01'
+  HTS::Tools::Constants:
+    file: lib/HTS/Tools/Constants.pm
+    version: '0.01'
+  HTS::Tools::Convert:
+    file: lib/HTS/Tools/Convert.pm
+    version: '0.01'
+  HTS::Tools::Count:
+    file: lib/HTS/Tools/Count.pm
+    version: '0.01'
+  HTS::Tools::Fetch:
+    file: lib/HTS/Tools/Fetch.pm
+    version: '0.01'
+  HTS::Tools::Intersect:
+    file: lib/HTS/Tools/Intersect.pm
+    version: '0.01'
+  HTS::Tools::Motifscan:
+    file: lib/HTS/Tools/Motifscan.pm
+    version: '0.01'
+  HTS::Tools::Normalize:
+    file: lib/HTS/Tools/Normalize.pm
+    version: '0.01'
+  HTS::Tools::Paramcheck:
+    file: lib/HTS/Tools/Paramcheck.pm
+    version: '0.01'
+  HTS::Tools::Profile:
+    file: lib/HTS/Tools/Profile.pm
+    version: '0.01'
+  HTS::Tools::QC:
+    file: lib/HTS/Tools/QC.pm
+    version: '0.01'
+  HTS::Tools::Queries:
+    file: lib/HTS/Tools/Queries.pm
+    version: '0.01'
+  HTS::Tools::Utils:
+    file: lib/HTS/Tools/Utils.pm
+    version: '0.01'
+resources:
+  license: http://opensource.org/licenses/artistic-license-2.0.php
+version: '0.01'
+x_serialization_backend: 'CPAN::Meta::YAML version 0.018'

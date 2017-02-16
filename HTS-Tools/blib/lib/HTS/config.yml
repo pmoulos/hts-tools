@@ -1,0 +1,19 @@
+LOCAL_HOST: localhost
+LOCAL_USER: user
+LOCAL_PASS: password
+REMOTE_HOST: genome-mysql.cse.ucsc.edu
+REMOTE_USER: genome
+MAX_CORES: 12
+BIOMART_PATH: http://www.biomart.org/biomart/martservice?
+BEDTOOLS_HOME: /opt/NGSTools/BEDTools/bin
+SAMTOOLS_HOME: /opt/NGSTools/SAMTools
+GENOMICTOOLS_HOME: /opt/NGSTools/GenomicTools
+KENTBIN_HOME: /opt/NGSTools/ucsc_bin
+MACS_HOME: /usr/bin/macs14
+MACS2_HOME: /usr/local/bin/macs2
+SICER_HOME: /opt/NGSTools/SICER
+RSEG_HOME: /opt/NGSTools/rseg
+GIMMEMOTIFS_HOME: /usr/bin
+MOTIFSCANNER_HOME: 
+LOCAL_GENOMES: /opt/genomes
+IGENOMES_HOME: /opt/iGenomes

@@ -78,6 +78,10 @@ use HTS::Tools::Utils;
 
 use vars qw($helper $qobj $const);
 
+#use constant BIOMART_PATH => "http://www.biomart.org/biomart/martservice?";
+#use constant REMOTE_HOST => "genome-mysql.cse.ucsc.edu";
+#use constant REMOTE_USER => "genome";
+
 BEGIN {
     $helper = HTS::Tools::Utils->new();
     $qobj = HTS::Tools::Queries->new();
@@ -87,6 +91,7 @@ BEGIN {
     $SIG{INT} = sub { $helper->catch_cleanup; }
 }
 
+use constant BIOMART_PATH => $const->get("BIOMART_PATH");
 use constant REMOTE_HOST => $const->get("REMOTE_HOST");
 use constant REMOTE_USER => $const->get("REMOTE_USER");
 
@@ -115,6 +120,7 @@ sub new
         ($helper->set("silent",0));
     (defined($params->{"tmpdir"})) ? ($helper->set("tmpdir",$params->{"tmpdir"})) :
         ($helper->set("tmpdir",File::Temp->newdir()));
+    $helper->set_logger($params->{"log"}) if (defined($params->{"log"}));
     
     $helper->advertise($MODNAME,$VERSION,$AUTHOR,$EMAIL,$DESC);
     
@@ -161,11 +167,11 @@ For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count.
 
 sub fetch_ensembl_genes
 {
-    my ($self,$org,$ver) = @_;
+    my ($self,$org) = @_;
     my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
     my $sp = $self->format_species($org,"","ensembl");
     my $xml = $self->get_xml_genes_query($sp);
-    my $path = $self->get_host($ver);
+    my $path = BIOMART_PATH;
     my $request = HTTP::Request->new("POST",$path,HTTP::Headers->new(),'query='.$xml."\n");
     my $ua = LWP::UserAgent->new;
     my $tmpfh = File::Temp->new(DIR => $tmpdir,SUFFIX => ".ens");
@@ -214,11 +220,11 @@ For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count.
 
 sub fetch_ensembl_exons
 {
-    my ($self,$org,$ver) = @_;
+    my ($self,$org) = @_;
     my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
     my $sp = $self->format_species($org,"","ensembl");
     my $xml = $self->get_xml_exons_query($sp);
-    my $path = $self->get_host($ver);
+    my $path = BIOMART_PATH;
     my $request = HTTP::Request->new("POST",$path,HTTP::Headers->new(),'query='.$xml."\n");
     my $ua = LWP::UserAgent->new;
     my $tmpfh = File::Temp->new(DIR => $tmpdir,SUFFIX => ".ens");
@@ -267,11 +273,11 @@ For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count. $utr c
 
 sub fetch_ensembl_utr
 {
-    my ($self,$org,$ver,$utr) = @_;
+    my ($self,$org,$utr) = @_;
     my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
     my $sp = $self->format_species($org,"","ensembl");
     my $xml = $self->get_xml_utr_query($sp,$utr);
-    my $path = $self->get_host($ver);
+    my $path = BIOMART_PATH;
     my $request = HTTP::Request->new("POST",$path,HTTP::Headers->new(),'query='.$xml."\n");
     my $ua = LWP::UserAgent->new;
     my $tmpfh = File::Temp->new(DIR => $tmpdir,SUFFIX => ".ens");
@@ -321,11 +327,11 @@ For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count.
 
 sub fetch_ensembl_cds
 {
-    my ($self,$org,$ver) = @_;
+    my ($self,$org) = @_;
     my $tmpdir = (defined($self->get("output"))) ? ($self->get("output")) : ($self->get("tmpdir"));
     my $sp = $self->format_species($org,"","ensembl");
     my $xml = $self->get_xml_cds_query($sp);
-    my $path = $self->get_host($ver);
+    my $path = BIOMART_PATH;
     my $request = HTTP::Request->new("POST",$path,HTTP::Headers->new(),'query='.$xml."\n");
     my $ua = LWP::UserAgent->new;
     my $tmpfh = File::Temp->new(DIR => $tmpdir,SUFFIX => ".ens");
@@ -830,7 +836,7 @@ sub get_xml_cds_query
 Construct a string representing with the correct nomenclature, species for each external annotaton
 source database. Mostly for internal use.
 
-    $fetcher->format_species($organism,$version,$source);
+    $fetcher->format_species($organism,$source);
     
 For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count. $source can be one of 'ucsc',
 'refseq' or 'ensembl'.
@@ -873,34 +879,6 @@ sub format_species
         elsif ($org =~ m/fly/) { return("dmelanogaster_gene_ensembl"); }
         elsif ($org =~ m/zebrafish/) { return("drerio_gene_ensembl"); }
     }
-}
-
-=head2 get_host
-
-Get the proper Ensembl host according to genome version. Mostly for internal use.
-
-    $fetcher->get_host($version);
-    
-For a list of supported organisms, see the SYNOPSIS of HTS::Tools::Count. $source can be one of 'ucsc',
-'refseq' or 'ensembl'.
-
-=cut
-
-sub get_host 
-{
-	my ($self,$ver) = @_;
-    return("http://may2009.archive.ensembl.org/biomart/martservice?") 
-        if ($ver eq "hg18");
-    return("http://grch37.ensembl.org/biomart/martservice?") 
-        if ($ver eq "hg19");
-    return("http://www.ensembl.org/biomart/martservice?") 
-        if ($ver eq "hg38");
-    return("http://may2012.archive.ensembl.org/biomart/martservice?") 
-        if ($ver eq "mm9");
-    return("http://www.ensembl.org/biomart/martservice?") 
-        if ($ver eq "mm10");
-    return("http://www.ensembl.org/biomart/martservice?") if ($ver eq "rn5");
-    return("http://www.ensembl.org/biomart/martservice?") if ($ver eq "dm6");
 }
 
 =head2 sort_ensembl_genes

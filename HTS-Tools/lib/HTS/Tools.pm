@@ -45,8 +45,6 @@ use HTS::Tools::Fetch;
 use HTS::Tools::Intersect;
 use HTS::Tools::Motifscan;
 use HTS::Tools::Normalize;
-use HTS::Tools::Profile;
-use HTS::Tools::QC;
 use HTS::Tools::Utils;
 
 use vars qw($tmpdir $helper);
@@ -85,26 +83,17 @@ sub init
         ($self->set("tmpdir",File::Temp->newdir()));
     (defined($args->{"silent"})) ? ($self->set("silent",$args->{"silent"})) :
         ($self->set("silent",0));
-    (defined($args->{"log"})) ? ($self->set("log",$args->{"log"})) :
-        ($self->set("log",0));
 
     # Pass the above global parameters to the parameter structure for each tool. We do it like this
     # because each module is supposed to be used also independently of the wrapper.
     $args->{"params"}->{"tmpdir"} = $self->get("tmpdir");
     $args->{"params"}->{"silent"} = $self->get("silent");
-    $args->{"params"}->{"log"} = $self->get("log");
     
     if ($args->{"tool"} =~ m/assign/i) {
         $self->set("tool",HTS::Tools::Assign->new($args->{"params"}));
     }
     elsif ($args->{"tool"} =~ m/convert/i) {
         $self->set("tool",HTS::Tools::Convert->new($args->{"params"}));
-    }
-    elsif ($args->{"tool"} =~ m/count/i) {
-        $self->set("tool",HTS::Tools::Count->new($args->{"params"}));
-    }
-    elsif ($args->{"tool"} =~ m/fetch/i) {
-        $self->set("tool",HTS::Tools::Fetch->new($args->{"params"}));
     }
     elsif ($args->{"tool"} =~ m/intersect/i) {
         $self->set("tool",HTS::Tools::Intersect->new($args->{"params"}));
@@ -114,12 +103,6 @@ sub init
     }
     elsif ($args->{"tool"} =~ m/normalize/i) {
         $self->set("tool",HTS::Tools::Normalize->new($args->{"params"}));
-    }
-    elsif ($args->{"tool"} =~ m/profile/i) {
-        $self->set("tool",HTS::Tools::Profile->new($args->{"params"}));
-    }
-    elsif ($args->{"tool"} =~ m/qc/i) {
-        $self->set("tool",HTS::Tools::QC->new($args->{"params"}));
     }
     elsif ($args->{"tool"} =~ m/track/i) {
         $self->set("tool",HTS::Tools::Track->new($args->{"params"}));
